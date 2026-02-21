@@ -1,7 +1,8 @@
-import { supabase } from "@/lib/supabaseClient";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export async function GET() {
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.from("profiles").select("*");
 
   if (error) {
