@@ -12,7 +12,8 @@ export async function GET() {
     );
   }
 
-  console.log("Supabase connected successfully!");
+  console.log("Supabase connected successfully!+dd");
+
   return new Response("Testausgabe: API funktioniert!", {
     status: 200,
     headers: { "Content-Type": "text/plain" },
