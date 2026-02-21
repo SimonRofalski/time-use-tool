@@ -13,7 +13,8 @@ export async function GET() {
   }
 
   console.log("Supabase connected successfully!");
-  return new Response(JSON.stringify({ connected: true, users: data }), {
+  return new Response("Testausgabe: API funktioniert!", {
     status: 200,
+    headers: { "Content-Type": "text/plain" },
   });
 }
