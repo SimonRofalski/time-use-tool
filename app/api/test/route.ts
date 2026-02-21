@@ -12,9 +12,9 @@ export async function GET() {
     );
   }
 
-  console.log("Supabase connected successfully!+dd");
+  console.log("Supabase connected successfully!");
 
-  return new Response("Testausgabe: API funktioniert!", {
+  return new Response("Testausgabe: API funktioniert einwandfrei!", {
     status: 200,
     headers: { "Content-Type": "text/plain" },
   });
