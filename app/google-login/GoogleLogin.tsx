@@ -3,6 +3,7 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { User } from "@supabase/supabase-js";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { AuthPage } from "../components/AuthPage";
 
 type GoogleLoginProps = {
@@ -13,9 +14,12 @@ export default function GoogleLogin({ user }: GoogleLoginProps) {
   const supabase = getSupabaseBrowserClient();
   const [currentUser, setCurrentUser] = useState<User | null>(user);
 
+  const router = useRouter();
+
   async function handleSignOut() {
     await supabase.auth.signOut();
     setCurrentUser(null);
+    router.push("/");
   }
 
   useEffect(() => {
@@ -30,14 +34,25 @@ export default function GoogleLogin({ user }: GoogleLoginProps) {
     };
   }, [supabase]);
 
+  // redirect to protected area when user becomes available
+  useEffect(() => {
+    if (currentUser) {
+      router.push("/erfasste-zeit");
+    }
+  }, [currentUser, router]);
+
   async function handleGoogleLogin() {
-    await supabase.auth.signInWithOAuth({
+    const { error, data } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/google-login`,
         skipBrowserRedirect: false,
       },
     });
+    if (!error) {
+      // Supabase will redirect back to this page, listener in effect will push to protected area
+      router.push("/erfasste-zeit");
+    }
   }
 
   return (
@@ -49,6 +64,8 @@ export default function GoogleLogin({ user }: GoogleLoginProps) {
         "Submit to watch the session card refresh instantly.",
         "Sign out to reset the listener.",
       ]}
+      user={currentUser}
+      onSignOut={handleSignOut}
     >
       {!currentUser && (
         <>

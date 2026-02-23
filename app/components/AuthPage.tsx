@@ -3,14 +3,27 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { User } from "@supabase/supabase-js";
+
 type AuthPageProps = {
   title: string;
   intro: string;
   steps: string[];
   children: ReactNode;
+  /** currently signed in user; when provided and onSignOut is passed we swap header action */
+  user?: User | null;
+  /** handler invoked when the header sign-out button is clicked */
+  onSignOut?: () => void;
 };
 
-export function AuthPage({ title, intro, steps, children }: AuthPageProps) {
+export function AuthPage({
+  title,
+  intro,
+  steps,
+  children,
+  user,
+  onSignOut,
+}: AuthPageProps) {
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-[#02050b] via-[#050c1d] to-[#071426] text-slate-100">
       <header className="border-b border-white/10 bg-slate-950/40 backdrop-blur">
@@ -21,12 +34,15 @@ export function AuthPage({ title, intro, steps, children }: AuthPageProps) {
             </p>
             <h1 className="text-2xl font-semibold text-white">{title}</h1>
           </div>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-300 transition hover:text-emerald-200"
-          >
-            Back home →
-          </Link>
+          {user && onSignOut && (
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
+            >
+              Sign out
+            </button>
+          )}
         </div>
       </header>
 

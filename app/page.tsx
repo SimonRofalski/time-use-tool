@@ -54,7 +54,7 @@ export default function Home() {
             Supabase × Next.js
           </p>
           <h1 className="text-4xl font-semibold text-white drop-shadow-sm">
-            Two auth flows.
+            Login Seite
           </h1>
           <p className="text-base text-slate-400">
             Production-ready Supabase auth blueprints with real session
