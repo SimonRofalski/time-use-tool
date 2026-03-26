@@ -5,28 +5,30 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import {
-  Bars3Icon,
-  XMarkIcon,
-  ClockIcon,
-  CalendarIcon,
-  ChartBarIcon,
-  UserIcon,
-  CogIcon,
-} from "@heroicons/react/24/outline";
+  ClipboardList,
+  Calendar,
+  BarChart3,
+  User,
+  Settings,
+  ShieldCheck,
+  Menu,
+  X,
+} from "lucide-react";
+
+const tabs = [
+  { path: "/zeiterfassung", label: "EINGABE", icon: ClipboardList },
+  { path: "/erfasste-zeit", label: "ÜBERSICHT", icon: Calendar },
+  { path: "/statistiken", label: "STATISTIKEN", icon: BarChart3 },
+  { path: "/profil", label: "PROFIL", icon: User },
+  { path: "/settings", label: "EINSTELLUNGEN", icon: Settings },
+  { path: "/admin", label: "ADMIN", icon: ShieldCheck },
+];
 
 export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
   const [user, setUser] = useState<any>(null);
   const pathname = usePathname();
-  const titles: Record<string, string> = {
-    "/zeiterfassung": "Zeiterfassung",
-    "/erfasste-zeit": "Erfasste Zeit",
-    "/leaderboard": "Leaderboard",
-    "/profil": "Profil",
-    "/settings": "Einstellungen",
-  };
-  const pageTitle = titles[pathname] || "";
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -55,66 +57,87 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    return null; // or some loader
+    return null;
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <header className="flex items-center justify-between border-b border-white/10 bg-slate-950/40 px-6 py-4">
-        <button
-          type="button"
-          className="p-2 text-white"
-          onClick={() => setMenuOpen(true)}
-        >
-          <Bars3Icon className="h-6 w-6" />
-        </button>
-        <span className="text-lg font-semibold text-white">{pageTitle}</span>
-        <div style={{ width: 24 }} />
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-800">
+              Time Use Tool
+            </h1>
+            <p className="text-slate-500 text-sm">
+              Zeittagebuch – 10-Minuten-Intervalle
+            </p>
+          </div>
+          <button
+            type="button"
+            className="p-2 text-slate-600 hover:text-slate-800"
+            onClick={() => setMenuOpen(true)}
+          >
+            <Menu size={24} />
+          </button>
+        </div>
       </header>
 
+      {/* Tab Navigation */}
+      <nav className="bg-white border-b border-slate-200 sticky top-[73px] z-10">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+            {tabs.map((tab) => {
+              const isActive = pathname === tab.path;
+              const Icon = tab.icon;
+              return (
+                <Link
+                  key={tab.path}
+                  href={tab.path}
+                  className={`flex items-center gap-2 px-4 py-3 border-b-2 whitespace-nowrap transition-colors text-sm font-medium ${
+                    isActive
+                      ? "border-blue-600 text-blue-600"
+                      : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                  }`}
+                >
+                  <Icon size={18} />
+                  <span>{tab.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </nav>
+
+      {/* Sidebar Menu */}
       {menuOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div
             className="flex-1 bg-black/40"
             onClick={() => setMenuOpen(false)}
           />
-          <div className="w-64 bg-white p-4">
+          <div className="w-64 bg-white p-4 shadow-lg">
             <div className="flex justify-end">
-              <button onClick={() => setMenuOpen(false)}>
-                <XMarkIcon className="h-6 w-6" />
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="p-1 text-slate-600 hover:text-slate-800"
+              >
+                <X size={24} />
               </button>
             </div>
+            <div className="mt-4 text-sm text-slate-500">{user?.email}</div>
             <button
-              className="mt-4 w-full rounded bg-emerald-500 px-4 py-2 text-white"
+              className="mt-4 w-full rounded-lg bg-slate-800 px-4 py-2 text-white text-sm hover:bg-slate-700 transition-colors"
               onClick={handleSignOut}
             >
-              Sign out
+              Abmelden
             </button>
           </div>
         </div>
       )}
 
-      <main className="flex-1 overflow-auto">{children}</main>
-
-      <nav className="fixed bottom-0 left-0 right-0 bg-slate-900">
-        <div className="flex justify-around py-3">
-          <Link href="/zeiterfassung" className="text-white">
-            <ClockIcon className="h-6 w-6" />
-          </Link>
-          <Link href="/erfasste-zeit" className="text-white">
-            <CalendarIcon className="h-6 w-6" />
-          </Link>
-          <Link href="/leaderboard" className="text-white">
-            <ChartBarIcon className="h-6 w-6" />
-          </Link>
-          <Link href="/profil" className="text-white">
-            <UserIcon className="h-6 w-6" />
-          </Link>
-          <Link href="/settings" className="text-white">
-            <CogIcon className="h-6 w-6" />
-          </Link>
-        </div>
-      </nav>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6">{children}</main>
     </div>
   );
 }
