@@ -22,27 +22,6 @@ const demos = [
       ],
     },
   },
-  {
-    href: "/google-login",
-    title: "Google Login",
-    description:
-      "Demonstrate social login via signInWithOAuth plus the automatic UI sync powered by onAuthStateChange.",
-    highlights: [
-      "Redirect URLs",
-      "Call signInWithOAuth",
-      "Watch session update",
-    ],
-    theme: {
-      card: "border border-[#5a8dee]/30 bg-gradient-to-br from-[#060f24] via-[#07122e] to-[#0f2346] shadow-[0_30px_70px_rgba(2,6,23,0.65)] hover:border-[#7fb0ff]/60",
-      open: "text-[#8ab4ff]",
-      title: "text-[#bcd7ff]",
-      bullets: "text-[#9fc1ff]",
-      overlays: [
-        "pointer-events-none absolute -right-8 -top-6 -z-10 h-16 w-16 rounded-full bg-[radial-gradient(circle,_rgba(66,133,244,0.3),_rgba(234,67,53,0.06))] blur-lg",
-        "pointer-events-none absolute bottom-4 left-6 -z-10 h-12 w-32 rounded-full bg-[linear-gradient(120deg,_rgba(251,188,5,0.18),_rgba(66,133,244,0.12))] blur-lg",
-      ],
-    },
-  },
 ] as const;
 
 export default function Home() {
