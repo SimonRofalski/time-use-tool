@@ -51,10 +51,13 @@ export default function ResetPasswordPage() {
     });
 
     if (error) {
-      setStatus(error.message);
+      const msg = error.message.includes("different from the old")
+        ? "Das neue Passwort muss sich vom alten unterscheiden."
+        : error.message;
+      setStatus(msg);
       setLoading(false);
     } else {
-      setStatus("Passwort erfolgreich zurückgesetzt! Redirecting...");
+      setStatus("Passwort erfolgreich zurückgesetzt!");
       setTimeout(() => {
         router.push("/");
       }, 2000);
@@ -62,114 +65,81 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-[#02050b] via-[#050c1d] to-[#071426] text-slate-100">
-      <header className="border-b border-white/10 bg-slate-950/40 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.25em] text-slate-400">
-              Supabase Auth
-            </p>
-            <h1 className="text-2xl font-semibold text-white">
-              Passwort zurücksetzen
-            </h1>
-          </div>
+    <div className="relative flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div
+        className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/login-bg.svg')" }}
+        aria-hidden="true"
+      />
+      <div className="relative w-full max-w-sm">
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl font-semibold text-slate-800">
+            Time Use Tool
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">Neues Passwort setzen</p>
         </div>
-      </header>
 
-      <main className="mx-auto w-full max-w-5xl px-6 py-12">
-        <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
-          <section className="rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-[0_25px_70px_rgba(2,6,23,0.65)] backdrop-blur">
-            <p className="text-lg font-medium text-white/90">
-              Setzen Sie ein neues Passwort
-            </p>
-            <p className="mt-2 text-sm text-slate-300">
-              Geben Sie ein neues Passwort ein, um Ihren Account zu schützen.
-            </p>
-          </section>
+        {hasToken ? (
+          <form
+            onSubmit={handleResetPassword}
+            className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+          >
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-slate-700">
+                Neues Passwort
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  minLength={6}
+                  className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Mindestens 6 Zeichen"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Passwort bestätigen
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  required
+                  minLength={6}
+                  className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Passwort wiederholen"
+                />
+              </label>
+            </div>
 
-          <div className="flex flex-col gap-6">
-            {hasToken ? (
-              <form
-                className="relative overflow-hidden rounded-[32px] border border-emerald-500/30 bg-gradient-to-br from-[#05130d] via-[#04100c] to-[#0c2a21] p-8 text-slate-100 shadow-[0_35px_90px_rgba(2,6,23,0.65)]"
-                onSubmit={handleResetPassword}
+            <button
+              type="submit"
+              disabled={loading}
+              className="mt-5 w-full rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {loading ? "Wird zurückgesetzt..." : "Passwort zurücksetzen"}
+            </button>
+
+            {status && (
+              <p
+                className={`mt-3 text-center text-sm ${
+                  status.includes("erfolgreich")
+                    ? "text-green-600"
+                    : "text-slate-600"
+                }`}
+                role="status"
               >
-                <div
-                  className="pointer-events-none absolute -left-4 -top-4 -z-10 h-20 w-28 rounded-full bg-[radial-gradient(circle,_rgba(16,185,129,0.25),_transparent)] blur-lg"
-                  aria-hidden="true"
-                />
-                <div
-                  className="pointer-events-none absolute -bottom-10 right-2 -z-10 h-28 w-40 rounded-full bg-[linear-gradient(140deg,_rgba(45,212,191,0.32),_rgba(59,130,246,0.12))] blur-xl"
-                  aria-hidden="true"
-                />
-                <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/70">
-                      Credentials
-                    </p>
-                    <h3 className="text-xl font-semibold text-white">
-                      Neues Passwort
-                    </h3>
-                  </div>
-                </div>
-                <div className="mt-6 space-y-4">
-                  <label className="block text-sm font-medium text-slate-200">
-                    Neues Passwort
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      required
-                      minLength={6}
-                      className="mt-2 w-full rounded-2xl border border-white/10 bg-[#0b1b18] px-3 py-2.5 text-base text-white placeholder-slate-500 shadow-inner shadow-black/30 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
-                      placeholder="Mindestens 6 Zeichen"
-                    />
-                  </label>
-                  <label className="block text-sm font-medium text-slate-200">
-                    Passwort bestätigen
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(event) =>
-                        setConfirmPassword(event.target.value)
-                      }
-                      required
-                      minLength={6}
-                      className="mt-2 w-full rounded-2xl border border-white/10 bg-[#0b1b18] px-3 py-2.5 text-base text-white placeholder-slate-500 shadow-inner shadow-black/30 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
-                      placeholder="Wiederholen Sie das Passwort"
-                    />
-                  </label>
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-emerald-600/40"
-                >
-                  {loading ? "Wird zurückgesetzt..." : "Passwort zurücksetzen"}
-                </button>
-                {status && (
-                  <p
-                    className={`mt-4 text-sm ${
-                      status.includes("erfolgreich")
-                        ? "text-emerald-300"
-                        : "text-slate-300"
-                    }`}
-                    role="status"
-                    aria-live="polite"
-                  >
-                    {status}
-                  </p>
-                )}
-              </form>
-            ) : (
-              <div className="rounded-[28px] border border-white/10 bg-white/5 p-7 text-slate-200 shadow-[0_25px_70px_rgba(2,6,23,0.65)] backdrop-blur">
-                <p className="text-sm text-slate-400">
-                  {status || "Wird überprüft..."}
-                </p>
-              </div>
+                {status}
+              </p>
             )}
+          </form>
+        ) : (
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-center text-sm text-slate-500">
+              {status || "Wird überprüft..."}
+            </p>
           </div>
-        </div>
-      </main>
+        )}
+      </div>
     </div>
   );
 }
