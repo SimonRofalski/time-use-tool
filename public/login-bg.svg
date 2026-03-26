@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0f4ff"/>
+      <stop offset="50%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eef2ff"/>
+    </linearGradient>
+    <linearGradient id="ring1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="ring2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="900" fill="url(#bg)"/>
+
+  <!-- Large decorative ring, top-right -->
+  <circle cx="1200" cy="150" r="220" fill="none" stroke="url(#ring1)" stroke-width="2.5" opacity="0.15"/>
+  <circle cx="1200" cy="150" r="175" fill="none" stroke="url(#ring2)" stroke-width="1.5" opacity="0.12"/>
+  <circle cx="1200" cy="150" r="130" fill="none" stroke="#6366f1" stroke-width="0.8" opacity="0.08"/>
+  <!-- Clock ticks on outer ring -->
+  <g stroke="#6366f1" stroke-width="2" opacity="0.2" stroke-linecap="round">
+    <line x1="1200" y1="-60" x2="1200" y2="-40" transform="translate(0,210)"/>
+    <line x1="1200" y1="360" x2="1200" y2="380" transform="translate(0,-10)"/>
+    <line x1="990" y1="150" x2="1010" y2="150"/>
+    <line x1="1390" y1="150" x2="1410" y2="150"/>
+  </g>
+  <!-- Clock hands -->
+  <line x1="1200" y1="150" x2="1200" y2="10" stroke="#6366f1" stroke-width="2.5" opacity="0.2" stroke-linecap="round"/>
+  <line x1="1200" y1="150" x2="1320" y2="95" stroke="#3b82f6" stroke-width="2" opacity="0.18" stroke-linecap="round"/>
+  <circle cx="1200" cy="150" r="5" fill="#6366f1" opacity="0.25"/>
+  <!-- Progress arc -->
+  <path d="M1200,-70 A220,220 0 0,1 1420,150" transform="translate(0,220) translate(0,-220)" fill="none" stroke="url(#accent)" stroke-width="3" opacity="0.12" stroke-linecap="round" stroke-dasharray="200 500"/>
+
+  <!-- Small ring, bottom-left -->
+  <circle cx="180" cy="740" r="130" fill="none" stroke="url(#ring2)" stroke-width="2" opacity="0.12"/>
+  <circle cx="180" cy="740" r="100" fill="none" stroke="#8b5cf6" stroke-width="1" opacity="0.08"/>
+  <line x1="180" y1="740" x2="180" y2="640" stroke="#8b5cf6" stroke-width="2" opacity="0.15" stroke-linecap="round"/>
+  <line x1="180" y1="740" x2="260" y2="710" stroke="#6366f1" stroke-width="1.5" opacity="0.12" stroke-linecap="round"/>
+  <circle cx="180" cy="740" r="4" fill="#8b5cf6" opacity="0.18"/>
+
+  <!-- Timeline bars, left -->
+  <g opacity="0.9">
+    <rect x="70" y="220" width="4" height="200" rx="2" fill="#e2e8f0"/>
+    <!-- Time blocks -->
+    <rect x="85" y="225" width="110" height="24" rx="6" fill="#6366f1" opacity="0.12"/>
+    <rect x="85" y="258" width="170" height="36" rx="6" fill="#3b82f6" opacity="0.1"/>
+    <rect x="85" y="303" width="90" height="20" rx="6" fill="#06b6d4" opacity="0.09"/>
+    <rect x="85" y="332" width="140" height="28" rx="6" fill="#8b5cf6" opacity="0.08"/>
+    <rect x="85" y="369" width="60" height="20" rx="6" fill="#3b82f6" opacity="0.07"/>
+    <rect x="85" y="398" width="120" height="18" rx="6" fill="#6366f1" opacity="0.06"/>
+  </g>
+  <!-- Time labels -->
+  <g fill="#94a3b8" font-family="system-ui, sans-serif" font-size="10" font-weight="500" opacity="0.25">
+    <text x="30" y="240">08:00</text>
+    <text x="30" y="278">09:00</text>
+    <text x="30" y="314">10:00</text>
+    <text x="30" y="348">11:00</text>
+    <text x="30" y="380">12:00</text>
+    <text x="30" y="410">13:00</text>
+  </g>
+
+  <!-- Timeline bars, bottom-right -->
+  <g opacity="0.9">
+    <rect x="1120" y="560" width="4" height="150" rx="2" fill="#e2e8f0" opacity="0.6"/>
+    <rect x="1135" y="565" width="130" height="22" rx="6" fill="#3b82f6" opacity="0.08"/>
+    <rect x="1135" y="596" width="90" height="28" rx="6" fill="#8b5cf6" opacity="0.07"/>
+    <rect x="1135" y="633" width="160" height="20" rx="6" fill="#06b6d4" opacity="0.06"/>
+    <rect x="1135" y="662" width="70" height="22" rx="6" fill="#6366f1" opacity="0.05"/>
+  </g>
+
+  <!-- Floating orbs -->
+  <circle cx="400" cy="80" r="60" fill="#6366f1" opacity="0.04"/>
+  <circle cx="500" cy="120" r="30" fill="#3b82f6" opacity="0.05"/>
+  <circle cx="1320" cy="680" r="45" fill="#8b5cf6" opacity="0.04"/>
+  <circle cx="1380" cy="750" r="20" fill="#06b6d4" opacity="0.05"/>
+  <circle cx="100" cy="100" r="35" fill="#3b82f6" opacity="0.04"/>
+
+  <!-- Dots pattern -->
+  <g fill="#6366f1" opacity="0.12">
+    <circle cx="700" cy="60" r="2"/>
+    <circle cx="730" cy="80" r="1.5"/>
+    <circle cx="760" cy="55" r="2.5"/>
+    <circle cx="680" cy="85" r="1.5"/>
+    <circle cx="740" cy="45" r="1"/>
+  </g>
+  <g fill="#8b5cf6" opacity="0.1">
+    <circle cx="650" cy="820" r="2"/>
+    <circle cx="690" cy="840" r="1.5"/>
+    <circle cx="720" cy="810" r="2"/>
+    <circle cx="750" cy="850" r="1"/>
+  </g>
+</svg>
