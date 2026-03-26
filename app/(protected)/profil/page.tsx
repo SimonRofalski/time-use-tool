@@ -53,7 +53,7 @@ export default function ProfilPage() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user ?? null);
-      }
+      },
     );
 
     // Load saved profile from localStorage
@@ -85,16 +85,16 @@ export default function ProfilPage() {
   const renderOptionButtons = (
     field: keyof ProfileFormData,
     options: { value: string; label: string }[],
-    columns: number = 2
+    columns: number = 2,
   ) => {
     const gridClass = `grid grid-cols-1 ${
       columns === 2
         ? "md:grid-cols-2"
         : columns === 3
-        ? "md:grid-cols-3"
-        : columns === 4
-        ? "md:grid-cols-4"
-        : "md:grid-cols-5"
+          ? "md:grid-cols-3"
+          : columns === 4
+            ? "md:grid-cols-4"
+            : "md:grid-cols-5"
     } gap-3`;
 
     return (
@@ -125,9 +125,7 @@ export default function ProfilPage() {
           <User className="text-blue-600" size={28} />
           <div>
             <h2 className="text-xl font-semibold text-slate-800">Profil</h2>
-            <p className="text-sm text-slate-500">
-              Ihre persönlichen Angaben
-            </p>
+            <p className="text-sm text-slate-500">Ihre persönlichen Angaben</p>
           </div>
         </div>
 
@@ -145,7 +143,7 @@ export default function ProfilPage() {
                 { value: "3", label: "Andere / divers" },
                 { value: "9", label: "Keine Angabe" },
               ],
-              4
+              4,
             )}
           </div>
 
@@ -168,8 +166,7 @@ export default function ProfilPage() {
           {/* Zivilstand / Familienstand */}
           <div>
             <label className="block text-sm text-slate-700 mb-2">
-              Zivilstand / Familienstand{" "}
-              <span className="text-red-500">*</span>
+              Zivilstand / Familienstand <span className="text-red-500">*</span>
             </label>
             {renderOptionButtons(
               "zivilstand",
@@ -181,7 +178,7 @@ export default function ProfilPage() {
                 { value: "5", label: "Verwitwet" },
                 { value: "6", label: "Getrennt lebend" },
               ],
-              2
+              2,
             )}
           </div>
 
@@ -197,15 +194,14 @@ export default function ProfilPage() {
                 { value: "1", label: "Ja" },
                 { value: "2", label: "Nein" },
               ],
-              2
+              2,
             )}
           </div>
 
           {/* Anzahl Kinder im Haushalt */}
           <div>
             <label className="block text-sm text-slate-700 mb-2">
-              Anzahl Kinder im Haushalt{" "}
-              <span className="text-red-500">*</span>
+              Anzahl Kinder im Haushalt <span className="text-red-500">*</span>
             </label>
             {renderOptionButtons(
               "anzahlKinder",
@@ -216,7 +212,7 @@ export default function ProfilPage() {
                 { value: "3", label: "3" },
                 { value: "4", label: "4 oder mehr" },
               ],
-              5
+              5,
             )}
           </div>
 
@@ -242,15 +238,14 @@ export default function ProfilPage() {
                 },
                 { value: "6", label: "Master / Doktorat" },
               ],
-              2
+              2,
             )}
           </div>
 
           {/* Aktueller Erwerbsstatus (Mehrfachauswahl) */}
           <div>
             <label className="block text-sm text-slate-700 mb-2">
-              Aktueller Erwerbsstatus{" "}
-              <span className="text-red-500">*</span>
+              Aktueller Erwerbsstatus <span className="text-red-500">*</span>
               <span className="text-slate-500 text-xs ml-2">
                 (Mehrfachauswahl möglich)
               </span>
@@ -278,8 +273,8 @@ export default function ProfilPage() {
                         erwerbsstatus: selected
                           ? prev.erwerbsstatus.filter((v) => v !== option.value)
                           : prev.erwerbsstatus.length < 2
-                          ? [...prev.erwerbsstatus, option.value]
-                          : prev.erwerbsstatus,
+                            ? [...prev.erwerbsstatus, option.value]
+                            : prev.erwerbsstatus,
                       }));
                     }}
                     className={`px-4 py-3 text-sm rounded-lg border transition-all text-left ${
@@ -308,15 +303,14 @@ export default function ProfilPage() {
                 { value: "3", label: "Selbständig mit Angestellten" },
                 { value: "4", label: "Mithelfendes Familienmitglied" },
               ],
-              2
+              2,
             )}
           </div>
 
           {/* Übliche Wochenarbeitszeit */}
           <div>
             <label className="block text-sm text-slate-700 mb-2">
-              Übliche Wochenarbeitszeit{" "}
-              <span className="text-red-500">*</span>
+              Übliche Wochenarbeitszeit <span className="text-red-500">*</span>
               <span className="text-slate-500 text-xs ml-2">
                 (Stundenangabe pro Woche)
               </span>
@@ -336,7 +330,7 @@ export default function ProfilPage() {
               <span className="text-sm text-slate-500">
                 {formData.wochenarbeitszeit
                   ? `≈ ${Math.round(
-                      (parseFloat(formData.wochenarbeitszeit) / 41) * 100
+                      (parseFloat(formData.wochenarbeitszeit) / 41) * 100,
                     )}% Pensum (Basis: 41 h/Woche CH)`
                   : "Pensum wird berechnet"}
               </span>
@@ -362,7 +356,7 @@ export default function ProfilPage() {
                   label: "Kein Arbeitsplatz (nicht erwerbstätig)",
                 },
               ],
-              2
+              2,
             )}
           </div>
 
@@ -381,7 +375,7 @@ export default function ProfilPage() {
                 { value: "4", label: "Schlecht" },
                 { value: "5", label: "Sehr schlecht" },
               ],
-              5
+              5,
             )}
           </div>
 
@@ -389,9 +383,7 @@ export default function ProfilPage() {
           <div>
             <label className="block text-sm text-slate-700 mb-2">
               Staatsangehörigkeit
-              <span className="text-slate-500 text-xs ml-2">
-                (Landcode)
-              </span>
+              <span className="text-slate-500 text-xs ml-2">(Landcode)</span>
             </label>
             <input
               type="text"
@@ -433,7 +425,7 @@ export default function ProfilPage() {
                 { value: "2", label: "Vorort" },
                 { value: "3", label: "Ländlich" },
               ],
-              3
+              3,
             )}
           </div>
 
