@@ -1,54 +1,260 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
-import { User, Save } from "lucide-react";
+import { User, Save, Loader2 } from "lucide-react";
 
-interface ProfileFormData {
-  geschlecht: string;
-  alter: string;
-  zivilstand: string;
-  erwachsenePersonImHaushalt: string;
-  anzahlKinder: string;
-  bildungsabschluss: string;
-  erwerbsstatus: string[];
-  stellungImBeruf: string;
-  wochenarbeitszeit: string;
-  hauptarbeitsort: string;
-  gesundheitszustand: string;
-  staatsangehoerigkeit: string;
-  region: string;
-  urbanitaet: string;
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+interface LookupRow {
+  id: number;
+  code: string;
+  name: string;
 }
 
-const STORAGE_KEY = "time-use-tool-profile";
+interface LookupTables {
+  gender: LookupRow[];
+  maritalStatus: LookupRow[];
+  childrenInHousehold: LookupRow[];
+  educationLevel: LookupRow[];
+  employmentStatus: LookupRow[];
+  occupationalStatus: LookupRow[];
+  mainWorkplace: LookupRow[];
+  healthStatus: LookupRow[];
+  nationality: LookupRow[];
+  region: LookupRow[];
+  urbanity: LookupRow[];
+}
+
+interface FormData {
+  genderId: string;
+  age: string;
+  maritalStatusId: string;
+  partnerInHousehold: string;
+  childrenInHouseholdId: string;
+  educationLevelId: string;
+  employmentStatusIds: string[];
+  occupationalStatusId: string;
+  weeklyWorkHours: string;
+  mainWorkplaceId: string;
+  healthStatusId: string;
+  nationalityId: string;
+  regionId: string;
+  urbanityId: string;
+}
+
+const emptyForm: FormData = {
+  genderId: "",
+  age: "",
+  maritalStatusId: "",
+  partnerInHousehold: "",
+  childrenInHouseholdId: "",
+  educationLevelId: "",
+  employmentStatusIds: [],
+  occupationalStatusId: "",
+  weeklyWorkHours: "",
+  mainWorkplaceId: "",
+  healthStatusId: "",
+  nationalityId: "",
+  regionId: "",
+  urbanityId: "",
+};
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = () => getSupabaseBrowserClient() as any;
+
+/** Fetch a lookup table and normalise column names to { id, code, name }. */
+async function fetchLookup(table: string, idCol: string): Promise<LookupRow[]> {
+  const { data } = await db()
+    .from(table)
+    .select(`${idCol}, code, name`)
+    .order(idCol);
+  if (!data) return [];
+  return (data as Record<string, unknown>[]).map((r) => ({
+    id: r[idCol] as number,
+    code: r.code as string,
+    name: r.name as string,
+  }));
+}
+
+function userDataToForm(
+  row: Record<string, unknown>,
+  empIds: number[],
+): FormData {
+  return {
+    genderId: row.gender_id != null ? String(row.gender_id) : "",
+    age: row.age != null ? String(row.age) : "",
+    maritalStatusId:
+      row.marital_status_id != null ? String(row.marital_status_id) : "",
+    partnerInHousehold:
+      row.partner_in_household === true
+        ? "true"
+        : row.partner_in_household === false
+          ? "false"
+          : "",
+    childrenInHouseholdId:
+      row.children_in_household_id != null
+        ? String(row.children_in_household_id)
+        : "",
+    educationLevelId:
+      row.education_level_id != null ? String(row.education_level_id) : "",
+    employmentStatusIds: empIds.map(String),
+    occupationalStatusId:
+      row.occupational_status_id != null
+        ? String(row.occupational_status_id)
+        : "",
+    weeklyWorkHours:
+      row.weekly_work_hours != null ? String(row.weekly_work_hours) : "",
+    mainWorkplaceId:
+      row.main_workplace_id != null ? String(row.main_workplace_id) : "",
+    healthStatusId:
+      row.health_status_id != null ? String(row.health_status_id) : "",
+    nationalityId: row.nationality_id != null ? String(row.nationality_id) : "",
+    regionId: row.region_id != null ? String(row.region_id) : "",
+    urbanityId: row.urbanity_id != null ? String(row.urbanity_id) : "",
+  };
+}
+
+function formToUserDataRow(form: FormData, profilesId: string) {
+  const intOrNull = (v: string) => (v ? parseInt(v, 10) : null);
+  const numOrNull = (v: string) => (v ? parseFloat(v) : null);
+  return {
+    profiles_id: profilesId,
+    gender_id: intOrNull(form.genderId),
+    age: intOrNull(form.age),
+    marital_status_id: intOrNull(form.maritalStatusId),
+    partner_in_household:
+      form.partnerInHousehold === "true"
+        ? true
+        : form.partnerInHousehold === "false"
+          ? false
+          : null,
+    children_in_household_id: intOrNull(form.childrenInHouseholdId),
+    education_level_id: intOrNull(form.educationLevelId),
+    occupational_status_id: intOrNull(form.occupationalStatusId),
+    weekly_work_hours: numOrNull(form.weeklyWorkHours),
+    main_workplace_id: intOrNull(form.mainWorkplaceId),
+    health_status_id: intOrNull(form.healthStatusId),
+    nationality_id: intOrNull(form.nationalityId),
+    region_id: intOrNull(form.regionId),
+    urbanity_id: intOrNull(form.urbanityId),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
 
 export default function ProfilPage() {
   const supabase = getSupabaseBrowserClient();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [saved, setSaved] = useState(false);
-  const [formData, setFormData] = useState<ProfileFormData>({
-    geschlecht: "",
-    alter: "",
-    zivilstand: "",
-    erwachsenePersonImHaushalt: "",
-    anzahlKinder: "",
-    bildungsabschluss: "",
-    erwerbsstatus: [],
-    stellungImBeruf: "",
-    wochenarbeitszeit: "",
-    hauptarbeitsort: "",
-    gesundheitszustand: "",
-    staatsangehoerigkeit: "",
-    region: "",
-    urbanitaet: "",
-  });
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const savedFormData = useRef<string>("");
+  const userDataId = useRef<number | null>(null);
+  const [formData, setFormData] = useState<FormData>({ ...emptyForm });
+  const [lookups, setLookups] = useState<LookupTables | null>(null);
+  const [role, setRole] = useState<string>("");
 
+  /* ---- Load user + lookups + existing user_data ---- */
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
+    let cancelled = false;
+
+    async function init() {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      setUser(authUser);
+
+      // Fetch all lookup tables in parallel
+      const [
+        gender,
+        maritalStatus,
+        childrenInHousehold,
+        educationLevel,
+        employmentStatus,
+        occupationalStatus,
+        mainWorkplace,
+        healthStatus,
+        nationality,
+        region,
+        urbanity,
+      ] = await Promise.all([
+        fetchLookup("gender", "gender_id"),
+        fetchLookup("marital_status", "marital_status_id"),
+        fetchLookup("children_in_household", "children_in_household_id"),
+        fetchLookup("education_level", "education_level_id"),
+        fetchLookup("employment_status", "employment_status_id"),
+        fetchLookup("occupational_status", "occupational_status_id"),
+        fetchLookup("main_workplace", "main_workplace_id"),
+        fetchLookup("health_status", "health_status_id"),
+        fetchLookup("nationality", "nationality_id"),
+        fetchLookup("region", "region_id"),
+        fetchLookup("urbanity", "urbanity_id"),
+      ]);
+      if (cancelled) return;
+      setLookups({
+        gender,
+        maritalStatus,
+        childrenInHousehold,
+        educationLevel,
+        employmentStatus,
+        occupationalStatus,
+        mainWorkplace,
+        healthStatus,
+        nationality,
+        region,
+        urbanity,
+      });
+
+      // Fetch existing user_data + role
+      if (authUser) {
+        const [{ data: ud }, { data: profileRow }] = await Promise.all([
+          db()
+            .from("user_data")
+            .select("*")
+            .eq("profiles_id", authUser.id)
+            .single(),
+          db().from("profiles").select("role").eq("id", authUser.id).single(),
+        ]);
+
+        if (!cancelled && profileRow?.role) {
+          setRole(profileRow.role);
+        }
+
+        let empIds: number[] = [];
+        if (ud) {
+          userDataId.current = ud.user_data_id;
+          const { data: empRows } = await db()
+            .from("user_employment_status")
+            .select("employment_status_id")
+            .eq("user_data_id", ud.user_data_id);
+          empIds = (empRows ?? []).map(
+            (r: { employment_status_id: number }) => r.employment_status_id,
+          );
+          const loaded = userDataToForm(ud, empIds);
+          if (!cancelled) {
+            setFormData(loaded);
+            savedFormData.current = JSON.stringify(loaded);
+          }
+        } else if (!cancelled) {
+          savedFormData.current = JSON.stringify(emptyForm);
+        }
+      }
+      if (!cancelled) setLoading(false);
+    }
+
+    init();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
@@ -56,35 +262,116 @@ export default function ProfilPage() {
       },
     );
 
-    // Load saved profile from localStorage
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setFormData(JSON.parse(stored));
-      } catch {
-        // ignore invalid JSON
-      }
-    }
-
     return () => {
+      cancelled = true;
       listener?.subscription.unsubscribe();
     };
   }, [supabase]);
 
-  const updateField = (field: keyof ProfileFormData, value: string) => {
+  /* ---- Dirty tracking ---- */
+  const isDirty = JSON.stringify(formData) !== savedFormData.current;
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handleClick = (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement).closest("a");
+      if (
+        anchor &&
+        anchor.href &&
+        anchor.href.startsWith(window.location.origin) &&
+        !anchor.href.includes("/profil")
+      ) {
+        if (
+          !window.confirm(
+            "Du hast ungespeicherte Änderungen. Möchtest du die Seite wirklich verlassen?",
+          )
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [isDirty]);
+
+  /* ---- Field updaters ---- */
+  const updateField = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  /* ---- Submit ---- */
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    if (!user) return;
+
+    setSaving(true);
+    setSaveError(null);
+
+    try {
+      const row = formToUserDataRow(formData, user.id);
+
+      if (userDataId.current) {
+        // Update existing
+        const { error } = await db()
+          .from("user_data")
+          .update(row)
+          .eq("user_data_id", userDataId.current);
+        if (error) throw error;
+      } else {
+        // Insert new
+        const { data: inserted, error } = await db()
+          .from("user_data")
+          .insert(row)
+          .select("user_data_id")
+          .single();
+        if (error) throw error;
+        userDataId.current = inserted.user_data_id;
+      }
+
+      // Sync employment status junction table
+      await db()
+        .from("user_employment_status")
+        .delete()
+        .eq("user_data_id", userDataId.current);
+
+      if (formData.employmentStatusIds.length > 0) {
+        const junctionRows = formData.employmentStatusIds.map((id) => ({
+          user_data_id: userDataId.current!,
+          employment_status_id: parseInt(id, 10),
+        }));
+        const { error: jErr } = await db()
+          .from("user_employment_status")
+          .insert(junctionRows);
+        if (jErr) throw jErr;
+      }
+
+      const json = JSON.stringify(formData);
+      savedFormData.current = json;
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? (err as { message: string }).message
+          : "Unbekannter Fehler";
+      setSaveError("Fehler beim Speichern: " + msg);
+    }
+    setSaving(false);
   };
 
+  /* ---- Render helpers ---- */
   const renderOptionButtons = (
-    field: keyof ProfileFormData,
-    options: { value: string; label: string }[],
+    field: keyof FormData,
+    options: LookupRow[],
     columns: number = 2,
   ) => {
     const gridClass = `grid grid-cols-1 ${
@@ -99,26 +386,74 @@ export default function ProfilPage() {
 
     return (
       <div className={gridClass}>
-        {options.map((option) => (
+        {options.map((opt) => (
           <button
-            key={option.value}
+            key={opt.id}
             type="button"
-            onClick={() => updateField(field, option.value)}
+            onClick={() => updateField(field, String(opt.id))}
             className={`px-4 py-3 text-sm rounded-lg border transition-all text-left ${
-              formData[field] === option.value
+              formData[field] === String(opt.id)
                 ? "bg-blue-600 text-white border-blue-600"
                 : "bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50"
             }`}
           >
-            {option.label}
+            {opt.name}
           </button>
         ))}
       </div>
     );
   };
 
+  /* ---- Loading state ---- */
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
+        <Loader2 size={28} className="animate-spin text-blue-600" />
+        <span className="ml-3 text-slate-500">Profil wird geladen…</span>
+      </div>
+    );
+  }
+
+  const L = lookups!;
+
   return (
     <div className="max-w-4xl mx-auto">
+      {/* Account info bar */}
+      {user && (
+        <div className="mb-4 bg-slate-50 rounded-lg border border-slate-200 px-5 py-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-slate-500">
+            <span>
+              <span className="text-slate-400">Email:</span>{" "}
+              <span className="text-slate-600">{user.email}</span>
+            </span>
+            <span>
+              <span className="text-slate-400">User ID:</span>{" "}
+              <span className="font-mono text-slate-600">{user.id}</span>
+            </span>
+            {role && (
+              <span>
+                <span className="text-slate-400">Rolle:</span>{" "}
+                <span
+                  className={`font-medium ${
+                    role === "admin" ? "text-amber-600" : "text-slate-600"
+                  }`}
+                >
+                  {role === "admin" ? "Admin" : "User"}
+                </span>
+              </span>
+            )}
+            <span>
+              <span className="text-slate-400">Letzter Login:</span>{" "}
+              <span className="text-slate-600">
+                {user.last_sign_in_at
+                  ? new Date(user.last_sign_in_at).toLocaleString()
+                  : "—"}
+              </span>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Profile form card */}
       <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
         <div className="flex items-center gap-3 mb-6">
@@ -135,16 +470,7 @@ export default function ProfilPage() {
             <label className="block text-sm text-slate-700 mb-2">
               Geschlecht <span className="text-red-500">*</span>
             </label>
-            {renderOptionButtons(
-              "geschlecht",
-              [
-                { value: "1", label: "Männlich" },
-                { value: "2", label: "Weiblich" },
-                { value: "3", label: "Andere / divers" },
-                { value: "9", label: "Keine Angabe" },
-              ],
-              4,
-            )}
+            {renderOptionButtons("genderId", L.gender, 4)}
           </div>
 
           {/* Alter */}
@@ -154,8 +480,8 @@ export default function ProfilPage() {
             </label>
             <input
               type="number"
-              value={formData.alter}
-              onChange={(e) => updateField("alter", e.target.value)}
+              value={formData.age}
+              onChange={(e) => updateField("age", e.target.value)}
               placeholder="z.B. 35"
               min="0"
               max="120"
@@ -168,18 +494,7 @@ export default function ProfilPage() {
             <label className="block text-sm text-slate-700 mb-2">
               Zivilstand / Familienstand <span className="text-red-500">*</span>
             </label>
-            {renderOptionButtons(
-              "zivilstand",
-              [
-                { value: "1", label: "Ledig" },
-                { value: "2", label: "Verheiratet" },
-                { value: "3", label: "Eingetragene Partnerschaft" },
-                { value: "4", label: "Geschieden" },
-                { value: "5", label: "Verwitwet" },
-                { value: "6", label: "Getrennt lebend" },
-              ],
-              2,
-            )}
+            {renderOptionButtons("maritalStatusId", L.maritalStatus, 2)}
           </div>
 
           {/* Lebt eine erwachsene Person im selben Haushalt */}
@@ -188,14 +503,25 @@ export default function ProfilPage() {
               Lebt eine erwachsene Person im selben Haushalt{" "}
               <span className="text-red-500">*</span>
             </label>
-            {renderOptionButtons(
-              "erwachsenePersonImHaushalt",
-              [
-                { value: "1", label: "Ja" },
-                { value: "2", label: "Nein" },
-              ],
-              2,
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[
+                { value: "true", label: "Ja" },
+                { value: "false", label: "Nein" },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => updateField("partnerInHousehold", opt.value)}
+                  className={`px-4 py-3 text-sm rounded-lg border transition-all text-left ${
+                    formData.partnerInHousehold === opt.value
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Anzahl Kinder im Haushalt */}
@@ -204,15 +530,9 @@ export default function ProfilPage() {
               Anzahl Kinder im Haushalt <span className="text-red-500">*</span>
             </label>
             {renderOptionButtons(
-              "anzahlKinder",
-              [
-                { value: "0", label: "0" },
-                { value: "1", label: "1" },
-                { value: "2", label: "2" },
-                { value: "3", label: "3" },
-                { value: "4", label: "4 oder mehr" },
-              ],
-              5,
+              "childrenInHouseholdId",
+              L.childrenInHousehold,
+              Math.min(L.childrenInHousehold.length, 5),
             )}
           </div>
 
@@ -222,24 +542,7 @@ export default function ProfilPage() {
               Höchster abgeschlossener Bildungsabschluss{" "}
               <span className="text-red-500">*</span>
             </label>
-            {renderOptionButtons(
-              "bildungsabschluss",
-              [
-                { value: "1", label: "Keine formale Ausbildung" },
-                { value: "2", label: "Primarschule" },
-                { value: "3", label: "Sekundarstufe I" },
-                {
-                  value: "4",
-                  label: "Sekundarstufe II (Berufsbildung / Gymnasium)",
-                },
-                {
-                  value: "5",
-                  label: "Tertiärstufe (Bachelor / FH / Universität)",
-                },
-                { value: "6", label: "Master / Doktorat" },
-              ],
-              2,
-            )}
+            {renderOptionButtons("educationLevelId", L.educationLevel, 2)}
           </div>
 
           {/* Aktueller Erwerbsstatus (Mehrfachauswahl) */}
@@ -251,30 +554,24 @@ export default function ProfilPage() {
               </span>
             </label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                { value: "1", label: "Erwerbstätig (Vollzeit)" },
-                { value: "2", label: "Erwerbstätig (Teilzeit)" },
-                { value: "3", label: "Selbständig" },
-                { value: "4", label: "Arbeitslos" },
-                { value: "5", label: "Schüler / Student" },
-                { value: "6", label: "Pensioniert" },
-                { value: "7", label: "Hausarbeit / Betreuung" },
-                { value: "8", label: "Dauerhaft arbeitsunfähig" },
-                { value: "9", label: "Sonstiges" },
-              ].map((option) => {
-                const selected = formData.erwerbsstatus.includes(option.value);
+              {L.employmentStatus.map((opt) => {
+                const selected = formData.employmentStatusIds.includes(
+                  String(opt.id),
+                );
                 return (
                   <button
-                    key={option.value}
+                    key={opt.id}
                     type="button"
                     onClick={() => {
                       setFormData((prev) => ({
                         ...prev,
-                        erwerbsstatus: selected
-                          ? prev.erwerbsstatus.filter((v) => v !== option.value)
-                          : prev.erwerbsstatus.length < 2
-                            ? [...prev.erwerbsstatus, option.value]
-                            : prev.erwerbsstatus,
+                        employmentStatusIds: selected
+                          ? prev.employmentStatusIds.filter(
+                              (v) => v !== String(opt.id),
+                            )
+                          : prev.employmentStatusIds.length < 2
+                            ? [...prev.employmentStatusIds, String(opt.id)]
+                            : prev.employmentStatusIds,
                       }));
                     }}
                     className={`px-4 py-3 text-sm rounded-lg border transition-all text-left ${
@@ -283,7 +580,7 @@ export default function ProfilPage() {
                         : "bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50"
                     }`}
                   >
-                    {option.label}
+                    {opt.name}
                   </button>
                 );
               })}
@@ -296,13 +593,8 @@ export default function ProfilPage() {
               Stellung im Beruf <span className="text-red-500">*</span>
             </label>
             {renderOptionButtons(
-              "stellungImBeruf",
-              [
-                { value: "1", label: "Angestellte / Angestellter" },
-                { value: "2", label: "Selbständig ohne Angestellte" },
-                { value: "3", label: "Selbständig mit Angestellten" },
-                { value: "4", label: "Mithelfendes Familienmitglied" },
-              ],
+              "occupationalStatusId",
+              L.occupationalStatus,
               2,
             )}
           </div>
@@ -318,19 +610,17 @@ export default function ProfilPage() {
             <div className="flex items-center gap-3">
               <input
                 type="number"
-                value={formData.wochenarbeitszeit}
-                onChange={(e) =>
-                  updateField("wochenarbeitszeit", e.target.value)
-                }
+                value={formData.weeklyWorkHours}
+                onChange={(e) => updateField("weeklyWorkHours", e.target.value)}
                 placeholder="z.B. 40"
                 min="0"
                 max="100"
                 className="w-32 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <span className="text-sm text-slate-500">
-                {formData.wochenarbeitszeit
+                {formData.weeklyWorkHours
                   ? `≈ ${Math.round(
-                      (parseFloat(formData.wochenarbeitszeit) / 41) * 100,
+                      (parseFloat(formData.weeklyWorkHours) / 41) * 100,
                     )}% Pensum (Basis: 41 h/Woche CH)`
                   : "Pensum wird berechnet"}
               </span>
@@ -342,22 +632,7 @@ export default function ProfilPage() {
             <label className="block text-sm text-slate-700 mb-2">
               Hauptarbeitsort <span className="text-red-500">*</span>
             </label>
-            {renderOptionButtons(
-              "hauptarbeitsort",
-              [
-                {
-                  value: "1",
-                  label: "Arbeitsplatz ausserhalb des Hauses",
-                },
-                { value: "2", label: "Zuhause (Homeoffice)" },
-                { value: "3", label: "Wechselnde Arbeitsorte" },
-                {
-                  value: "4",
-                  label: "Kein Arbeitsplatz (nicht erwerbstätig)",
-                },
-              ],
-              2,
-            )}
+            {renderOptionButtons("mainWorkplaceId", L.mainWorkplace, 2)}
           </div>
 
           {/* Allgemeiner Gesundheitszustand */}
@@ -367,50 +642,34 @@ export default function ProfilPage() {
               <span className="text-red-500">*</span>
             </label>
             {renderOptionButtons(
-              "gesundheitszustand",
-              [
-                { value: "1", label: "Sehr gut" },
-                { value: "2", label: "Gut" },
-                { value: "3", label: "Mittel" },
-                { value: "4", label: "Schlecht" },
-                { value: "5", label: "Sehr schlecht" },
-              ],
-              5,
+              "healthStatusId",
+              L.healthStatus,
+              Math.min(L.healthStatus.length, 5),
             )}
           </div>
 
           {/* Staatsangehörigkeit */}
           <div>
             <label className="block text-sm text-slate-700 mb-2">
-              Staatsangehörigkeit
-              <span className="text-slate-500 text-xs ml-2">(Landcode)</span>
+              Staatsangehörigkeit <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={formData.staatsangehoerigkeit}
-              onChange={(e) =>
-                updateField("staatsangehoerigkeit", e.target.value)
-              }
-              placeholder="z.B. CH, DE, AT"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            {renderOptionButtons(
+              "nationalityId",
+              L.nationality,
+              Math.min(L.nationality.length, 4),
+            )}
           </div>
 
           {/* Region / Wohnort */}
           <div>
             <label className="block text-sm text-slate-700 mb-2">
               Region / Wohnort <span className="text-red-500">*</span>
-              <span className="text-slate-500 text-xs ml-2">
-                (Region / Kanton)
-              </span>
             </label>
-            <input
-              type="text"
-              value={formData.region}
-              onChange={(e) => updateField("region", e.target.value)}
-              placeholder="z.B. Zürich, Bern, Wien"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            {renderOptionButtons(
+              "regionId",
+              L.region,
+              Math.min(L.region.length, 4),
+            )}
           </div>
 
           {/* Urbanität */}
@@ -419,13 +678,9 @@ export default function ProfilPage() {
               Urbanität <span className="text-red-500">*</span>
             </label>
             {renderOptionButtons(
-              "urbanitaet",
-              [
-                { value: "1", label: "Stadt / urban" },
-                { value: "2", label: "Vorort" },
-                { value: "3", label: "Ländlich" },
-              ],
-              3,
+              "urbanityId",
+              L.urbanity,
+              Math.min(L.urbanity.length, 3),
             )}
           </div>
 
@@ -433,49 +688,28 @@ export default function ProfilPage() {
           <div className="pt-4 border-t border-slate-200 flex items-center gap-4">
             <button
               type="submit"
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={saving}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
-              <Save size={18} />
-              Profil speichern
+              {saving ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Save size={18} />
+              )}
+              {saving ? "Speichern…" : "Profil speichern"}
             </button>
             {saved && (
               <span className="text-sm text-green-600 font-medium">
                 Profil gespeichert!
               </span>
             )}
+            {saveError && (
+              <span className="text-sm text-red-600 font-medium">
+                {saveError}
+              </span>
+            )}
           </div>
         </form>
-      </div>
-
-      {/* Account info card */}
-      <div className="mt-6 bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-        <h3 className="text-sm font-semibold text-slate-800 mb-4">
-          Kontoinformationen
-        </h3>
-        {user ? (
-          <div className="space-y-3 text-sm">
-            <div className="flex items-start gap-2">
-              <span className="text-slate-500 w-28 shrink-0">User ID</span>
-              <span className="font-mono text-xs text-slate-700 break-all">
-                {user.id}
-              </span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-slate-500 w-28 shrink-0">Email</span>
-              <span className="text-slate-700">{user.email}</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-slate-500 w-28 shrink-0">Last sign in</span>
-              <span className="text-slate-700">
-                {user.last_sign_in_at
-                  ? new Date(user.last_sign_in_at).toLocaleString()
-                  : "—"}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-slate-500">Lade Kontoinformationen…</p>
-        )}
       </div>
     </div>
   );
