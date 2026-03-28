@@ -4,6 +4,7 @@ import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import EnrollmentModal from "@/app/components/EnrollmentModal";
 import {
   ClipboardList,
   Calendar,
@@ -31,12 +32,17 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // null = still checking, false = not enrolled, true = enrolled
+  const [isEnrolled, setIsEnrolled] = useState<boolean | null>(null);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) {
         router.push("/");
       } else {
         setUser(data.user);
+        // After confirming the user is logged in, check course enrollment
+        checkEnrollment(data.user.id);
       }
     });
     const { data: listener } = supabase.auth.onAuthStateChange(
@@ -45,18 +51,38 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
           router.push("/");
         } else {
           setUser(session.user);
+          checkEnrollment(session.user.id);
         }
       },
     );
     return () => listener?.subscription.unsubscribe();
   }, [supabase, router]);
 
+  // Checks whether the user has an active course enrollment
+  // Sets isEnrolled to true if a user_course record exists, false otherwise
+  async function checkEnrollment(userId: string) {
+    const { data } = await supabase
+      .from("user_course")
+      .select("user_course_id")
+      .eq("profiles_id", userId)
+      .single();
+
+    setIsEnrolled(!!data);
+  }
+
+  // Called by EnrollmentModal after a successful enrollment
+  // Closes the modal by marking the user as enrolled
+  function handleEnrolled() {
+    setIsEnrolled(true);
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.push("/");
   }
 
-  if (!user) {
+  // Wait until both auth check and enrollment check are resolved
+  if (!user || isEnrolled === null) {
     return null;
   }
 
@@ -138,6 +164,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6">{children}</main>
+
+      {/* Enrollment modal — shown as overlay when user has no course assigned */}
+      {!isEnrolled && (
+        <EnrollmentModal userId={user.id} onEnrolled={handleEnrolled} />
+      )}
     </div>
   );
 }
