@@ -46,18 +46,23 @@ function normalizeDbTime(dbTime: string): string {
 }
 
 // Calculates how many 10-minute slots are covered by a time range
+// Handles the midnight wrap: end_time "00:00" after a non-zero start means 1440 min
 function calculateCoveredSlots(startTime: string, endTime: string): number {
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
-  return Math.round((eh * 60 + em - (sh * 60 + sm)) / 10);
+  const startMinTotal = sh * 60 + sm;
+  const endMinTotal = (eh === 0 && em === 0 && startMinTotal > 0) ? 1440 : eh * 60 + em;
+  return Math.round((endMinTotal - startMinTotal) / 10);
 }
 
 // Computes the DB end_time string for one 10-minute slot
-// e.g. "08:50" → "09:00:00", "23:50" → "24:00:00"
-// PostgreSQL's TIME type accepts "24:00:00" as a valid end-of-day value
+// e.g. "08:50" → "09:00:00"
+// Special case: the last slot (23:50) ends at midnight — stored as "00:00:00"
+// because PostgreSQL TIME arithmetic wraps 23:50 + 10min → 00:00, not 24:00
 function getSlotEndTime(slot: string): string {
   const [h, m] = slot.split(":").map(Number);
   const endTotal = h * 60 + m + 10;
+  if (endTotal >= 1440) return "00:00:00";
   return `${Math.floor(endTotal / 60).toString().padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}:00`;
 }
 
@@ -74,8 +79,7 @@ function getNextStep(
     case "digital_media_type": return "location_transport";
     case "location_transport": return "social_context";
     case "social_context":     return "satisfaction";
-    case "satisfaction":       return "additional_context";
-    case "additional_context": return null;
+    case "satisfaction":       return null;
   }
 }
 
@@ -90,7 +94,6 @@ function createEmptyPendingEntry(slots: string[]): PendingEntry {
     location_transport_id: null,
     social_context_ids: [],
     satisfaction_id: null,
-    additional_context: "",
   };
 }
 
@@ -123,8 +126,7 @@ function getPreloadedEntry(
       e.satisfaction_id === first.satisfaction_id &&
       e.location_transport_id === first.location_transport_id &&
       e.digital_media_used === first.digital_media_used &&
-      e.digital_media_type_id === first.digital_media_type_id &&
-      e.additional_context === first.additional_context
+      e.digital_media_type_id === first.digital_media_type_id
   );
 
   if (!allIdentical) return null;
@@ -138,7 +140,6 @@ function getPreloadedEntry(
     location_transport_id: first.location_transport_id,
     social_context_ids: first.social_context_ids,
     satisfaction_id: first.satisfaction_id,
-    additional_context: first.additional_context ?? "",
   };
 }
 
@@ -155,7 +156,6 @@ function mapRawEntryToRecord(raw: any): TimeEntryRecord {
     location_transport_id: raw.location_transport_id ?? null,
     digital_media_used: raw.digital_media_used,
     digital_media_type_id: raw.digital_media_type_id ?? null,
-    additional_context: raw.additional_context ?? null,
     social_context_ids:
       raw.time_entry_social_context?.map((sc: any) => sc.social_context_id) ?? [],
   };
@@ -366,7 +366,6 @@ export default function ZeiterfassungPage() {
         primary_activity_id, secondary_activity_id,
         satisfaction_id, location_transport_id,
         digital_media_used, digital_media_type_id,
-        additional_context,
         time_entry_social_context ( social_context_id )
       `)
       .eq("day_id", targetDayId);
@@ -409,11 +408,10 @@ export default function ZeiterfassungPage() {
     const { _save, _advance, ...cleanData } = stepData as any;
     const updatedEntry: PendingEntry = { ...pendingEntry, ...cleanData };
 
-    // social_context toggles and additional_context typing fire onStepComplete
-    // for state updates without advancing — only proceed when _advance or _save is set
+    // social_context toggles fire onStepComplete for state updates without advancing
+    // only proceed when _advance is set
     const isIntermediateUpdate =
-      (currentStep === "social_context" && !isAdvance && !shouldSave) ||
-      (currentStep === "additional_context" && !shouldSave);
+      currentStep === "social_context" && !isAdvance && !shouldSave;
 
     if (isIntermediateUpdate) {
       setPendingEntry(updatedEntry);
@@ -473,7 +471,6 @@ export default function ZeiterfassungPage() {
       digital_media_type_id: finalEntry.digital_media_used
         ? finalEntry.digital_media_type_id
         : null,
-      additional_context: finalEntry.additional_context || null,
     }));
 
     const { data: newEntries, error: insertError } = await supabase
@@ -537,7 +534,9 @@ export default function ZeiterfassungPage() {
     await supabase.from("time_entry").delete().in("entry_id", ids);
   }
 
-  // Counts covered slots after save and updates is_complete on the day record
+  // Counts covered slots after save and updates is_complete + is_submitted on the day record
+  // Both flags are kept in sync: a fully filled day is automatically marked as submitted,
+  // and editing it back below 144 slots un-submits it
   async function updateDayCompletion(activeDayId: number) {
     const { data: entries } = await supabase
       .from("time_entry").select("start_time, end_time").eq("day_id", activeDayId);
@@ -545,9 +544,10 @@ export default function ZeiterfassungPage() {
     const totalCovered = (entries ?? []).reduce(
       (sum, e) => sum + calculateCoveredSlots(e.start_time, e.end_time), 0
     );
+    const isComplete = totalCovered >= TOTAL_SLOTS_PER_DAY;
     await supabase
       .from("day")
-      .update({ is_complete: totalCovered >= TOTAL_SLOTS_PER_DAY })
+      .update({ is_complete: isComplete, is_submitted: isComplete })
       .eq("day_id", activeDayId);
   }
 

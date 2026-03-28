@@ -25,12 +25,13 @@ function generateAllSlots(): string[] {
 
 // Returns all "HH:MM" slots that fall within an entry's time range
 // start is inclusive, end is exclusive (e.g. "09:00" is not in a "08:00"–"09:00" entry)
+// Handles the midnight wrap: end_time "00:00" after a non-zero start means 1440 min
 function getSlotsForEntry(startTime: string, endTime: string): string[] {
   const slots: string[] = [];
   const [startHour, startMin] = startTime.split(":").map(Number);
   const [endHour, endMin] = endTime.split(":").map(Number);
   const startTotal = startHour * 60 + startMin;
-  const endTotal = endHour * 60 + endMin;
+  const endTotal = (endHour === 0 && endMin === 0 && startTotal > 0) ? 1440 : endHour * 60 + endMin;
 
   for (let min = startTotal; min < endTotal; min += 10) {
     slots.push(
@@ -109,6 +110,17 @@ function getSlotTooltip(slot: string): string {
   return `${slot} – ${endStr}`;
 }
 
+// Returns all slots between anchorSlot and currentSlot (inclusive, chronological order).
+// This gives a range-select feel: dragging from 08:20 down to 09:20 selects all
+// 7 slots in between regardless of the mouse path taken.
+function getSlotsInRange(anchorSlot: string, currentSlot: string): Set<string> {
+  const anchorIndex = ALL_SLOTS.indexOf(anchorSlot);
+  const currentIndex = ALL_SLOTS.indexOf(currentSlot);
+  const start = Math.min(anchorIndex, currentIndex);
+  const end = Math.max(anchorIndex, currentIndex);
+  return new Set(ALL_SLOTS.slice(start, end + 1));
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 // Labels shown in the sticky header row (minute offsets per column)
@@ -135,12 +147,10 @@ export default function TimeGrid({
 }: TimeGridProps) {
   // Ref tracks whether a drag is active — avoids state re-renders during drag
   const isDraggingRef = useRef(false);
-  // Ref accumulates slots during drag for access inside the global mouseup handler
-  const draggingSlotsRef = useRef(new Set<string>());
+  // Ref holds the slot where the drag started (the anchor for range calculation)
+  const anchorSlotRef = useRef<string | null>(null);
   // State drives visual update during drag (separate from ref for rendering)
-  const [liveDraggingSlots, setLiveDraggingSlots] = useState(
-    new Set<string>()
-  );
+  const [liveDraggingSlots, setLiveDraggingSlots] = useState(new Set<string>());
 
   // Pre-built slot → entry map so each cell render is O(1)
   const slotToEntry = useMemo(
@@ -148,33 +158,34 @@ export default function TimeGrid({
     [existingEntries]
   );
 
-  // Global mouseup: finalizes the drag and passes the selection to the parent
+  // Global mouseup: finalizes the drag and commits the current live range to the parent
   // Attached to document so mouseup outside the grid still ends the drag
   useEffect(() => {
     function handleGlobalMouseUp() {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
-      onSlotsSelected(new Set(draggingSlotsRef.current));
-      draggingSlotsRef.current = new Set();
+      onSlotsSelected(new Set(liveDraggingSlots));
+      anchorSlotRef.current = null;
       setLiveDraggingSlots(new Set());
     }
     document.addEventListener("mouseup", handleGlobalMouseUp);
     return () => document.removeEventListener("mouseup", handleGlobalMouseUp);
-  }, [onSlotsSelected]);
+  }, [onSlotsSelected, liveDraggingSlots]);
 
-  // Start drag: clear previous live selection and add this slot
+  // Start drag: record the anchor slot and initialise a single-slot selection
   function handleCellMouseDown(slot: string, event: React.MouseEvent) {
     event.preventDefault(); // prevent browser text-selection during drag
     isDraggingRef.current = true;
-    draggingSlotsRef.current = new Set([slot]);
+    anchorSlotRef.current = slot;
     setLiveDraggingSlots(new Set([slot]));
   }
 
-  // Extend drag: add slot to live selection while mouse button is held
+  // Extend drag: recalculate the full range from anchor to the current slot
+  // This means moving down from 08:20 to 09:20 selects all slots in between,
+  // not just the ones the mouse physically passed over
   function handleCellMouseEnter(slot: string) {
-    if (!isDraggingRef.current) return;
-    draggingSlotsRef.current.add(slot);
-    setLiveDraggingSlots(new Set(draggingSlotsRef.current));
+    if (!isDraggingRef.current || !anchorSlotRef.current) return;
+    setLiveDraggingSlots(getSlotsInRange(anchorSlotRef.current, slot));
   }
 
   // A cell is highlighted if it is being dragged over OR in the committed selection

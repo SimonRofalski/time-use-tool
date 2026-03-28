@@ -81,22 +81,13 @@ function buildActivityHierarchy(
 // Returns the German question text for each questionnaire step
 function getStepQuestion(step: QuestionnaireStep): string {
   switch (step) {
-    case "primary_activity":
-      return "Welche Haupttätigkeit hast du in dieser Zeit ausgeführt?";
-    case "secondary_activity":
-      return "Hast du gleichzeitig eine Nebentätigkeit ausgeführt?";
-    case "digital_media":
-      return "Hast du während dieser Zeit ein elektronisches Gerät benutzt?";
-    case "digital_media_type":
-      return "Welches Gerät hast du hauptsächlich benutzt?";
-    case "location_transport":
-      return "Wo warst du während dieser Zeit?";
-    case "social_context":
-      return "Mit wem warst du während dieser Zeit?";
-    case "satisfaction":
-      return "Wie hast du dich während dieser Zeit gefühlt?";
-    case "additional_context":
-      return "Möchtest du eine zusätzliche Notiz hinzufügen?";
+    case "primary_activity":   return "Welche Haupttätigkeit hast du in dieser Zeit ausgeführt?";
+    case "secondary_activity": return "Hast du gleichzeitig eine Nebentätigkeit ausgeführt?";
+    case "digital_media":      return "Hast du während dieser Zeit ein elektronisches Gerät benutzt?";
+    case "digital_media_type": return "Welches Gerät hast du hauptsächlich benutzt?";
+    case "location_transport": return "Wo warst du während dieser Zeit?";
+    case "social_context":     return "Mit wem warst du während dieser Zeit?";
+    case "satisfaction":       return "Wie hast du dich während dieser Zeit gefühlt?";
   }
 }
 
@@ -105,12 +96,11 @@ function getStepProgress(step: QuestionnaireStep): number {
   const progressMap: Record<QuestionnaireStep, number> = {
     primary_activity: 5,
     secondary_activity: 20,
-    digital_media: 35,
-    digital_media_type: 45,
-    location_transport: 55,
-    social_context: 70,
-    satisfaction: 83,
-    additional_context: 95,
+    digital_media: 38,
+    digital_media_type: 52,
+    location_transport: 65,
+    social_context: 80,
+    satisfaction: 100,
   };
   return progressMap[step] ?? 0;
 }
@@ -437,7 +427,7 @@ export default function ActivitySelector({
     );
   }
 
-  // Step 7: how did the user feel? (single choice)
+  // Step 7 (final): how did the user feel? (single choice — selecting saves immediately)
   function renderSatisfactionStep() {
     return (
       <div className="space-y-2">
@@ -466,53 +456,16 @@ export default function ActivitySelector({
     );
   }
 
-  // Step 8: optional free-text note — user can skip or save
-  function renderAdditionalContextStep() {
-    return (
-      <div className="space-y-3">
-        <textarea
-          value={pendingEntry.additional_context}
-          onChange={(e) =>
-            // Update without advancing — parent handles state merging
-            onStepComplete({ additional_context: e.target.value })
-          }
-          placeholder="Optionale Notiz (z.B. besondere Umstände, Ergänzungen…)"
-          rows={4}
-          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none"
-        />
-
-        {/* Skip = save with empty context | Save = save with filled context */}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => onStepComplete({ additional_context: "", _save: true } as any)}
-            className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            Überspringen
-          </button>
-          <button
-            type="button"
-            onClick={() => onStepComplete({ _save: true } as any)}
-            className="flex-1 rounded-lg bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
-          >
-            Speichern
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Render the correct step content
   function renderStepContent() {
     switch (step) {
-      case "primary_activity":    return renderPrimaryActivityStep();
-      case "secondary_activity":  return renderSecondaryActivityStep();
-      case "digital_media":       return renderDigitalMediaStep();
-      case "digital_media_type":  return renderDigitalMediaTypeStep();
-      case "location_transport":  return renderLocationStep();
-      case "social_context":      return renderSocialContextStep();
-      case "satisfaction":        return renderSatisfactionStep();
-      case "additional_context":  return renderAdditionalContextStep();
+      case "primary_activity":   return renderPrimaryActivityStep();
+      case "secondary_activity": return renderSecondaryActivityStep();
+      case "digital_media":      return renderDigitalMediaStep();
+      case "digital_media_type": return renderDigitalMediaTypeStep();
+      case "location_transport": return renderLocationStep();
+      case "social_context":     return renderSocialContextStep();
+      case "satisfaction":       return renderSatisfactionStep();
     }
   }
 
@@ -561,8 +514,8 @@ export default function ActivitySelector({
         {renderStepContent()}
       </div>
 
-      {/* Footer: back button (hidden on first step) */}
-      {!isFirstStep && step !== "social_context" && step !== "additional_context" && (
+      {/* Footer: back button (hidden only on the first step) */}
+      {!isFirstStep && (
         <div className="px-4 pb-4">
           <button
             type="button"

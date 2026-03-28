@@ -60,10 +60,13 @@ type CategoryLookup = {
 
 // Calculates how many minutes are covered by a single time_entry row
 // e.g. "08:00:00", "09:30:00" → 90 minutes
+// Handles the midnight wrap: end_time "00:00" after a non-zero start means 1440 min
 function calculateMinutes(startTime: string, endTime: string): number {
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
-  return eh * 60 + em - (sh * 60 + sm);
+  const startMinTotal = sh * 60 + sm;
+  const endMinTotal = (eh === 0 && em === 0 && startMinTotal > 0) ? 1440 : eh * 60 + em;
+  return endMinTotal - startMinTotal;
 }
 
 // Generates an array of all ISO date strings between startDate and endDate (inclusive)

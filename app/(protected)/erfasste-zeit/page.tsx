@@ -11,11 +11,12 @@ const TOTAL_ENTRIES_PER_DAY = 144;
 
 // Calculates how many 10-minute slots are covered by one time entry
 // e.g. start="08:00:00", end="09:00:00" → 6 slots
+// Handles the midnight wrap: end_time "00:00" after a non-zero start means 1440 min
 function calculateCoveredSlots(startTime: string, endTime: string): number {
   const [startHour, startMin] = startTime.split(":").map(Number);
   const [endHour, endMin] = endTime.split(":").map(Number);
   const startMinTotal = startHour * 60 + startMin;
-  const endMinTotal = endHour * 60 + endMin;
+  const endMinTotal = (endHour === 0 && endMin === 0 && startMinTotal > 0) ? 1440 : endHour * 60 + endMin;
   return Math.round((endMinTotal - startMinTotal) / 10);
 }
 

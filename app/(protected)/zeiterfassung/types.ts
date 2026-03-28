@@ -99,7 +99,6 @@ export type TimeEntryRecord = {
   location_transport_id: number | null;
   digital_media_used: boolean;
   digital_media_type_id: number | null;
-  additional_context: string | null;
   social_context_ids: number[];
 };
 
@@ -113,7 +112,6 @@ export type PendingEntry = {
   location_transport_id: number | null;
   social_context_ids: number[];
   satisfaction_id: number | null;
-  additional_context: string;
 };
 
 // The ordered steps in the questionnaire flow
@@ -125,5 +123,4 @@ export type QuestionnaireStep =
   | "digital_media_type"
   | "location_transport"
   | "social_context"
-  | "satisfaction"
-  | "additional_context";
+  | "satisfaction";
