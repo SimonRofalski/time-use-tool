@@ -53,7 +53,8 @@ function calculateCoveredSlots(startTime: string, endTime: string): number {
 }
 
 // Computes the DB end_time string for one 10-minute slot
-// e.g. "08:50" → "09:00:00"
+// e.g. "08:50" → "09:00:00", "23:50" → "24:00:00"
+// PostgreSQL's TIME type accepts "24:00:00" as a valid end-of-day value
 function getSlotEndTime(slot: string): string {
   const [h, m] = slot.split(":").map(Number);
   const endTotal = h * 60 + m + 10;

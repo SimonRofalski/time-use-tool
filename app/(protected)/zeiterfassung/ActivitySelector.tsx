@@ -45,9 +45,12 @@ type ActivitySelectorProps = {
 
 // Builds the nested category → subcategory → activity hierarchy
 // Filters by searchQuery if provided; hides empty branches
+// excludeActivityId: optionally removes one activity from the list (used in
+// the secondary activity step to prevent selecting the same as primary)
 function buildActivityHierarchy(
   lookupData: LookupData,
-  searchQuery: string
+  searchQuery: string,
+  excludeActivityId?: number | null
 ): CategoryNode[] {
   const query = searchQuery.toLowerCase().trim();
 
@@ -58,9 +61,9 @@ function buildActivityHierarchy(
       const subcategories = lookupData.subcategories
         .filter((sub) => sub.category_id === cat.category_id)
         .map((sub) => {
-          // Filter activities by search query (or show all if no query)
           const activities = lookupData.activities
             .filter((act) => act.subcategory_id === sub.subcategory_id)
+            .filter((act) => act.activity_id !== excludeActivityId)
             .filter((act) =>
               query ? act.name.toLowerCase().includes(query) : true
             )
@@ -257,10 +260,16 @@ export default function ActivitySelector({
 
   // Step 2: select an optional secondary activity
   // Includes a "Keine Nebentätigkeit" button at the top
+  // The primary activity is excluded from the list to prevent check constraint violations
   function renderSecondaryActivityStep() {
+    const hierarchyWithoutPrimary = buildActivityHierarchy(
+      lookupData,
+      searchQuery,
+      pendingEntry.primary_activity_id
+    );
     return (
       <ActivityList
-        hierarchy={hierarchy}
+        hierarchy={hierarchyWithoutPrimary}
         selectedActivityId={pendingEntry.secondary_activity_id}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
