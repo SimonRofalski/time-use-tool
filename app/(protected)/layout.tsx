@@ -28,6 +28,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
   const [user, setUser] = useState<any>(null);
+  const [courseName, setCourseName] = useState<string | null>(null);
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -37,6 +38,16 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
         router.push("/");
       } else {
         setUser(data.user);
+        // Kursname des Users laden (über Junction-Tabelle user_course)
+        supabase
+          .from("user_course")
+          .select("course(name)")
+          .eq("profiles_id", data.user.id)
+          .single()
+          .then(({ data: row }) => {
+            const course = (row as any)?.course as { name: string } | null;
+            setCourseName(course?.name ?? null);
+          });
       }
     });
     const { data: listener } = supabase.auth.onAuthStateChange(
@@ -70,7 +81,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
               Time Use Tool
             </h1>
             <p className="text-slate-500 text-sm">
-              Zeittagebuch – 10-Minuten-Intervalle
+              {courseName ? `Kurs: ${courseName}` : "Kein Kurs zugewiesen"}
             </p>
           </div>
           <button
