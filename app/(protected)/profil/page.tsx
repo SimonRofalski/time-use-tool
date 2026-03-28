@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
-import { User, Save, Loader2 } from "lucide-react";
+import { User, Save, Loader2, Check, Search } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -62,6 +62,102 @@ const emptyForm: FormData = {
   regionId: "",
   urbanityId: "",
 };
+
+/* ------------------------------------------------------------------ */
+/*  SearchableSelect component                                         */
+/* ------------------------------------------------------------------ */
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder,
+}: {
+  options: LookupRow[];
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const selectedOption = options.find((o) => String(o.id) === value);
+
+  const filtered = useMemo(() => {
+    if (!query) return options.slice(0, 20);
+    const q = query.toLowerCase();
+    return options.filter((o) => o.name.toLowerCase().includes(q)).slice(0, 20);
+  }, [options, query]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div className="relative">
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+        />
+        <input
+          type="text"
+          value={open ? query : (selectedOption?.name ?? query)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => {
+            setOpen(true);
+            setQuery("");
+          }}
+          placeholder={placeholder}
+          className="w-full pl-9 pr-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg">
+          {filtered.length === 0 ? (
+            <div className="px-4 py-3 text-sm text-slate-400">
+              Keine Treffer
+            </div>
+          ) : (
+            filtered.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => {
+                  onChange(String(opt.id));
+                  setQuery("");
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-4 py-3 text-sm text-left hover:bg-blue-50 transition-colors ${
+                  value === String(opt.id)
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-slate-700"
+                }`}
+              >
+                <span>{opt.name}</span>
+                {value === String(opt.id) && (
+                  <Check size={16} className="text-blue-600" />
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -369,37 +465,66 @@ export default function ProfilPage() {
   };
 
   /* ---- Render helpers ---- */
-  const renderOptionButtons = (
+  const renderOptionCards = (field: keyof FormData, options: LookupRow[]) => {
+    return (
+      <div className="space-y-2">
+        {options.map((opt) => {
+          const selected = formData[field] === String(opt.id);
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => updateField(field, String(opt.id))}
+              className={`w-full flex items-center justify-between px-4 py-3 text-sm rounded-xl border-2 transition-all text-left ${
+                selected
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <span>{opt.name}</span>
+              {selected && (
+                <Check size={18} className="text-blue-600 flex-shrink-0" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderOptionCardsGrid = (
     field: keyof FormData,
     options: LookupRow[],
-    columns: number = 2,
+    cols: 2 | 3 | 4 = 2,
   ) => {
-    const gridClass = `grid grid-cols-1 ${
-      columns === 2
-        ? "md:grid-cols-2"
-        : columns === 3
-          ? "md:grid-cols-3"
-          : columns === 4
-            ? "md:grid-cols-4"
-            : "md:grid-cols-5"
-    } gap-3`;
-
+    const gridClass =
+      cols === 3
+        ? "grid grid-cols-1 sm:grid-cols-3 gap-2"
+        : cols === 4
+          ? "grid grid-cols-2 sm:grid-cols-4 gap-2"
+          : "grid grid-cols-1 sm:grid-cols-2 gap-2";
     return (
       <div className={gridClass}>
-        {options.map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            onClick={() => updateField(field, String(opt.id))}
-            className={`px-4 py-3 text-sm rounded-lg border transition-all text-left ${
-              formData[field] === String(opt.id)
-                ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50"
-            }`}
-          >
-            {opt.name}
-          </button>
-        ))}
+        {options.map((opt) => {
+          const selected = formData[field] === String(opt.id);
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => updateField(field, String(opt.id))}
+              className={`flex items-center justify-between px-4 py-3 text-sm rounded-xl border-2 transition-all text-left ${
+                selected
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <span>{opt.name}</span>
+              {selected && (
+                <Check size={18} className="text-blue-600 flex-shrink-0" />
+              )}
+            </button>
+          );
+        })}
       </div>
     );
   };
@@ -455,7 +580,7 @@ export default function ProfilPage() {
       )}
 
       {/* Profile form card */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <div className="flex items-center gap-3 mb-6">
           <User className="text-blue-600" size={28} />
           <div>
@@ -464,96 +589,112 @@ export default function ProfilPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Geschlecht */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Geschlecht <span className="text-red-500">*</span>
-            </label>
-            {renderOptionButtons("genderId", L.gender, 4)}
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Row 1: Geschlecht + Alter */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Geschlecht <span className="text-red-500">*</span>
+              </label>
+              {renderOptionCardsGrid("genderId", L.gender, 2)}
+            </div>
 
-          {/* Alter */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Alter <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              value={formData.age}
-              onChange={(e) => updateField("age", e.target.value)}
-              placeholder="z.B. 35"
-              min="0"
-              max="120"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Zivilstand / Familienstand */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Zivilstand / Familienstand <span className="text-red-500">*</span>
-            </label>
-            {renderOptionButtons("maritalStatusId", L.maritalStatus, 2)}
-          </div>
-
-          {/* Lebt eine erwachsene Person im selben Haushalt */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Lebt eine erwachsene Person im selben Haushalt{" "}
-              <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                { value: "true", label: "Ja" },
-                { value: "false", label: "Nein" },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => updateField("partnerInHousehold", opt.value)}
-                  className={`px-4 py-3 text-sm rounded-lg border transition-all text-left ${
-                    formData.partnerInHousehold === opt.value
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Alter <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={formData.age}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "" || val.length <= 4) {
+                    updateField("age", val);
+                  }
+                }}
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
           </div>
 
-          {/* Anzahl Kinder im Haushalt */}
+          {/* Row 2: Zivilstand + Partner im Haushalt */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Zivilstand / Familienstand{" "}
+                <span className="text-red-500">*</span>
+              </label>
+              {renderOptionCards("maritalStatusId", L.maritalStatus)}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Lebt ein/e Partner/in im selben Haushalt?{" "}
+                <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                {[
+                  { value: "true", label: "Ja" },
+                  { value: "false", label: "Nein" },
+                ].map((opt) => {
+                  const selected = formData.partnerInHousehold === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() =>
+                        updateField("partnerInHousehold", opt.value)
+                      }
+                      className={`w-full flex items-center justify-between px-4 py-3 text-sm rounded-xl border-2 transition-all text-left ${
+                        selected
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      {selected && (
+                        <Check
+                          size={18}
+                          className="text-blue-600 flex-shrink-0"
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Kinder im Haushalt */}
           <div>
-            <label className="block text-sm text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Anzahl Kinder im Haushalt <span className="text-red-500">*</span>
             </label>
-            {renderOptionButtons(
+            {renderOptionCardsGrid(
               "childrenInHouseholdId",
               L.childrenInHousehold,
-              Math.min(L.childrenInHousehold.length, 5),
+              Math.min(L.childrenInHousehold.length, 4) as 2 | 3 | 4,
             )}
           </div>
 
-          {/* Höchster abgeschlossener Bildungsabschluss */}
+          {/* Bildung */}
           <div>
-            <label className="block text-sm text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Höchster abgeschlossener Bildungsabschluss{" "}
               <span className="text-red-500">*</span>
             </label>
-            {renderOptionButtons("educationLevelId", L.educationLevel, 2)}
+            {renderOptionCards("educationLevelId", L.educationLevel)}
           </div>
 
-          {/* Aktueller Erwerbsstatus (Mehrfachauswahl) */}
+          {/* Erwerbsstatus (Mehrfach) */}
           <div>
-            <label className="block text-sm text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Aktueller Erwerbsstatus <span className="text-red-500">*</span>
-              <span className="text-slate-500 text-xs ml-2">
+              <span className="text-slate-400 text-xs ml-2">
                 (Mehrfachauswahl möglich)
               </span>
             </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-2">
               {L.employmentStatus.map((opt) => {
                 const selected = formData.employmentStatusIds.includes(
                   String(opt.id),
@@ -574,40 +715,39 @@ export default function ProfilPage() {
                             : prev.employmentStatusIds,
                       }));
                     }}
-                    className={`px-4 py-3 text-sm rounded-lg border transition-all text-left ${
+                    className={`w-full flex items-center justify-between px-4 py-3 text-sm rounded-xl border-2 transition-all text-left ${
                       selected
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-slate-700 border-slate-300 hover:border-blue-400 hover:bg-blue-50"
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                     }`}
                   >
-                    {opt.name}
+                    <span>{opt.name}</span>
+                    {selected && (
+                      <Check
+                        size={18}
+                        className="text-blue-600 flex-shrink-0"
+                      />
+                    )}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Stellung im Beruf */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Stellung im Beruf <span className="text-red-500">*</span>
-            </label>
-            {renderOptionButtons(
-              "occupationalStatusId",
-              L.occupationalStatus,
-              2,
-            )}
-          </div>
+          {/* Row: Stellung im Beruf + Arbeitszeit */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Stellung im Beruf <span className="text-red-500">*</span>
+              </label>
+              {renderOptionCards("occupationalStatusId", L.occupationalStatus)}
+            </div>
 
-          {/* Übliche Wochenarbeitszeit */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Übliche Wochenarbeitszeit <span className="text-red-500">*</span>
-              <span className="text-slate-500 text-xs ml-2">
-                (Stundenangabe pro Woche)
-              </span>
-            </label>
-            <div className="flex items-center gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Übliche Wochenarbeitszeit{" "}
+                <span className="text-red-500">*</span>
+              </label>
               <input
                 type="number"
                 value={formData.weeklyWorkHours}
@@ -615,81 +755,79 @@ export default function ProfilPage() {
                 placeholder="z.B. 40"
                 min="0"
                 max="100"
-                className="w-32 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
-              <span className="text-sm text-slate-500">
-                {formData.weeklyWorkHours
-                  ? `≈ ${Math.round(
-                      (parseFloat(formData.weeklyWorkHours) / 41) * 100,
-                    )}% Pensum (Basis: 41 h/Woche CH)`
-                  : "Pensum wird berechnet"}
-              </span>
+              {formData.weeklyWorkHours && (
+                <p className="text-xs text-slate-400 mt-1">
+                  ≈{" "}
+                  {Math.round(
+                    (parseFloat(formData.weeklyWorkHours) / 41) * 100,
+                  )}
+                  % Pensum (Basis: 41 h/Woche CH)
+                </p>
+              )}
             </div>
           </div>
 
           {/* Hauptarbeitsort */}
           <div>
-            <label className="block text-sm text-slate-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Hauptarbeitsort <span className="text-red-500">*</span>
             </label>
-            {renderOptionButtons("mainWorkplaceId", L.mainWorkplace, 2)}
+            {renderOptionCards("mainWorkplaceId", L.mainWorkplace)}
           </div>
 
-          {/* Allgemeiner Gesundheitszustand */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Allgemeiner Gesundheitszustand{" "}
-              <span className="text-red-500">*</span>
-            </label>
-            {renderOptionButtons(
-              "healthStatusId",
-              L.healthStatus,
-              Math.min(L.healthStatus.length, 5),
-            )}
+          {/* Gesundheit + Urbanität */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Allgemeiner Gesundheitszustand{" "}
+                <span className="text-red-500">*</span>
+              </label>
+              {renderOptionCards("healthStatusId", L.healthStatus)}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Urbanität <span className="text-red-500">*</span>
+              </label>
+              {renderOptionCards("urbanityId", L.urbanity)}
+            </div>
           </div>
 
-          {/* Staatsangehörigkeit */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Staatsangehörigkeit <span className="text-red-500">*</span>
-            </label>
-            {renderOptionButtons(
-              "nationalityId",
-              L.nationality,
-              Math.min(L.nationality.length, 4),
-            )}
+          {/* Staatsangehörigkeit + Region — Suchfelder */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Staatsangehörigkeit <span className="text-red-500">*</span>
+              </label>
+              <SearchableSelect
+                options={L.nationality}
+                value={formData.nationalityId}
+                onChange={(val) => updateField("nationalityId", val)}
+                placeholder="Staatsangehörigkeit suchen…"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Region / Wohnort <span className="text-red-500">*</span>
+              </label>
+              <SearchableSelect
+                options={L.region}
+                value={formData.regionId}
+                onChange={(val) => updateField("regionId", val)}
+                placeholder="Region suchen…"
+              />
+            </div>
           </div>
 
-          {/* Region / Wohnort */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Region / Wohnort <span className="text-red-500">*</span>
-            </label>
-            {renderOptionButtons(
-              "regionId",
-              L.region,
-              Math.min(L.region.length, 4),
-            )}
-          </div>
-
-          {/* Urbanität */}
-          <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Urbanität <span className="text-red-500">*</span>
-            </label>
-            {renderOptionButtons(
-              "urbanityId",
-              L.urbanity,
-              Math.min(L.urbanity.length, 3),
-            )}
-          </div>
-
-          {/* Submit Button */}
+          {/* Submit */}
           <div className="pt-4 border-t border-slate-200 flex items-center gap-4">
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-3 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition-colors disabled:opacity-50 text-sm font-medium"
             >
               {saving ? (
                 <Loader2 size={18} className="animate-spin" />
