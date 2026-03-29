@@ -149,7 +149,13 @@ export default function Home() {
         aria-hidden="true"
       />
       <div className="relative w-full max-w-sm">
-        <div className="mb-8 text-center">
+        <div className="mb-8 text-center flex flex-col items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icon.svg"
+            alt="Time Use Tool"
+            className="h-16 w-16 drop-shadow-lg"
+          />
           <h1 className="text-2xl font-semibold text-slate-800">
             Time Use Tool
           </h1>

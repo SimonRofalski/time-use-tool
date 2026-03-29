@@ -298,15 +298,12 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950/95">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <div>
+          <div className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.svg" alt="" className="h-8 w-8" />
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
               Time Use Tool
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {adminMode
-                ? "Admin Center"
-                : "Zeittagebuch – 10-Minuten-Intervalle"}
-            </p>
           </div>
 
           <div className="flex items-center gap-2">

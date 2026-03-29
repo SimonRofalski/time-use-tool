@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="seg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="seg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="seg3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="seg4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f87171"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="248" fill="url(#bgGrad)"/>
+
+  <!-- Outer ring -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="url(#ringGrad)" stroke-width="6" opacity="0.3"/>
+
+  <!-- Activity segments (pie-chart style arcs) -->
+  <!-- Segment 1: ~100° from top (work) - indigo -->
+  <path d="M256 256 L256 60 A196 196 0 0 1 441 196 Z" fill="url(#seg1)" opacity="0.85"/>
+  <!-- Segment 2: ~80° (learning) - green -->
+  <path d="M256 256 L441 196 A196 196 0 0 1 414 384 Z" fill="url(#seg2)" opacity="0.85"/>
+  <!-- Segment 3: ~70° (leisure) - amber -->
+  <path d="M256 256 L414 384 A196 196 0 0 1 256 452 Z" fill="url(#seg3)" opacity="0.85"/>
+  <!-- Segment 4: ~110° (rest/other) - red -->
+  <path d="M256 256 L256 452 A196 196 0 0 1 72 196 Z" fill="url(#seg4)" opacity="0.85"/>
+
+  <!-- Inner circle (clock face) -->
+  <circle cx="256" cy="256" r="120" fill="url(#bgGrad)"/>
+  <circle cx="256" cy="256" r="118" fill="none" stroke="#475569" stroke-width="1"/>
+
+  <!-- Hour markers -->
+  <line x1="256" y1="148" x2="256" y2="162" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+  <line x1="346" y1="256" x2="332" y2="256" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+  <line x1="256" y1="364" x2="256" y2="350" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+  <line x1="166" y1="256" x2="180" y2="256" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Small hour markers -->
+  <circle cx="299" cy="155" r="2.5" fill="#64748b"/>
+  <circle cx="333" cy="186" r="2.5" fill="#64748b"/>
+  <circle cx="350" cy="213" r="2.5" fill="#64748b"/>
+  <circle cx="350" cy="299" r="2.5" fill="#64748b"/>
+  <circle cx="333" cy="326" r="2.5" fill="#64748b"/>
+  <circle cx="299" cy="357" r="2.5" fill="#64748b"/>
+  <circle cx="213" cy="357" r="2.5" fill="#64748b"/>
+  <circle cx="179" cy="326" r="2.5" fill="#64748b"/>
+  <circle cx="162" cy="299" r="2.5" fill="#64748b"/>
+  <circle cx="162" cy="213" r="2.5" fill="#64748b"/>
+  <circle cx="179" cy="186" r="2.5" fill="#64748b"/>
+  <circle cx="213" cy="155" r="2.5" fill="#64748b"/>
+
+  <!-- Clock hands -->
+  <!-- Hour hand (pointing ~10 o'clock) -->
+  <line x1="256" y1="256" x2="210" y2="185" stroke="#e2e8f0" stroke-width="5" stroke-linecap="round"/>
+  <!-- Minute hand (pointing ~2 o'clock) -->
+  <line x1="256" y1="256" x2="316" y2="188" stroke="#e2e8f0" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Center dot -->
+  <circle cx="256" cy="256" r="8" fill="#3b82f6"/>
+  <circle cx="256" cy="256" r="4" fill="#e2e8f0"/>
+
+  <!-- Small decorative data dots on outer ring -->
+  <circle cx="256" cy="40" r="5" fill="#60a5fa" opacity="0.8"/>
+  <circle cx="450" cy="256" r="5" fill="#34d399" opacity="0.8"/>
+  <circle cx="256" cy="472" r="5" fill="#fbbf24" opacity="0.8"/>
+  <circle cx="62" cy="256" r="5" fill="#f87171" opacity="0.8"/>
+</svg>
