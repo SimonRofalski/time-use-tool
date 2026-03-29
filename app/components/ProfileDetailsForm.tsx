@@ -42,6 +42,37 @@ interface FormData {
   urbanityId: string;
 }
 
+type RequiredField =
+  | "genderId"
+  | "age"
+  | "maritalStatusId"
+  | "partnerInHousehold"
+  | "childrenInHouseholdId"
+  | "educationLevelId"
+  | "employmentStatusIds"
+  | "occupationalStatusId"
+  | "weeklyWorkHours"
+  | "mainWorkplaceId"
+  | "healthStatusId"
+  | "regionId"
+  | "urbanityId";
+
+const requiredFields: RequiredField[] = [
+  "genderId",
+  "age",
+  "maritalStatusId",
+  "partnerInHousehold",
+  "childrenInHouseholdId",
+  "educationLevelId",
+  "employmentStatusIds",
+  "occupationalStatusId",
+  "weeklyWorkHours",
+  "mainWorkplaceId",
+  "healthStatusId",
+  "regionId",
+  "urbanityId",
+];
+
 const emptyForm: FormData = {
   genderId: "",
   age: "",
@@ -148,18 +179,42 @@ function formatRole(role: string) {
   return role === "admin" ? "Admin" : "User";
 }
 
+function getMissingRequiredFields(form: FormData): RequiredField[] {
+  const missingFields: RequiredField[] = [];
+
+  if (!form.genderId) missingFields.push("genderId");
+  if (!/^\d{1,2}$/.test(form.age)) missingFields.push("age");
+  if (!form.maritalStatusId) missingFields.push("maritalStatusId");
+  if (!form.partnerInHousehold) missingFields.push("partnerInHousehold");
+  if (!form.childrenInHouseholdId) missingFields.push("childrenInHouseholdId");
+  if (!form.educationLevelId) missingFields.push("educationLevelId");
+  if (form.employmentStatusIds.length === 0) {
+    missingFields.push("employmentStatusIds");
+  }
+  if (!form.occupationalStatusId) missingFields.push("occupationalStatusId");
+  if (!form.weeklyWorkHours.trim()) missingFields.push("weeklyWorkHours");
+  if (!form.mainWorkplaceId) missingFields.push("mainWorkplaceId");
+  if (!form.healthStatusId) missingFields.push("healthStatusId");
+  if (!form.regionId) missingFields.push("regionId");
+  if (!form.urbanityId) missingFields.push("urbanityId");
+
+  return missingFields;
+}
+
 function SearchableSelect({
   options,
   value,
   onChange,
   placeholder,
   disabled,
+  invalid = false,
 }: {
   options: LookupRow[];
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   disabled: boolean;
+  invalid?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -217,7 +272,9 @@ function SearchableSelect({
           className={`w-full rounded-xl border px-4 py-3 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 ${
             disabled
               ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-              : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-500"
+              : invalid
+                ? "border-red-300 bg-white focus:border-red-500 focus:ring-red-500"
+                : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-500"
           }`}
         />
       </div>
@@ -261,13 +318,17 @@ export default function ProfileDetailsForm({
   initialEditMode = true,
   showAccountInfoBar = true,
   showPopupHint = true,
+  requireCompletion = false,
+  onEditStateChange,
   onSaved,
 }: {
   allowEditToggle?: boolean;
   initialEditMode?: boolean;
   showAccountInfoBar?: boolean;
   showPopupHint?: boolean;
-  onSaved?: () => void;
+  requireCompletion?: boolean;
+  onEditStateChange?: (isEditing: boolean) => void;
+  onSaved?: () => void | Promise<void>;
 }) {
   const supabase = getSupabaseBrowserClient();
   const savedFormData = useRef<string>(JSON.stringify(emptyForm));
@@ -282,9 +343,16 @@ export default function ProfileDetailsForm({
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(initialEditMode);
+  const [missingRequiredFields, setMissingRequiredFields] = useState<
+    RequiredField[]
+  >([]);
 
   const isDirty = JSON.stringify(formData) !== savedFormData.current;
-  const isInteractive = allowEditToggle ? isEditing : true;
+  const isInteractive = requireCompletion
+    ? true
+    : allowEditToggle
+      ? isEditing
+      : true;
   const formId = useId();
 
   useEffect(() => {
@@ -409,13 +477,26 @@ export default function ProfileDetailsForm({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty, isInteractive]);
 
+  useEffect(() => {
+    onEditStateChange?.(isEditing);
+  }, [isEditing, onEditStateChange]);
+
   const updateField = (field: keyof FormData, value: string) => {
     if (!isInteractive) {
       return;
     }
 
+    if (requiredFields.includes(field as RequiredField)) {
+      setMissingRequiredFields((previous) =>
+        previous.filter((item) => item !== field),
+      );
+    }
+
     setFormData((previous) => ({ ...previous, [field]: value }));
   };
+
+  const hasMissingField = (field: keyof FormData) =>
+    missingRequiredFields.includes(field as RequiredField);
 
   const renderOptionCards = (field: keyof FormData, options: LookupRow[]) => (
     <div className="space-y-2">
@@ -482,6 +563,102 @@ export default function ProfileDetailsForm({
     );
   };
 
+  const renderQuestionPanel = (
+    field: keyof FormData,
+    label: string,
+    content: React.ReactNode,
+    helperText?: string,
+    isRequired = true,
+  ) => (
+    <div
+      data-required-field={field}
+      className={`rounded-2xl border p-4 ${
+        hasMissingField(field)
+          ? "border-red-300 bg-red-50/60 dark:border-red-500/40 dark:bg-red-500/10"
+          : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/40"
+      }`}
+    >
+      <div
+        className={`mb-3 border-b pb-3 ${
+          hasMissingField(field)
+            ? "border-red-200 dark:border-red-500/30"
+            : "border-slate-200 dark:border-slate-800"
+        }`}
+      >
+        <label className="block text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {label} {isRequired && <span className="text-red-500">*</span>}
+        </label>
+        {helperText && (
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {helperText}
+          </p>
+        )}
+        {hasMissingField(field) && (
+          <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-300">
+            Bitte ausfüllen oder auswählen.
+          </p>
+        )}
+      </div>
+      {content}
+    </div>
+  );
+
+  const renderMultiSelectCardsGrid = (options: LookupRow[]) => (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      {options.map((option) => {
+        const selected = formData.employmentStatusIds.includes(
+          String(option.id),
+        );
+
+        return (
+          <button
+            key={option.id}
+            type="button"
+            disabled={!isInteractive}
+            onClick={() => {
+              if (!isInteractive) {
+                return;
+              }
+
+              setFormData((previous) => {
+                const nextEmploymentStatusIds = selected
+                  ? previous.employmentStatusIds.filter(
+                      (value) => value !== String(option.id),
+                    )
+                  : previous.employmentStatusIds.length < 2
+                    ? [...previous.employmentStatusIds, String(option.id)]
+                    : previous.employmentStatusIds;
+
+                setMissingRequiredFields((missingPrevious) =>
+                  nextEmploymentStatusIds.length > 0
+                    ? missingPrevious.filter(
+                        (item) => item !== "employmentStatusIds",
+                      )
+                    : missingPrevious,
+                );
+
+                return {
+                  ...previous,
+                  employmentStatusIds: nextEmploymentStatusIds,
+                };
+              });
+            }}
+            className={`flex items-center justify-between rounded-xl border-2 px-4 py-3 text-left text-sm transition-all ${
+              selected
+                ? "border-blue-500 bg-blue-50 text-blue-700"
+                : isInteractive
+                  ? "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                  : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+            }`}
+          >
+            <span>{option.name}</span>
+            {selected && <Check size={18} className="text-blue-600" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user || !isInteractive) {
@@ -490,6 +667,21 @@ export default function ProfileDetailsForm({
 
     setSaving(true);
     setSaveError(null);
+
+    const missingFields = getMissingRequiredFields(formData);
+    if (missingFields.length > 0) {
+      setMissingRequiredFields(missingFields);
+      setSaveError("Bitte füllen Sie alle Pflichtfelder aus.");
+      setSaving(false);
+
+      if (typeof document !== "undefined") {
+        document
+          .querySelector(`[data-required-field="${missingFields[0]}"]`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+
+      return;
+    }
 
     try {
       const row = formToUserDataRow(formData, user.id);
@@ -535,12 +727,13 @@ export default function ProfileDetailsForm({
       }
 
       savedFormData.current = JSON.stringify(formData);
+      setMissingRequiredFields([]);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-      if (allowEditToggle) {
+      if (allowEditToggle && !requireCompletion) {
         setIsEditing(false);
       }
-      onSaved?.();
+      await onSaved?.();
     } catch (error: unknown) {
       const message =
         error && typeof error === "object" && "message" in error
@@ -554,6 +747,7 @@ export default function ProfileDetailsForm({
 
   function handleCancelEdit() {
     setFormData(JSON.parse(savedFormData.current) as FormData);
+    setMissingRequiredFields([]);
     setSaveError(null);
     setIsEditing(false);
   }
@@ -614,8 +808,8 @@ export default function ProfileDetailsForm({
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-6 flex items-start justify-between gap-4 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="sticky top-0 z-20 flex items-start justify-between gap-4 rounded-t-xl border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
           <div className="flex items-center gap-3">
             <User className="text-blue-600" size={28} />
             <div>
@@ -634,7 +828,7 @@ export default function ProfileDetailsForm({
             </div>
           </div>
 
-          {allowEditToggle && (
+          {(allowEditToggle || requireCompletion) && (
             <div className="flex flex-wrap items-center justify-end gap-2">
               {saved && (
                 <span className="text-sm font-medium text-green-600">
@@ -646,7 +840,21 @@ export default function ProfileDetailsForm({
                   {saveError}
                 </span>
               )}
-              {!isEditing ? (
+              {requireCompletion ? (
+                <button
+                  type="submit"
+                  form={formId}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
+                >
+                  {saving ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                  {saving ? "Speichern..." : "Profil speichern"}
+                </button>
+              ) : !isEditing ? (
                 <button
                   type="button"
                   onClick={() => setIsEditing(true)}
@@ -684,52 +892,51 @@ export default function ProfileDetailsForm({
           )}
         </div>
 
-        <form id={formId} onSubmit={handleSubmit} className="space-y-8">
+        <form id={formId} onSubmit={handleSubmit} className="space-y-8 p-6">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Geschlecht <span className="text-red-500">*</span>
-              </label>
-              {renderOptionCardsGrid("genderId", lookupData.gender, 2)}
-            </div>
+            {renderQuestionPanel(
+              "genderId",
+              "Geschlecht",
+              renderOptionCardsGrid("genderId", lookupData.gender, 2),
+            )}
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Alter <span className="text-red-500">*</span>
-              </label>
+            {renderQuestionPanel(
+              "age",
+              "Alter",
               <input
-                type="number"
+                type="text"
                 value={formData.age}
+                inputMode="numeric"
+                maxLength={2}
+                placeholder="z.b. 32"
                 disabled={!isInteractive}
                 onChange={(event) => {
                   const value = event.target.value;
-                  if (value === "" || value.length <= 4) {
+                  if (/^\d{0,2}$/.test(value)) {
                     updateField("age", value);
                   }
                 }}
                 className={`w-full rounded-xl border-2 px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
                   isInteractive
-                    ? "border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                    ? hasMissingField("age")
+                      ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                      : "border-slate-200 focus:border-blue-500 focus:ring-blue-500"
                     : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
                 }`}
-              />
-            </div>
+              />,
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Zivilstand / Familienstand{" "}
-                <span className="text-red-500">*</span>
-              </label>
-              {renderOptionCards("maritalStatusId", lookupData.maritalStatus)}
-            </div>
+            {renderQuestionPanel(
+              "maritalStatusId",
+              "Zivilstand / Familienstand",
+              renderOptionCards("maritalStatusId", lookupData.maritalStatus),
+            )}
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Lebt ein/e Partner/in im selben Haushalt?{" "}
-                <span className="text-red-500">*</span>
-              </label>
+            {renderQuestionPanel(
+              "partnerInHousehold",
+              "Lebt ein/e Partner/in im selben Haushalt?",
               <div className="space-y-2">
                 {[
                   { value: "true", label: "Ja" },
@@ -759,175 +966,133 @@ export default function ProfileDetailsForm({
                     </button>
                   );
                 })}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Anzahl Kinder im Haushalt <span className="text-red-500">*</span>
-            </label>
-            {renderOptionCardsGrid(
-              "childrenInHouseholdId",
-              lookupData.childrenInHousehold,
-              Math.min(lookupData.childrenInHousehold.length, 4) as 2 | 3 | 4,
+              </div>,
             )}
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Höchster abgeschlossener Bildungsabschluss{" "}
-              <span className="text-red-500">*</span>
-            </label>
-            {renderOptionCards("educationLevelId", lookupData.educationLevel)}
-          </div>
+          {renderQuestionPanel(
+            "childrenInHouseholdId",
+            "Anzahl Kinder im Haushalt",
+            renderOptionCardsGrid(
+              "childrenInHouseholdId",
+              lookupData.childrenInHousehold,
+              Math.min(lookupData.childrenInHousehold.length, 4) as 2 | 3 | 4,
+            ),
+          )}
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Aktueller Erwerbsstatus <span className="text-red-500">*</span>
-              <span className="ml-2 text-xs text-slate-400">
-                (Mehrfachauswahl möglich)
-              </span>
-            </label>
-            <div className="space-y-2">
-              {lookupData.employmentStatus.map((option) => {
-                const selected = formData.employmentStatusIds.includes(
-                  String(option.id),
-                );
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    disabled={!isInteractive}
-                    onClick={() => {
-                      if (!isInteractive) {
-                        return;
-                      }
+          {renderQuestionPanel(
+            "educationLevelId",
+            "Höchster abgeschlossener Bildungsabschluss",
+            renderOptionCardsGrid(
+              "educationLevelId",
+              lookupData.educationLevel,
+              Math.min(lookupData.educationLevel.length, 3) as 2 | 3 | 4,
+            ),
+          )}
 
-                      setFormData((previous) => ({
-                        ...previous,
-                        employmentStatusIds: selected
-                          ? previous.employmentStatusIds.filter(
-                              (value) => value !== String(option.id),
-                            )
-                          : previous.employmentStatusIds.length < 2
-                            ? [
-                                ...previous.employmentStatusIds,
-                                String(option.id),
-                              ]
-                            : previous.employmentStatusIds,
-                      }));
-                    }}
-                    className={`flex w-full items-center justify-between rounded-xl border-2 px-4 py-3 text-left text-sm transition-all ${
-                      selected
-                        ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : isInteractive
-                          ? "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                          : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-                    }`}
-                  >
-                    <span>{option.name}</span>
-                    {selected && <Check size={18} className="text-blue-600" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {renderQuestionPanel(
+            "employmentStatusIds",
+            "Aktueller Erwerbsstatus",
+            renderMultiSelectCardsGrid(lookupData.employmentStatus),
+            "Mehrfachauswahl möglich, maximal 2 Antworten.",
+          )}
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Stellung im Beruf <span className="text-red-500">*</span>
-              </label>
-              {renderOptionCards(
+            {renderQuestionPanel(
+              "occupationalStatusId",
+              "Stellung im Beruf",
+              renderOptionCards(
                 "occupationalStatusId",
                 lookupData.occupationalStatus,
-              )}
-            </div>
+              ),
+            )}
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Übliche Wochenarbeitszeit{" "}
-                <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                value={formData.weeklyWorkHours}
-                disabled={!isInteractive}
-                onChange={(event) =>
-                  updateField("weeklyWorkHours", event.target.value)
-                }
-                placeholder="z.B. 40"
-                min="0"
-                max="100"
-                className={`w-full rounded-xl border-2 px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
-                  isInteractive
-                    ? "border-slate-200 focus:border-blue-500 focus:ring-blue-500"
-                    : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-                }`}
-              />
-              {formData.weeklyWorkHours && (
-                <p className="mt-1 text-xs text-slate-400">
-                  ≈{" "}
-                  {Math.round(
-                    (parseFloat(formData.weeklyWorkHours) / 41) * 100,
-                  )}
-                  % Pensum (Basis: 41 h/Woche CH)
-                </p>
-              )}
-            </div>
+            {renderQuestionPanel(
+              "weeklyWorkHours",
+              "Übliche Wochenarbeitszeit",
+              <>
+                <input
+                  type="number"
+                  value={formData.weeklyWorkHours}
+                  disabled={!isInteractive}
+                  onChange={(event) =>
+                    updateField("weeklyWorkHours", event.target.value)
+                  }
+                  placeholder="z.B. 40"
+                  min="0"
+                  max="100"
+                  className={`w-full rounded-xl border-2 px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
+                    isInteractive
+                      ? hasMissingField("weeklyWorkHours")
+                        ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                        : "border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                      : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                  }`}
+                />
+                {formData.weeklyWorkHours && (
+                  <p className="mt-1 text-xs text-slate-400">
+                    ≈{" "}
+                    {Math.round(
+                      (parseFloat(formData.weeklyWorkHours) / 41) * 100,
+                    )}
+                    % Pensum (Basis: 41 h/Woche CH)
+                  </p>
+                )}
+              </>,
+            )}
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Hauptarbeitsort <span className="text-red-500">*</span>
-            </label>
-            {renderOptionCards("mainWorkplaceId", lookupData.mainWorkplace)}
-          </div>
+          {renderQuestionPanel(
+            "mainWorkplaceId",
+            "Hauptarbeitsort",
+            renderOptionCardsGrid(
+              "mainWorkplaceId",
+              lookupData.mainWorkplace,
+              Math.min(lookupData.mainWorkplace.length, 3) as 2 | 3 | 4,
+            ),
+          )}
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Allgemeiner Gesundheitszustand{" "}
-                <span className="text-red-500">*</span>
-              </label>
-              {renderOptionCards("healthStatusId", lookupData.healthStatus)}
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Urbanität <span className="text-red-500">*</span>
-              </label>
-              {renderOptionCards("urbanityId", lookupData.urbanity)}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Staatsangehörigkeit <span className="text-red-500">*</span>
-              </label>
+            {renderQuestionPanel(
+              "nationalityId",
+              "Staatsangehörigkeit",
               <SearchableSelect
                 options={lookupData.nationality}
                 value={formData.nationalityId}
                 onChange={(value) => updateField("nationalityId", value)}
                 placeholder="Staatsangehörigkeit suchen…"
                 disabled={!isInteractive}
-              />
-            </div>
+              />,
+              undefined,
+              false,
+            )}
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Region / Wohnort <span className="text-red-500">*</span>
-              </label>
+            {renderQuestionPanel(
+              "regionId",
+              "Region / Wohnort",
               <SearchableSelect
                 options={lookupData.region}
                 value={formData.regionId}
                 onChange={(value) => updateField("regionId", value)}
                 placeholder="Region suchen…"
                 disabled={!isInteractive}
-              />
-            </div>
+                invalid={hasMissingField("regionId")}
+              />,
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            {renderQuestionPanel(
+              "healthStatusId",
+              "Allgemeiner Gesundheitszustand",
+              renderOptionCards("healthStatusId", lookupData.healthStatus),
+            )}
+
+            {renderQuestionPanel(
+              "urbanityId",
+              "Urbanität",
+              renderOptionCards("urbanityId", lookupData.urbanity),
+            )}
           </div>
         </form>
       </div>
