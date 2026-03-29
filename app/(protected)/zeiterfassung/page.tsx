@@ -1,8 +1,630 @@
-export default function ZeiterfassungPage() {
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import TimeGrid from "./TimeGrid";
+import ActivitySelector from "./ActivitySelector";
+import {
+  type TimeEntryRecord,
+  type PendingEntry,
+  type QuestionnaireStep,
+  type LookupData,
+} from "./types";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const TOTAL_SLOTS_PER_DAY = 144;
+
+// ─── Pure helper functions ────────────────────────────────────────────────────
+
+// Generates every date string between startDate and endDate (inclusive)
+function generateDateRange(startDate: string, endDate: string): string[] {
+  const dates: string[] = [];
+  const current = new Date(startDate);
+  const last = new Date(endDate);
+  while (current <= last) {
+    dates.push(current.toISOString().split("T")[0]);
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+}
+
+// Formats a date string to German long format: "Freitag, 28. März 2026"
+function formatDateGerman(dateString: string): string {
+  return new Date(dateString).toLocaleDateString("de-DE", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+// Strips seconds from a DB time string: "08:30:00" → "08:30"
+function normalizeDbTime(dbTime: string): string {
+  return dbTime.substring(0, 5);
+}
+
+// Calculates how many 10-minute slots are covered by a time range
+// Handles the midnight wrap: end_time "00:00" after a non-zero start means 1440 min
+function calculateCoveredSlots(startTime: string, endTime: string): number {
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  const startMinTotal = sh * 60 + sm;
+  const endMinTotal = (eh === 0 && em === 0 && startMinTotal > 0) ? 1440 : eh * 60 + em;
+  return Math.round((endMinTotal - startMinTotal) / 10);
+}
+
+// Computes the DB end_time string for one 10-minute slot
+// e.g. "08:50" → "09:00:00"
+// Special case: the last slot (23:50) ends at midnight — stored as "00:00:00"
+// because PostgreSQL TIME arithmetic wraps 23:50 + 10min → 00:00, not 24:00
+function getSlotEndTime(slot: string): string {
+  const [h, m] = slot.split(":").map(Number);
+  const endTotal = h * 60 + m + 10;
+  if (endTotal >= 1440) return "00:00:00";
+  return `${Math.floor(endTotal / 60).toString().padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}:00`;
+}
+
+// Determines the next questionnaire step based on the current step and pending data
+// Returns null when all steps are complete and the entry should be saved
+function getNextStep(
+  currentStep: QuestionnaireStep,
+  entry: PendingEntry
+): QuestionnaireStep | null {
+  switch (currentStep) {
+    case "primary_activity":   return "secondary_activity";
+    case "secondary_activity": return "digital_media";
+    case "digital_media":      return entry.digital_media_used ? "digital_media_type" : "location_transport";
+    case "digital_media_type": return "location_transport";
+    case "location_transport": return "social_context";
+    case "social_context":     return "satisfaction";
+    case "satisfaction":       return null;
+  }
+}
+
+// Creates a blank PendingEntry for a fresh questionnaire
+function createEmptyPendingEntry(slots: string[]): PendingEntry {
+  return {
+    slots,
+    primary_activity_id: null,
+    secondary_activity_id: null,
+    digital_media_used: false,
+    digital_media_type_id: null,
+    location_transport_id: null,
+    social_context_ids: [],
+    satisfaction_id: null,
+  };
+}
+
+// Checks if all selected slots already have entries with identical activity data.
+// If so, pre-fills the questionnaire for editing. Otherwise returns null (fresh start).
+// Mixed selections (some filled, some empty, or different data) always return null.
+function getPreloadedEntry(
+  selectedSlots: Set<string>,
+  existingEntries: TimeEntryRecord[]
+): PendingEntry | null {
+  const slotList = [...selectedSlots].sort();
+
+  // Match existing entries by start_time (one entry per slot)
+  const matchingEntries = existingEntries.filter((e) =>
+    slotList.includes(e.start_time)
+  );
+
+  // No existing data → fresh entry
+  if (matchingEntries.length === 0) return null;
+
+  // Mixed: some slots filled, some empty → overwrite, start fresh
+  if (matchingEntries.length !== slotList.length) return null;
+
+  // All slots filled — only pre-load if every entry has identical activity data
+  const first = matchingEntries[0];
+  const allIdentical = matchingEntries.every(
+    (e) =>
+      e.primary_activity_id === first.primary_activity_id &&
+      e.secondary_activity_id === first.secondary_activity_id &&
+      e.satisfaction_id === first.satisfaction_id &&
+      e.location_transport_id === first.location_transport_id &&
+      e.digital_media_used === first.digital_media_used &&
+      e.digital_media_type_id === first.digital_media_type_id
+  );
+
+  if (!allIdentical) return null;
+
+  return {
+    slots: slotList,
+    primary_activity_id: first.primary_activity_id,
+    secondary_activity_id: first.secondary_activity_id,
+    digital_media_used: first.digital_media_used,
+    digital_media_type_id: first.digital_media_type_id,
+    location_transport_id: first.location_transport_id,
+    social_context_ids: first.social_context_ids,
+    satisfaction_id: first.satisfaction_id,
+  };
+}
+
+// Maps a raw Supabase row (with nested social_context join) to TimeEntryRecord
+function mapRawEntryToRecord(raw: any): TimeEntryRecord {
+  return {
+    entry_id: raw.entry_id,
+    day_id: raw.day_id,
+    start_time: normalizeDbTime(raw.start_time),
+    end_time: normalizeDbTime(raw.end_time),
+    primary_activity_id: raw.primary_activity_id,
+    secondary_activity_id: raw.secondary_activity_id ?? null,
+    satisfaction_id: raw.satisfaction_id ?? null,
+    location_transport_id: raw.location_transport_id ?? null,
+    digital_media_used: raw.digital_media_used,
+    digital_media_type_id: raw.digital_media_type_id ?? null,
+    social_context_ids:
+      raw.time_entry_social_context?.map((sc: any) => sc.social_context_id) ?? [],
+  };
+}
+
+// ─── CompletionBar component ──────────────────────────────────────────────────
+
+// Shows the current date with prev/next arrows and a slot-fill progress bar
+function CompletionBar({
+  currentDate,
+  coveredSlots,
+  allDates,
+  onDateChange,
+}: {
+  currentDate: string;
+  coveredSlots: number;
+  allDates: string[];
+  onDateChange: (date: string) => void;
+}) {
+  const currentIndex = allDates.indexOf(currentDate);
+  const canGoPrev = currentIndex > 0;
+  const canGoNext = currentIndex < allDates.length - 1;
+  const progressPercent = Math.min(
+    Math.round((coveredSlots / TOTAL_SLOTS_PER_DAY) * 100),
+    100
+  );
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold">Zeiterfassung</h1>
-      <p>Hier kommt die Zeiterfassungs-Ansicht.</p>
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      {/* Date row with prev/next navigation */}
+      <div className="flex items-center justify-between mb-2">
+        <button
+          type="button"
+          onClick={() => canGoPrev && onDateChange(allDates[currentIndex - 1])}
+          disabled={!canGoPrev}
+          className="text-xs font-medium text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          ← Vorher
+        </button>
+        <span className="text-sm font-semibold text-slate-800">
+          {formatDateGerman(currentDate)}
+        </span>
+        <button
+          type="button"
+          onClick={() => canGoNext && onDateChange(allDates[currentIndex + 1])}
+          disabled={!canGoNext}
+          className="text-xs font-medium text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          Nächster →
+        </button>
+      </div>
+
+      {/* Progress bar + slot count */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-2 rounded-full bg-slate-100">
+          <div
+            className="h-2 rounded-full bg-blue-500 transition-all duration-500"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+        <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+          {coveredSlots} / {TOTAL_SLOTS_PER_DAY} · {progressPercent}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page component ──────────────────────────────────────────────────────
+
+export default function ZeiterfassungPage() {
+  const supabase = getSupabaseBrowserClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Auth + course
+  const [userId, setUserId] = useState<string | null>(null);
+  const [courseId, setCourseId] = useState<number | null>(null);
+  const [allDates, setAllDates] = useState<string[]>([]);
+
+  // Current day
+  const [currentDate, setCurrentDate] = useState<string>("");
+  const [dayId, setDayId] = useState<number | null>(null);
+  const [existingEntries, setExistingEntries] = useState<TimeEntryRecord[]>([]);
+  const [coveredSlots, setCoveredSlots] = useState(0);
+
+  // Grid + questionnaire
+  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+  const [pendingEntry, setPendingEntry] = useState<PendingEntry | null>(null);
+  const [currentStep, setCurrentStep] = useState<QuestionnaireStep | null>(null);
+  const [stepHistory, setStepHistory] = useState<QuestionnaireStep[]>([]);
+
+  // Lookup data (reference tables)
+  const [lookupData, setLookupData] = useState<LookupData | null>(null);
+
+  // UI state
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    loadPageData();
+  }, []);
+
+  // Reload day entries whenever the date or user/course changes
+  useEffect(() => {
+    if (!currentDate || !userId || courseId === null) return;
+    loadDayData(currentDate);
+  }, [currentDate, userId, courseId]);
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+
+  // Loads auth, course enrollment, lookup tables, and determines the initial date
+  async function loadPageData() {
+    setIsLoading(true);
+
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData.user) { router.push("/"); return; }
+    const uid = authData.user.id;
+    setUserId(uid);
+
+    // Get course enrollment
+    const { data: userCourse } = await supabase
+      .from("user_course").select("course_id").eq("profiles_id", uid).single();
+    if (!userCourse) {
+      setErrorMessage("Kein Kurs gefunden."); setIsLoading(false); return;
+    }
+    const cid = userCourse.course_id;
+    setCourseId(cid);
+
+    // Load course date range
+    const { data: course } = await supabase
+      .from("course").select("start_date, end_date").eq("course_id", cid).single();
+    if (!course) {
+      setErrorMessage("Kursdaten konnten nicht geladen werden."); setIsLoading(false); return;
+    }
+    const dates = generateDateRange(course.start_date, course.end_date);
+    setAllDates(dates);
+
+    // Load all lookup tables in parallel for speed
+    const [cats, subs, acts, locs, socials, media, sats] = await Promise.all([
+      supabase.from("category").select("*").order("category_id"),
+      supabase.from("subcategory").select("*").order("subcategory_id"),
+      supabase.from("activity").select("*").order("activity_id"),
+      supabase.from("location_transport").select("*").order("location_transport_id"),
+      supabase.from("social_context").select("*").order("social_context_id"),
+      supabase.from("digital_media_type").select("*").order("digital_media_type_id"),
+      supabase.from("satisfaction").select("*").order("satisfaction_id"),
+    ]);
+    setLookupData({
+      categories: cats.data ?? [],
+      subcategories: subs.data ?? [],
+      activities: acts.data ?? [],
+      locationTransports: locs.data ?? [],
+      socialContexts: socials.data ?? [],
+      digitalMediaTypes: media.data ?? [],
+      satisfactions: sats.data ?? [],
+    });
+
+    // Determine initial date: URL param → today → earliest incomplete → last
+    const dateFromUrl = searchParams.get("date");
+    const today = new Date().toISOString().split("T")[0];
+    let targetDate: string;
+
+    if (dateFromUrl && dates.includes(dateFromUrl)) {
+      targetDate = dateFromUrl;
+    } else if (dates.includes(today)) {
+      targetDate = today;
+    } else {
+      const { data: dayRecords } = await supabase
+        .from("day").select("date, is_complete")
+        .eq("profiles_id", uid).eq("course_id", cid);
+      const completedDates = new Set(
+        (dayRecords ?? []).filter((d) => d.is_complete).map((d) => d.date)
+      );
+      targetDate = dates.find((d) => !completedDates.has(d)) ?? dates[dates.length - 1];
+    }
+
+    setCurrentDate(targetDate);
+    setIsLoading(false);
+  }
+
+  // Loads the day record and entries for the given date
+  async function loadDayData(date: string) {
+    if (!userId || courseId === null) return;
+
+    const { data: dayRecord } = await supabase
+      .from("day").select("day_id")
+      .eq("profiles_id", userId).eq("course_id", courseId).eq("date", date)
+      .single();
+
+    const loadedDayId = dayRecord?.day_id ?? null;
+    setDayId(loadedDayId);
+
+    if (loadedDayId === null) {
+      setExistingEntries([]);
+      setCoveredSlots(0);
+      return;
+    }
+    await loadEntriesForDay(loadedDayId);
+  }
+
+  // Fetches all time entries (with social context) for a day_id
+  async function loadEntriesForDay(targetDayId: number) {
+    const { data: rawEntries, error } = await supabase
+      .from("time_entry")
+      .select(`
+        entry_id, day_id, start_time, end_time,
+        primary_activity_id, secondary_activity_id,
+        satisfaction_id, location_transport_id,
+        digital_media_used, digital_media_type_id,
+        time_entry_social_context ( social_context_id )
+      `)
+      .eq("day_id", targetDayId);
+
+    if (error) { setErrorMessage("Einträge konnten nicht geladen werden."); return; }
+
+    const entries = (rawEntries ?? []).map(mapRawEntryToRecord);
+    setExistingEntries(entries);
+
+    // Update progress bar
+    const totalCovered = entries.reduce(
+      (sum, e) => sum + calculateCoveredSlots(e.start_time, e.end_time), 0
+    );
+    setCoveredSlots(totalCovered);
+  }
+
+  // ── Grid interaction ──────────────────────────────────────────────────────
+
+  // Triggered when the user finishes a drag — starts the questionnaire
+  const handleSlotsSelected = useCallback(
+    (slots: Set<string>) => {
+      if (slots.size === 0) return;
+      const preloaded = getPreloadedEntry(slots, existingEntries);
+      setPendingEntry(preloaded ?? createEmptyPendingEntry([...slots].sort()));
+      setSelectedSlots(slots);
+      setCurrentStep("primary_activity");
+      setStepHistory([]);
+    },
+    [existingEntries]
+  );
+
+  // ── Questionnaire logic ───────────────────────────────────────────────────
+
+  // Merges step data into pendingEntry and advances to next step (or saves)
+  function handleStepComplete(stepData: Partial<PendingEntry>) {
+    if (!pendingEntry || !currentStep) return;
+
+    const shouldSave = (stepData as any)._save === true;
+    const isAdvance = (stepData as any)._advance === true;
+    const { _save, _advance, ...cleanData } = stepData as any;
+    const updatedEntry: PendingEntry = { ...pendingEntry, ...cleanData };
+
+    // social_context toggles fire onStepComplete for state updates without advancing
+    // only proceed when _advance is set
+    const isIntermediateUpdate =
+      currentStep === "social_context" && !isAdvance && !shouldSave;
+
+    if (isIntermediateUpdate) {
+      setPendingEntry(updatedEntry);
+      return;
+    }
+
+    setPendingEntry(updatedEntry);
+
+    if (shouldSave) { saveEntry(updatedEntry); return; }
+
+    const nextStep = getNextStep(currentStep, updatedEntry);
+    if (nextStep === null) {
+      saveEntry(updatedEntry);
+    } else {
+      setStepHistory((prev) => [...prev, currentStep]);
+      setCurrentStep(nextStep);
+    }
+  }
+
+  function handleBack() {
+    if (stepHistory.length === 0) return;
+    setCurrentStep(stepHistory[stepHistory.length - 1]);
+    setStepHistory((prev) => prev.slice(0, -1));
+  }
+
+  function handleCancel() {
+    setSelectedSlots(new Set());
+    setPendingEntry(null);
+    setCurrentStep(null);
+    setStepHistory([]);
+  }
+
+  // ── Saving ────────────────────────────────────────────────────────────────
+
+  async function saveEntry(finalEntry: PendingEntry) {
+    if (!userId || courseId === null || !finalEntry.primary_activity_id) return;
+
+    const sortedSlots = [...finalEntry.slots].sort();
+
+    // Ensure a day record exists before inserting entries
+    const activeDayId = await ensureDayRecord();
+    if (activeDayId === null) return;
+
+    // Remove any existing entries for the selected slots before inserting
+    await deleteOverlappingEntries(activeDayId, sortedSlots);
+
+    // Build one DB row per selected slot (constraint: end_time = start_time + 10 min)
+    const rowsToInsert = sortedSlots.map((slot) => ({
+      day_id: activeDayId,
+      start_time: `${slot}:00`,
+      end_time: getSlotEndTime(slot),
+      primary_activity_id: finalEntry.primary_activity_id,
+      secondary_activity_id: finalEntry.secondary_activity_id || null,
+      satisfaction_id: finalEntry.satisfaction_id || null,
+      location_transport_id: finalEntry.location_transport_id || null,
+      digital_media_used: finalEntry.digital_media_used,
+      digital_media_type_id: finalEntry.digital_media_used
+        ? finalEntry.digital_media_type_id
+        : null,
+    }));
+
+    const { data: newEntries, error: insertError } = await supabase
+      .from("time_entry")
+      .insert(rowsToInsert)
+      .select("entry_id");
+
+    if (insertError || !newEntries) {
+      setErrorMessage(`Eintrag konnte nicht gespeichert werden: ${insertError?.message ?? "unbekannter Fehler"}`);
+      return;
+    }
+
+    // Insert social context records for every newly created entry
+    if (finalEntry.social_context_ids.length > 0) {
+      const socialRows = newEntries.flatMap((entry) =>
+        finalEntry.social_context_ids.map((id) => ({
+          entry_id: entry.entry_id,
+          social_context_id: id,
+        }))
+      );
+      await supabase.from("time_entry_social_context").insert(socialRows);
+    }
+
+    // Refresh the grid and update day completion flag
+    await loadEntriesForDay(activeDayId);
+    await updateDayCompletion(activeDayId);
+    handleCancel();
+  }
+
+  // Creates a day record if one doesn't exist yet, returns the day_id
+  async function ensureDayRecord(): Promise<number | null> {
+    if (dayId !== null) return dayId;
+
+    const { data, error } = await supabase
+      .from("day")
+      .insert({ profiles_id: userId, course_id: courseId, date: currentDate })
+      .select("day_id")
+      .single();
+
+    if (error || !data) {
+      setErrorMessage(`Tageseintrag konnte nicht erstellt werden: ${error?.message ?? "unbekannter Fehler"}`);
+      return null;
+    }
+    setDayId(data.day_id);
+    return data.day_id;
+  }
+
+  // Deletes all existing entries whose start_time matches any of the selected slots
+  // Social context records are deleted first due to the foreign key constraint
+  async function deleteOverlappingEntries(
+    activeDayId: number,
+    slots: string[]
+  ) {
+    // existingEntries uses "HH:MM" — match directly against the slot strings
+    const slotsSet = new Set(slots);
+    const toDelete = existingEntries.filter((e) => slotsSet.has(e.start_time));
+    if (toDelete.length === 0) return;
+
+    const ids = toDelete.map((e) => e.entry_id);
+    await supabase.from("time_entry_social_context").delete().in("entry_id", ids);
+    await supabase.from("time_entry").delete().in("entry_id", ids);
+  }
+
+  // Counts covered slots after save and updates is_complete + is_submitted on the day record
+  // Both flags are kept in sync: a fully filled day is automatically marked as submitted,
+  // and editing it back below 144 slots un-submits it
+  async function updateDayCompletion(activeDayId: number) {
+    const { data: entries } = await supabase
+      .from("time_entry").select("start_time, end_time").eq("day_id", activeDayId);
+
+    const totalCovered = (entries ?? []).reduce(
+      (sum, e) => sum + calculateCoveredSlots(e.start_time, e.end_time), 0
+    );
+    const isComplete = totalCovered >= TOTAL_SLOTS_PER_DAY;
+    await supabase
+      .from("day")
+      .update({ is_complete: isComplete, is_submitted: isComplete })
+      .eq("day_id", activeDayId);
+  }
+
+  // ── Date navigation ───────────────────────────────────────────────────────
+
+  function handleDateChange(date: string) {
+    handleCancel(); // reset questionnaire state before switching days
+    setCurrentDate(date);
+    router.replace(`/zeiterfassung?date=${date}`);
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  if (isLoading || !lookupData || !currentDate) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-slate-500">Wird geladen...</p>
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <p className="text-sm text-red-600">{errorMessage}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Completion bar: date navigation + slot progress */}
+      <CompletionBar
+        currentDate={currentDate}
+        coveredSlots={coveredSlots}
+        allDates={allDates}
+        onDateChange={handleDateChange}
+      />
+
+      {/* Two-column layout: grid (1/3) + questionnaire panel (2/3) */}
+      <div className="flex gap-4 items-start">
+
+        {/* Left: 24×6 time grid */}
+        <div className="w-1/3 min-w-0">
+          <TimeGrid
+            existingEntries={existingEntries}
+            selectedSlots={selectedSlots}
+            lookupData={lookupData}
+            onSlotsSelected={handleSlotsSelected}
+          />
+        </div>
+
+        {/* Right: activity questionnaire or idle placeholder */}
+        <div className="w-2/3 min-w-0">
+          {currentStep && pendingEntry ? (
+            <ActivitySelector
+              step={currentStep}
+              pendingEntry={pendingEntry}
+              selectedSlots={selectedSlots}
+              lookupData={lookupData}
+              onStepComplete={handleStepComplete}
+              onBack={handleBack}
+              onCancel={handleCancel}
+            />
+          ) : (
+            <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-10 text-center">
+              <p className="text-2xl mb-3">👆</p>
+              <p className="text-sm font-medium text-slate-600">
+                Wähle einen oder mehrere Zeitslots im Raster aus
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                Klicken für einen Slot · Klicken und ziehen für mehrere
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

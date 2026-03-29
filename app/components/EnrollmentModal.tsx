@@ -3,9 +3,6 @@
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = () => getSupabaseBrowserClient() as any;
-
 type AvailableCourse = {
   course_id: number;
   name: string;
@@ -29,6 +26,8 @@ export default function EnrollmentModal({
   userId: string;
   onEnrolled: () => void;
 }) {
+  const supabase = getSupabaseBrowserClient();
+
   const [availableCourses, setAvailableCourses] = useState<AvailableCourse[]>(
     [],
   );
@@ -45,7 +44,7 @@ export default function EnrollmentModal({
   async function loadAvailableCourses() {
     setIsLoadingCourses(true);
 
-    const { data, error } = await db()
+    const { data, error } = await supabase
       .from("course")
       .select("course_id, name, start_date, end_date")
       .eq("is_locked", false)
@@ -81,7 +80,7 @@ export default function EnrollmentModal({
       return;
     }
 
-    const { data: courseData, error: fetchError } = await db()
+    const { data: courseData, error: fetchError } = await supabase
       .from("course")
       .select("course_id, accessCode")
       .eq("course_id", selectedCourseId)
@@ -95,15 +94,13 @@ export default function EnrollmentModal({
       return;
     }
 
-    if (
-      (courseData as { accessCode: string }).accessCode !== accessCode.trim()
-    ) {
+    if (courseData.accessCode !== accessCode.trim()) {
       setErrorMessage("Ungültiger Zugangscode. Bitte versuchen Sie es erneut.");
       setIsSubmitting(false);
       return;
     }
 
-    const { error: enrollError } = await db()
+    const { error: enrollError } = await supabase
       .from("user_course")
       .insert({ profiles_id: userId, course_id: selectedCourseId });
 
