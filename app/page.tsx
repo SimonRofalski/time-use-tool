@@ -6,13 +6,42 @@ import { useRouter } from "next/navigation";
 
 type Mode = "signin" | "signup" | "forgot-password";
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+const modeContent: Record<
+  Mode,
+  {
+    title: string;
+    submitLabel: string;
+  }
+> = {
+  signin: {
+    title: "Anmeldung",
+    submitLabel: "Jetzt anmelden",
+  },
+  signup: {
+    title: "Neuen Account erstellen",
+    submitLabel: "Account erstellen",
+  },
+  "forgot-password": {
+    title: "Passwort zurücksetzen",
+    submitLabel: "Link senden",
+  },
+};
+
 export default function Home() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
+  const [statusTone, setStatusTone] = useState<"error" | "success">("error");
+  const [emailHasError, setEmailHasError] = useState(false);
+  const [passwordHasError, setPasswordHasError] = useState(false);
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
+  const currentMode = modeContent[mode];
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -29,53 +58,83 @@ export default function Home() {
   const handleModeChange = (newMode: Mode) => {
     setMode(newMode);
     setStatus("");
+    setStatusTone("error");
     setEmail("");
     setPassword("");
+    setEmailHasError(false);
+    setPasswordHasError(false);
   };
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const normalizedEmail = email.trim();
+
+    setStatus("");
+    setStatusTone("error");
+    setEmailHasError(false);
+    setPasswordHasError(false);
+
+    if (!normalizedEmail) {
+      setStatus("Bitte E-Mail-Adresse eingeben.");
+      setEmailHasError(true);
+      return;
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
+      setStatus("Bitte eine gültige E-Mail-Adresse eingeben.");
+      setEmailHasError(true);
+      return;
+    }
+
     if (mode === "forgot-password") {
-      if (!email) {
-        setStatus("Bitte E-Mail-Adresse eingeben.");
-        return;
-      }
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        normalizedEmail,
+        {
+          redirectTo: `${window.location.origin}/reset-password`,
+        },
+      );
       if (error) {
         setStatus(error.message);
+        setStatusTone("error");
       } else {
         setStatus("Ein Link zum Zurücksetzen wurde an Ihre E-Mail gesendet.");
+        setStatusTone("success");
       }
       return;
     }
 
     if (mode === "signup") {
       const { error, data } = await supabase.auth.signUp({
-        email,
+        email: normalizedEmail,
         password,
       });
       if (error) {
         setStatus(error.message);
+        setStatusTone("error");
       } else if (data.session) {
         router.push("/zeiterfassung");
       } else {
+        setMode("signin");
+        setPassword("");
+        setPasswordHasError(false);
         setStatus("Account erstellt. Sie können sich jetzt anmelden.");
-        handleModeChange("signin");
+        setStatusTone("success");
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
       if (error) {
-        setStatus(
-          error.message.includes("Invalid login credentials")
-            ? "Falsches Passwort oder E-Mail."
-            : error.message,
-        );
+        if (error.message.includes("Invalid login credentials")) {
+          setStatus("Falsches Passwort oder E-Mail.");
+          setStatusTone("error");
+          setPasswordHasError(true);
+        } else {
+          setStatus(error.message);
+          setStatusTone("error");
+        }
       } else {
         router.push("/zeiterfassung");
       }
@@ -90,32 +149,76 @@ export default function Home() {
         aria-hidden="true"
       />
       <div className="relative w-full max-w-sm">
-        <div className="mb-8 text-center">
+        <div className="mb-8 text-center flex flex-col items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icon.svg"
+            alt="Time Use Tool"
+            className="h-16 w-16 drop-shadow-lg"
+          />
           <h1 className="text-2xl font-semibold text-slate-800">
             Time Use Tool
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {mode === "signin"
-              ? "Melden Sie sich an"
-              : mode === "signup"
-                ? "Neuen Account erstellen"
-                : "Passwort zurücksetzen"}
-          </p>
         </div>
+
+        {mode !== "forgot-password" && (
+          <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white/90 p-2 shadow-sm backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={() => handleModeChange("signin")}
+              className={`rounded-lg px-4 py-3 text-left text-sm transition ${
+                mode === "signin"
+                  ? "bg-slate-800 text-white shadow-sm"
+                  : "bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+              }`}
+            >
+              <span className="block font-semibold">Anmeldung</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeChange("signup")}
+              className={`rounded-lg px-4 py-3 text-left text-sm transition ${
+                mode === "signup"
+                  ? "bg-slate-800 text-white shadow-sm"
+                  : "bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+              }`}
+            >
+              <span className="block font-semibold">
+                Neuen Account erstellen
+              </span>
+            </button>
+          </div>
+        )}
 
         <form
           onSubmit={handleSubmit}
-          className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+          noValidate
+          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
         >
+          <h2 className="mb-5 text-center text-lg font-semibold text-slate-900">
+            {currentMode.title}
+          </h2>
+
           <div className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">
               E-Mail
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setStatus("");
+                  setEmailHasError(false);
+                }}
                 required
-                className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                inputMode="email"
+                autoComplete="email"
+                pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                className={`mt-1.5 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
+                  emailHasError
+                    ? "border-red-400 focus:border-red-500 focus:ring-red-500"
+                    : "border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                }`}
                 placeholder="name@beispiel.de"
               />
             </label>
@@ -126,10 +229,18 @@ export default function Home() {
                 <input
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setStatus("");
+                    setPasswordHasError(false);
+                  }}
                   required
                   minLength={6}
-                  className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={`mt-1.5 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
+                    passwordHasError
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-500"
+                      : "border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                  }`}
                   placeholder="Mindestens 6 Zeichen"
                 />
               </label>
@@ -140,48 +251,53 @@ export default function Home() {
             type="submit"
             className="mt-5 w-full rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
           >
-            {mode === "signin"
-              ? "Anmelden"
-              : mode === "signup"
-                ? "Account erstellen"
-                : "Link senden"}
+            {currentMode.submitLabel}
           </button>
 
           {status && (
             <p
-              className="mt-3 text-center text-sm text-slate-600"
+              className={`mt-3 text-center text-sm ${
+                statusTone === "success" ? "text-green-600" : "text-red-600"
+              }`}
               role="status"
             >
               {status}
             </p>
           )}
 
-          <div className="mt-4 flex justify-between text-xs">
+          <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 text-sm">
             {mode === "signin" ? (
               <>
                 <button
                   type="button"
                   onClick={() => handleModeChange("signup")}
-                  className="font-medium text-blue-600 hover:text-blue-500 transition"
+                  className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 font-medium text-blue-700 transition hover:bg-blue-100"
                 >
-                  Neuen Account erstellen
+                  Noch kein Konto? Hier neuen Account erstellen
                 </button>
                 <button
                   type="button"
                   onClick={() => handleModeChange("forgot-password")}
-                  className="text-slate-500 hover:text-slate-700 transition"
+                  className="text-center text-sm text-slate-500 transition hover:text-slate-700"
                 >
                   Passwort vergessen?
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                onClick={() => handleModeChange("signin")}
-                className="font-medium text-blue-600 hover:text-blue-500 transition"
-              >
-                Zurück zum Anmelden
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange("signin")}
+                  className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100"
+                >
+                  Zurück zur Anmeldung
+                </button>
+                {mode === "signup" && (
+                  <p className="text-center text-xs text-slate-500">
+                    Bereits registriert?
+                  </p>
+                )}
+              </>
             )}
           </div>
         </form>

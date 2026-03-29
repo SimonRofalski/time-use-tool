@@ -78,9 +78,15 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isEnrolled, setIsEnrolled] = useState<boolean | null>(null);
+  const [needsProfileDetails, setNeedsProfileDetails] = useState<
+    boolean | null
+  >(null);
+  const [accessCheckReady, setAccessCheckReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileModalMandatory, setProfileModalMandatory] = useState(false);
+  const [profileFormIsEditing, setProfileFormIsEditing] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
   const [adminMode, setAdminMode] = useState(false);
   const [activeAdminTab, setActiveAdminTab] = useState("kursuebersicht");
@@ -94,8 +100,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
         return;
       }
 
-      setUser(data.user);
-      checkEnrollment(data.user.id);
+      void initializeUserAccess(data.user);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
@@ -105,8 +110,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
           return;
         }
 
-        setUser(session.user);
-        checkEnrollment(session.user.id);
+        void initializeUserAccess(session.user);
       },
     );
 
@@ -157,7 +161,9 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setProfileMenuOpen(false);
-        setProfileModalOpen(false);
+        if (!profileModalMandatory) {
+          setProfileModalOpen(false);
+        }
         setSettingsOpen(false);
       }
     }
@@ -175,7 +181,45 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [profileMenuOpen]);
+  }, [profileMenuOpen, profileModalMandatory]);
+
+  async function initializeUserAccess(authUser: SupabaseUser) {
+    setUser(authUser);
+    setAccessCheckReady(false);
+    setNeedsProfileDetails(null);
+    setIsEnrolled(null);
+
+    const hasProfileDetails = await checkProfileDetails(authUser.id);
+    setNeedsProfileDetails(!hasProfileDetails);
+
+    if (!hasProfileDetails) {
+      setProfileMenuOpen(false);
+      setSettingsOpen(false);
+      setProfileModalMandatory(true);
+      setProfileModalOpen(true);
+      setAccessCheckReady(true);
+      return;
+    }
+
+    setProfileModalMandatory(false);
+    setProfileModalOpen(false);
+    await checkEnrollment(authUser.id);
+    setAccessCheckReady(true);
+  }
+
+  async function checkProfileDetails(userId: string) {
+    const { data, error } = await supabase
+      .from("user_data")
+      .select("user_data_id")
+      .eq("profiles_id", userId)
+      .limit(1);
+
+    if (error) {
+      return false;
+    }
+
+    return (data?.length ?? 0) > 0;
+  }
 
   async function checkEnrollment(userId: string) {
     const { data } = await supabase
@@ -191,17 +235,62 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setIsEnrolled(true);
   }
 
+  async function handleProfileSaved() {
+    if (!user) {
+      return;
+    }
+
+    setProfileModalOpen(false);
+    setProfileModalMandatory(false);
+    setNeedsProfileDetails(false);
+    setAccessCheckReady(false);
+    await checkEnrollment(user.id);
+    setAccessCheckReady(true);
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut();
+    setAccessCheckReady(false);
+    setNeedsProfileDetails(null);
+    setIsEnrolled(null);
+    setProfileFormIsEditing(false);
+    setProfileModalMandatory(false);
+    setProfileModalOpen(false);
     router.push("/");
+  }
+
+  function handleProfileModalClose() {
+    if (profileModalMandatory) {
+      return;
+    }
+
+    if (profileFormIsEditing) {
+      const shouldClose = window.confirm(
+        "Die Profilbearbeitung ist noch nicht gespeichert. Wirklich schließen?",
+      );
+
+      if (!shouldClose) {
+        return;
+      }
+    }
+
+    setProfileFormIsEditing(false);
+    setProfileModalOpen(false);
   }
 
   function openProfileModal() {
     setProfileMenuOpen(false);
+    setProfileModalMandatory(false);
+    setProfileFormIsEditing(false);
     setProfileModalOpen(true);
   }
 
-  if (!user || isEnrolled === null) {
+  if (
+    !user ||
+    !accessCheckReady ||
+    needsProfileDetails === null ||
+    (!needsProfileDetails && isEnrolled === null)
+  ) {
     return null;
   }
 
@@ -209,15 +298,12 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950/95">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <div>
+          <div className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.svg" alt="" className="h-8 w-8" />
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
               Time Use Tool
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {adminMode
-                ? "Admin Center"
-                : "Zeittagebuch – 10-Minuten-Intervalle"}
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -460,23 +546,30 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
           <div
             className="absolute inset-0"
-            onClick={() => setProfileModalOpen(false)}
+            onClick={() => {
+              handleProfileModalClose();
+            }}
           />
           <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-4 flex justify-end">
-              <button
-                type="button"
-                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                onClick={() => setProfileModalOpen(false)}
-              >
-                <X size={20} />
-              </button>
-            </div>
+            {!profileModalMandatory && (
+              <div className="mb-4 flex justify-end">
+                <button
+                  type="button"
+                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                  onClick={handleProfileModalClose}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            )}
             <ProfileDetailsForm
-              allowEditToggle={true}
-              initialEditMode={false}
+              allowEditToggle={!profileModalMandatory}
+              initialEditMode={profileModalMandatory ? true : false}
               showAccountInfoBar={false}
               showPopupHint={false}
+              requireCompletion={profileModalMandatory}
+              onEditStateChange={setProfileFormIsEditing}
+              onSaved={handleProfileSaved}
             />
           </div>
         </div>
@@ -519,7 +612,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
         <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
       )}
 
-      {!isEnrolled && (
+      {needsProfileDetails === false && isEnrolled === false && (
         <EnrollmentModal userId={user.id} onEnrolled={handleEnrolled} />
       )}
     </div>
