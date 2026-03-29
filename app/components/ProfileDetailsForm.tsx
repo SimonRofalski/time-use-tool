@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import { Check, Loader2, Pencil, Save, Search, User, X } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
@@ -285,6 +285,7 @@ export default function ProfileDetailsForm({
 
   const isDirty = JSON.stringify(formData) !== savedFormData.current;
   const isInteractive = allowEditToggle ? isEditing : true;
+  const formId = useId();
 
   useEffect(() => {
     let cancelled = false;
@@ -614,7 +615,7 @@ export default function ProfileDetailsForm({
       )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-6 flex items-start justify-between gap-4 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
           <div className="flex items-center gap-3">
             <User className="text-blue-600" size={28} />
             <div>
@@ -634,31 +635,56 @@ export default function ProfileDetailsForm({
           </div>
 
           {allowEditToggle && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {saved && (
+                <span className="text-sm font-medium text-green-600">
+                  Profil gespeichert!
+                </span>
+              )}
+              {saveError && (
+                <span className="text-sm font-medium text-red-600">
+                  {saveError}
+                </span>
+              )}
               {!isEditing ? (
                 <button
                   type="button"
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800"
+                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-400 dark:focus:ring-offset-slate-900"
                 >
                   <Pencil size={16} />
-                  Änderungen
+                  Bearbeiten
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800"
-                >
-                  <X size={16} />
-                  Abbrechen
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800"
+                  >
+                    <X size={16} />
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    form={formId}
+                    disabled={saving}
+                    className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
+                  >
+                    {saving ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Save size={16} />
+                    )}
+                    {saving ? "Speichern..." : "Speichern"}
+                  </button>
+                </>
               )}
             </div>
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form id={formId} onSubmit={handleSubmit} className="space-y-8">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -902,38 +928,6 @@ export default function ProfileDetailsForm({
                 disabled={!isInteractive}
               />
             </div>
-          </div>
-
-          <div className="flex items-center gap-4 border-t border-slate-200 pt-4 dark:border-slate-800">
-            {(!allowEditToggle || isEditing) && (
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex items-center gap-2 rounded-xl bg-slate-800 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50"
-              >
-                {saving ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Save size={18} />
-                )}
-                {saving ? "Speichern…" : "Speichern"}
-              </button>
-            )}
-            {saved && (
-              <span className="text-sm font-medium text-green-600">
-                Profil gespeichert!
-              </span>
-            )}
-            {saveError && (
-              <span className="text-sm font-medium text-red-600">
-                {saveError}
-              </span>
-            )}
-            {allowEditToggle && !isEditing && (
-              <span className="text-sm text-slate-500 dark:text-slate-400">
-                Über "Änderungen" können die Felder bearbeitet werden.
-              </span>
-            )}
           </div>
         </form>
       </div>
