@@ -92,9 +92,10 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
   const [adminMode, setAdminMode] = useState(false);
   const [activeAdminTab, setActiveAdminTab] = useState("kursuebersicht");
+  // Role fetched from profiles.role (the authoritative source — not JWT metadata)
+  const [profileRole, setProfileRole] = useState<string>("user");
 
-  const userRole = getUserRole(user);
-  const isAdmin = userRole === "Admin";
+  const isAdmin = profileRole === "admin";
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -192,8 +193,17 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setNeedsProfileDetails(null);
     setIsEnrolled(null);
 
+    // Fetch role from profiles table — this is the authoritative source
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", authUser.id)
+      .single();
+    const role = profileData?.role ?? "user";
+    setProfileRole(role);
+
     // Admins skip profile completion and course enrollment requirements
-    if (getUserRole(authUser) === "Admin") {
+    if (role === "admin") {
       setNeedsProfileDetails(false);
       setIsEnrolled(true);
       setProfileModalMandatory(false);
@@ -378,7 +388,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                       {user.email}
                     </p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {userRole}
+                      {profileRole.charAt(0).toUpperCase() + profileRole.slice(1)}
                     </p>
                   </div>
 
