@@ -271,7 +271,7 @@ export default function ActivitySelector({
           <button
             type="button"
             onClick={() => onStepComplete({ secondary_activity_id: null })}
-            className="w-full rounded-lg border-2 border-dashed border-slate-200 py-2 text-sm font-medium text-slate-400 hover:border-slate-300 hover:text-slate-500 transition-colors"
+            className="w-full rounded-lg border-2 border-slate-400 py-2 text-sm font-medium text-slate-600 hover:border-slate-600 hover:text-slate-800 transition-colors"
           >
             Keine Nebentätigkeit
           </button>
@@ -341,10 +341,10 @@ export default function ActivitySelector({
     );
   }
 
-  // Step 5: where was the user? (single choice)
+  // Step 5: where was the user? (2-column grid so all options fit without scrolling)
   function renderLocationStep() {
     return (
-      <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
         {lookupData.locationTransports.map((loc) => {
           const isSelected = pendingEntry.location_transport_id === loc.location_transport_id;
           return (
@@ -355,7 +355,7 @@ export default function ActivitySelector({
                 onStepComplete({ location_transport_id: loc.location_transport_id })
               }
               className={`
-                w-full rounded-lg border px-4 py-3 text-left text-sm font-medium transition-all
+                rounded-lg border px-3 py-2 text-left text-xs font-medium leading-tight transition-all
                 ${isSelected
                   ? "border-blue-500 bg-blue-50 text-blue-700"
                   : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"

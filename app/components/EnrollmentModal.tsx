@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { useRouter } from "next/navigation";
 
 type AvailableCourse = {
   course_id: number;
@@ -27,6 +28,12 @@ export default function EnrollmentModal({
   onEnrolled: () => void;
 }) {
   const supabase = getSupabaseBrowserClient();
+  const router = useRouter();
+
+  async function handleBackToLogin() {
+    await supabase.auth.signOut();
+    router.push("/");
+  }
 
   const [availableCourses, setAvailableCourses] = useState<AvailableCourse[]>(
     [],
@@ -187,6 +194,14 @@ export default function EnrollmentModal({
             </button>
           </form>
         )}
+
+        <button
+          type="button"
+          onClick={handleBackToLogin}
+          className="mt-4 w-full rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-800"
+        >
+          Zurück zum Login
+        </button>
       </div>
     </div>
   );

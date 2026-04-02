@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
@@ -89,6 +89,16 @@ function formatDateGerman(dateString: string): string {
   });
 }
 
+// Returns a compact two-part date label for carousel cards
+// e.g. "2026-03-28" → { weekday: "Sa.", dayMonth: "28. Mär." }
+function formatDateCompact(dateString: string): { weekday: string; dayMonth: string } {
+  const date = new Date(dateString);
+  return {
+    weekday: date.toLocaleDateString("de-DE", { weekday: "short" }),
+    dayMonth: date.toLocaleDateString("de-DE", { day: "numeric", month: "short" }),
+  };
+}
+
 // Returns Tailwind CSS classes for background, text, progress bar, and badge
 // based on the day's status
 function getStatusColors(status: DayStatus): {
@@ -146,9 +156,8 @@ function getStatusLabel(status: DayStatus): string {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-// DayCard: renders a single day row with date, status badge, progress bar, and percentage
-// onClick is only triggered for days that are available (not future)
-function DayCard({
+// DayCarouselCard: compact vertical card used inside the horizontal carousel
+function DayCarouselCard({
   day,
   onClick,
 }: {
@@ -157,42 +166,30 @@ function DayCard({
 }) {
   const colors = getStatusColors(day.status);
   const isAvailable = day.status !== "nicht_verfuegbar";
-
-  // Calculate completion percentage (capped at 100 to be safe)
   const completionPercentage = Math.min(
     Math.round((day.entryCount / TOTAL_ENTRIES_PER_DAY) * 100),
     100
   );
+  const { weekday, dayMonth } = formatDateCompact(day.date);
 
   return (
     <div
-      className={`${colors.cardBg} rounded-lg border border-slate-200 p-4 transition-shadow ${
-        isAvailable ? "cursor-pointer hover:shadow-md" : "cursor-default"
+      className={`${colors.cardBg} flex-shrink-0 rounded-lg border border-slate-200 p-3 transition-shadow ${
+        isAvailable ? "cursor-pointer hover:shadow-md" : "cursor-default opacity-60"
       }`}
+      style={{ width: "160px", scrollSnapAlign: "start" }}
       onClick={isAvailable ? onClick : undefined}
     >
-      {/* Top row: date + status badge on left, percentage + count on right */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-slate-800">
-            {formatDateGerman(day.date)}
-          </p>
-          <span
-            className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${colors.labelBg} ${colors.labelText}`}
-          >
-            {getStatusLabel(day.status)}
-          </span>
-        </div>
+      {/* Date */}
+      <p className="text-xs font-medium text-slate-400">{weekday}</p>
+      <p className="text-sm font-semibold text-slate-800 leading-tight">{dayMonth}</p>
 
-        <div className="text-right">
-          <p className={`text-lg font-semibold ${colors.percentText}`}>
-            {completionPercentage}%
-          </p>
-          <p className="text-xs text-slate-400">
-            {day.entryCount} / {TOTAL_ENTRIES_PER_DAY} Einträge
-          </p>
-        </div>
-      </div>
+      {/* Status badge */}
+      <span
+        className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${colors.labelBg} ${colors.labelText}`}
+      >
+        {getStatusLabel(day.status)}
+      </span>
 
       {/* Progress bar */}
       <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100">
@@ -200,6 +197,74 @@ function DayCard({
           className={`h-1.5 rounded-full ${colors.barFill} transition-all duration-300`}
           style={{ width: `${completionPercentage}%` }}
         />
+      </div>
+
+      {/* Percentage + entry count */}
+      <div className="mt-1.5 flex items-center justify-between">
+        <p className="text-xs text-slate-400">{day.entryCount}/{TOTAL_ENTRIES_PER_DAY}</p>
+        <p className={`text-sm font-semibold ${colors.percentText}`}>{completionPercentage}%</p>
+      </div>
+    </div>
+  );
+}
+
+// DayCarousel: horizontal scrolling carousel with prev/next navigation
+// Shows cards side by side; scrolls by one full viewport at a time
+function DayCarousel({
+  days,
+  onDayClick,
+}: {
+  days: CourseDay[];
+  onDayClick: (date: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  function scroll(direction: "prev" | "next") {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollBy({
+      left: direction === "next" ? scrollRef.current.clientWidth : -scrollRef.current.clientWidth,
+      behavior: "smooth",
+    });
+  }
+
+  return (
+    <div>
+      {/* Header row with day count and nav buttons */}
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-sm font-medium text-slate-600">{days.length} Tage</p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => scroll("prev")}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-800"
+            aria-label="Vorherige Tage"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={() => scroll("next")}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-800"
+            aria-label="Nächste Tage"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+
+      {/* Scrollable card row — scrollbar hidden, snap-to-start per card */}
+      <div
+        ref={scrollRef}
+        className="flex gap-3 overflow-x-auto pb-2"
+        style={{ scrollSnapType: "x mandatory", scrollbarWidth: "none" }}
+      >
+        {days.map((day) => (
+          <DayCarouselCard
+            key={day.date}
+            day={day}
+            onClick={() => onDayClick(day.date)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -423,16 +488,8 @@ export default function ErfassteZeitPage() {
         )}
       </div>
 
-      {/* List of all days in the course */}
-      <div className="space-y-3">
-        {courseDays.map((day) => (
-          <DayCard
-            key={day.date}
-            day={day}
-            onClick={() => handleDayClick(day.date)}
-          />
-        ))}
-      </div>
+      {/* Horizontal carousel of all days in the course */}
+      <DayCarousel days={courseDays} onDayClick={handleDayClick} />
 
       {/* Summary containers at the bottom */}
       <SummaryBar days={courseDays} />
