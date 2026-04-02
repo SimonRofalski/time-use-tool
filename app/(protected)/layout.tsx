@@ -7,6 +7,8 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import EnrollmentModal from "@/app/components/EnrollmentModal";
 import ProfileDetailsForm from "@/app/components/ProfileDetailsForm";
+import KursuebersichtTab from "@/app/components/admin/KursuebersichtTab";
+import NutzeruebersichtTab from "@/app/components/admin/NutzeruebersichtTab";
 import {
   BarChart3,
   BookOpen,
@@ -92,6 +94,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const [activeAdminTab, setActiveAdminTab] = useState("kursuebersicht");
 
   const userRole = getUserRole(user);
+  const isAdmin = userRole === "Admin";
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -188,6 +191,16 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setAccessCheckReady(false);
     setNeedsProfileDetails(null);
     setIsEnrolled(null);
+
+    // Admins skip profile completion and course enrollment requirements
+    if (getUserRole(authUser) === "Admin") {
+      setNeedsProfileDetails(false);
+      setIsEnrolled(true);
+      setProfileModalMandatory(false);
+      setProfileModalOpen(false);
+      setAccessCheckReady(true);
+      return;
+    }
 
     const hasProfileDetails = await checkProfileDetails(authUser.id);
     setNeedsProfileDetails(!hasProfileDetails);
@@ -307,7 +320,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
-            {adminMode ? (
+            {isAdmin && (adminMode ? (
               <button
                 type="button"
                 aria-label="Zurück zum Zeittagebuch"
@@ -337,7 +350,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                   Admin-Center
                 </span>
               </button>
-            )}
+            ))}
 
             <div className="relative" ref={profileMenuRef}>
               <div className="group relative">
@@ -578,23 +591,19 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       {adminMode ? (
         <main className="mx-auto max-w-7xl px-4 py-6">
           {activeAdminTab === "kursuebersicht" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+              <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Kursübersicht
               </h3>
-              <p className="mt-2 text-slate-500 dark:text-slate-400">
-                Hier erscheint die Kursübersicht. Platzhalter.
-              </p>
+              <KursuebersichtTab />
             </div>
           )}
           {activeAdminTab === "nutzeruebersicht" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+              <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Nutzerübersicht
               </h3>
-              <p className="mt-2 text-slate-500 dark:text-slate-400">
-                Hier erscheint die Nutzerübersicht. Platzhalter.
-              </p>
+              <NutzeruebersichtTab />
             </div>
           )}
           {activeAdminTab === "statistiken" && (
