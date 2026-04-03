@@ -9,6 +9,7 @@ import EnrollmentModal from "@/app/components/EnrollmentModal";
 import ProfileDetailsForm from "@/app/components/ProfileDetailsForm";
 import KursuebersichtTab from "@/app/components/admin/KursuebersichtTab";
 import NutzeruebersichtTab from "@/app/components/admin/NutzeruebersichtTab";
+import StatistikenTab from "@/app/components/admin/StatistikenTab";
 import {
   BarChart3,
   BookOpen,
@@ -617,13 +618,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
             </div>
           )}
           {activeAdminTab === "statistiken" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+              <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Statistiken
               </h3>
-              <p className="mt-2 text-slate-500 dark:text-slate-400">
-                Hier erscheinen die Statistiken. Platzhalter.
-              </p>
+              <StatistikenTab />
             </div>
           )}
         </main>
