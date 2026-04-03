@@ -304,6 +304,7 @@ export default function StatistikenTab() {
       userCoursesRes,
       allDaysRes,
       newEntriesRes,
+      totalEntriesRes,
       recentEntriesRes,
       allEntriesRes,
       activitiesRes,
@@ -316,8 +317,9 @@ export default function StatistikenTab() {
       supabase.from("user_course").select("profiles_id, course_id"),
       supabase.from("day").select("day_id, profiles_id, course_id, is_submitted"),
       supabase.from("time_entry").select("entry_id", { count: "exact", head: true }).gte("created_at", sevenDaysAgo),
+      supabase.from("time_entry").select("entry_id", { count: "exact", head: true }),
       supabase.from("time_entry").select("entry_id, day_id, created_at").gte("created_at", fourteenDaysAgo),
-      supabase.from("time_entry").select("primary_activity_id, satisfaction_id, start_time, end_time"),
+      supabase.from("time_entry").select("primary_activity_id, satisfaction_id, start_time, end_time").limit(100000),
       supabase.from("activity").select("activity_id, name, subcategory_id"),
       supabase.from("subcategory").select("subcategory_id, category_id"),
       supabase.from("category").select("category_id, name"),
@@ -373,7 +375,7 @@ export default function StatistikenTab() {
       activeCourses: courses.filter((c) => !c.is_locked).length,
       closedCourses: courses.filter((c) => c.is_locked).length,
       newEntriesLast7Days: newEntriesRes.count ?? 0,
-      totalEntries: allEntries.length,
+      totalEntries: totalEntriesRes.count ?? 0,
     });
 
     // ── Charts ────────────────────────────────────────────────────────────────
