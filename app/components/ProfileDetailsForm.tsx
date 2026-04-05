@@ -26,6 +26,8 @@ interface LookupTables {
 }
 
 interface FormData {
+  firstName: string;
+  lastName: string;
   genderId: string;
   age: string;
   maritalStatusId: string;
@@ -43,6 +45,8 @@ interface FormData {
 }
 
 type RequiredField =
+  | "firstName"
+  | "lastName"
   | "genderId"
   | "age"
   | "maritalStatusId"
@@ -58,6 +62,8 @@ type RequiredField =
   | "urbanityId";
 
 const requiredFields: RequiredField[] = [
+  "firstName",
+  "lastName",
   "genderId",
   "age",
   "maritalStatusId",
@@ -74,6 +80,8 @@ const requiredFields: RequiredField[] = [
 ];
 
 const emptyForm: FormData = {
+  firstName: "",
+  lastName: "",
   genderId: "",
   age: "",
   maritalStatusId: "",
@@ -115,6 +123,8 @@ function userDataToForm(
   employmentStatusIds: number[],
 ): FormData {
   return {
+    firstName: "",
+    lastName: "",
     genderId: row.gender_id != null ? String(row.gender_id) : "",
     age: row.age != null ? String(row.age) : "",
     maritalStatusId:
@@ -182,6 +192,8 @@ function formatRole(role: string) {
 function getMissingRequiredFields(form: FormData): RequiredField[] {
   const missingFields: RequiredField[] = [];
 
+  if (!form.firstName.trim()) missingFields.push("firstName");
+  if (!form.lastName.trim()) missingFields.push("lastName");
   if (!form.genderId) missingFields.push("genderId");
   if (!/^\d{1,2}$/.test(form.age)) missingFields.push("age");
   if (!form.maritalStatusId) missingFields.push("maritalStatusId");
@@ -420,12 +432,22 @@ export default function ProfileDetailsForm({
             .select("*")
             .eq("profiles_id", authUser.id)
             .single(),
-          db().from("profiles").select("role").eq("id", authUser.id).single(),
+          db()
+            .from("profiles")
+            .select("role, first_name, last_name")
+            .eq("id", authUser.id)
+            .single(),
         ]);
 
         if (!cancelled && profileRow?.role) {
           setRole(profileRow.role);
         }
+
+        let loadedForm: FormData = {
+          ...emptyForm,
+          firstName: profileRow?.first_name ?? "",
+          lastName: profileRow?.last_name ?? "",
+        };
 
         let employmentStatusIds: number[] = [];
         if (userData) {
@@ -437,11 +459,16 @@ export default function ProfileDetailsForm({
           employmentStatusIds = (employmentRows ?? []).map(
             (row: { employment_status_id: number }) => row.employment_status_id,
           );
-          const loadedForm = userDataToForm(userData, employmentStatusIds);
-          if (!cancelled) {
-            setFormData(loadedForm);
-            savedFormData.current = JSON.stringify(loadedForm);
-          }
+          loadedForm = {
+            ...userDataToForm(userData, employmentStatusIds),
+            firstName: profileRow?.first_name ?? "",
+            lastName: profileRow?.last_name ?? "",
+          };
+        }
+
+        if (!cancelled) {
+          setFormData(loadedForm);
+          savedFormData.current = JSON.stringify(loadedForm);
         }
       }
 
@@ -684,6 +711,20 @@ export default function ProfileDetailsForm({
     }
 
     try {
+      const trimmedFirstName = formData.firstName.trim();
+      const trimmedLastName = formData.lastName.trim();
+
+      const { error: profileUpdateError } = await db()
+        .from("profiles")
+        .update({
+          first_name: trimmedFirstName,
+          last_name: trimmedLastName,
+        })
+        .eq("id", user.id);
+      if (profileUpdateError) {
+        throw profileUpdateError;
+      }
+
       const row = formToUserDataRow(formData, user.id);
 
       if (userDataId.current) {
@@ -769,6 +810,14 @@ export default function ProfileDetailsForm({
         <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-5 py-3 dark:border-slate-800 dark:bg-slate-900/50">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
             <span>
+              <span className="text-slate-400 dark:text-slate-500">Name:</span>{" "}
+              <span className="text-slate-600 dark:text-slate-300">
+                {[formData.firstName, formData.lastName]
+                  .filter(Boolean)
+                  .join(" ") || "-"}
+              </span>
+            </span>
+            <span>
               <span className="text-slate-400 dark:text-slate-500">Email:</span>{" "}
               <span className="text-slate-600 dark:text-slate-300">
                 {user.email}
@@ -840,21 +889,7 @@ export default function ProfileDetailsForm({
                   {saveError}
                 </span>
               )}
-              {requireCompletion ? (
-                <button
-                  type="submit"
-                  form={formId}
-                  disabled={saving}
-                  className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
-                >
-                  {saving ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Save size={16} />
-                  )}
-                  {saving ? "Speichern..." : "Profil speichern"}
-                </button>
-              ) : !isEditing ? (
+              {!requireCompletion && !isEditing && (
                 <button
                   type="button"
                   onClick={() => setIsEditing(true)}
@@ -863,36 +898,60 @@ export default function ProfileDetailsForm({
                   <Pencil size={16} />
                   Bearbeiten
                 </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800"
-                  >
-                    <X size={16} />
-                    Abbrechen
-                  </button>
-                  <button
-                    type="submit"
-                    form={formId}
-                    disabled={saving}
-                    className="flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-400"
-                  >
-                    {saving ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <Save size={16} />
-                    )}
-                    {saving ? "Speichern..." : "Speichern"}
-                  </button>
-                </>
               )}
             </div>
           )}
         </div>
 
-        <form id={formId} onSubmit={handleSubmit} className="space-y-8 p-6">
+        <form
+          id={formId}
+          onSubmit={handleSubmit}
+          className="space-y-8 p-6 pb-28"
+        >
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            {renderQuestionPanel(
+              "firstName",
+              "Vorname",
+              <input
+                type="text"
+                value={formData.firstName}
+                placeholder="z.B. Max"
+                disabled={!isInteractive}
+                onChange={(event) =>
+                  updateField("firstName", event.target.value)
+                }
+                className={`w-full rounded-xl border-2 px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
+                  isInteractive
+                    ? hasMissingField("firstName")
+                      ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                      : "border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                    : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                }`}
+              />,
+            )}
+
+            {renderQuestionPanel(
+              "lastName",
+              "Nachname",
+              <input
+                type="text"
+                value={formData.lastName}
+                placeholder="z.B. Mustermann"
+                disabled={!isInteractive}
+                onChange={(event) =>
+                  updateField("lastName", event.target.value)
+                }
+                className={`w-full rounded-xl border-2 px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
+                  isInteractive
+                    ? hasMissingField("lastName")
+                      ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                      : "border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                    : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                }`}
+              />,
+            )}
+          </div>
+
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {renderQuestionPanel(
               "genderId",
@@ -1010,35 +1069,24 @@ export default function ProfileDetailsForm({
             {renderQuestionPanel(
               "weeklyWorkHours",
               "Übliche Wochenarbeitszeit",
-              <>
-                <input
-                  type="number"
-                  value={formData.weeklyWorkHours}
-                  disabled={!isInteractive}
-                  onChange={(event) =>
-                    updateField("weeklyWorkHours", event.target.value)
-                  }
-                  placeholder="z.B. 40"
-                  min="0"
-                  max="100"
-                  className={`w-full rounded-xl border-2 px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
-                    isInteractive
-                      ? hasMissingField("weeklyWorkHours")
-                        ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                        : "border-slate-200 focus:border-blue-500 focus:ring-blue-500"
-                      : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-                  }`}
-                />
-                {formData.weeklyWorkHours && (
-                  <p className="mt-1 text-xs text-slate-400">
-                    ≈{" "}
-                    {Math.round(
-                      (parseFloat(formData.weeklyWorkHours) / 41) * 100,
-                    )}
-                    % Pensum (Basis: 41 h/Woche CH)
-                  </p>
-                )}
-              </>,
+              <input
+                type="number"
+                value={formData.weeklyWorkHours}
+                disabled={!isInteractive}
+                onChange={(event) =>
+                  updateField("weeklyWorkHours", event.target.value)
+                }
+                placeholder="z.B. 40"
+                min="0"
+                max="100"
+                className={`w-full rounded-xl border-2 px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
+                  isInteractive
+                    ? hasMissingField("weeklyWorkHours")
+                      ? "border-red-300 focus:border-red-500 focus:ring-red-500"
+                      : "border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                    : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                }`}
+              />,
             )}
           </div>
 
@@ -1094,6 +1142,39 @@ export default function ProfileDetailsForm({
               renderOptionCards("urbanityId", lookupData.urbanity),
             )}
           </div>
+
+          {(requireCompletion || (allowEditToggle && isEditing)) && (
+            <div className="sticky bottom-0 z-20 -mx-6 border-t border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+              <div className="flex justify-end gap-2">
+                {allowEditToggle && isEditing && !requireCompletion && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus:ring-offset-slate-900"
+                  >
+                    <X size={16} />
+                    Abbrechen
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-blue-500 dark:hover:bg-blue-400 dark:focus:ring-offset-slate-900"
+                >
+                  {saving ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                  {saving
+                    ? "Speichern..."
+                    : requireCompletion
+                      ? "Profil speichern"
+                      : "Speichern"}
+                </button>
+              </div>
+            </div>
+          )}
         </form>
       </div>
     </div>
