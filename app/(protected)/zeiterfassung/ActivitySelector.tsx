@@ -50,7 +50,7 @@ type ActivitySelectorProps = {
 function buildActivityHierarchy(
   lookupData: LookupData,
   searchQuery: string,
-  excludeActivityId?: number | null
+  excludeActivityId?: number | null,
 ): CategoryNode[] {
   const query = searchQuery.toLowerCase().trim();
 
@@ -65,15 +65,24 @@ function buildActivityHierarchy(
             .filter((act) => act.subcategory_id === sub.subcategory_id)
             .filter((act) => act.activity_id !== excludeActivityId)
             .filter((act) =>
-              query ? act.name.toLowerCase().includes(query) : true
+              query ? act.name.toLowerCase().includes(query) : true,
             )
             .map((act) => ({ activity_id: act.activity_id, name: act.name }));
 
-          return { subcategory_id: sub.subcategory_id, name: sub.name, activities };
+          return {
+            subcategory_id: sub.subcategory_id,
+            name: sub.name,
+            activities,
+          };
         })
         .filter((sub) => sub.activities.length > 0); // hide empty subcategories
 
-      return { category_id: cat.category_id, name: cat.name, color, subcategories };
+      return {
+        category_id: cat.category_id,
+        name: cat.name,
+        color,
+        subcategories,
+      };
     })
     .filter((cat) => cat.subcategories.length > 0); // hide empty categories
 }
@@ -81,13 +90,20 @@ function buildActivityHierarchy(
 // Returns the German question text for each questionnaire step
 function getStepQuestion(step: QuestionnaireStep): string {
   switch (step) {
-    case "primary_activity":   return "Welche Haupttätigkeit hast du in dieser Zeit ausgeführt?";
-    case "secondary_activity": return "Hast du gleichzeitig eine Nebentätigkeit ausgeführt?";
-    case "digital_media":      return "Hast du während dieser Zeit ein elektronisches Gerät benutzt?";
-    case "digital_media_type": return "Welches Gerät hast du hauptsächlich benutzt?";
-    case "location_transport": return "Wo warst du während dieser Zeit?";
-    case "social_context":     return "Mit wem warst du während dieser Zeit?";
-    case "satisfaction":       return "Wie hast du dich während dieser Zeit gefühlt?";
+    case "primary_activity":
+      return "Welche Haupttätigkeit hast du in dieser Zeit ausgeführt?";
+    case "secondary_activity":
+      return "Hast du gleichzeitig eine Nebentätigkeit ausgeführt?";
+    case "digital_media":
+      return "Hast du während dieser Zeit ein elektronisches Gerät benutzt?";
+    case "digital_media_type":
+      return "Welches Gerät hast du hauptsächlich benutzt?";
+    case "location_transport":
+      return "Wo warst du während dieser Zeit?";
+    case "social_context":
+      return "Mit wem warst du während dieser Zeit?";
+    case "satisfaction":
+      return "Wie hast du dich während dieser Zeit gefühlt?";
   }
 }
 
@@ -113,7 +129,9 @@ function formatSlotsRange(slots: Set<string>): string {
   const lastSlot = sorted[sorted.length - 1];
   const [lh, lm] = lastSlot.split(":").map(Number);
   const endTotal = lh * 60 + lm + 10;
-  const endStr = `${Math.floor(endTotal / 60).toString().padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}`;
+  const endStr = `${Math.floor(endTotal / 60)
+    .toString()
+    .padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}`;
   return `${firstSlot} – ${endStr} · ${slots.size} Felder`;
 }
 
@@ -163,7 +181,10 @@ function ActivityList({
             {/* Category header with colored left border */}
             <div
               className="flex items-center gap-2 mb-1.5 px-1"
-              style={{ borderLeft: `3px solid ${cat.color}`, paddingLeft: "8px" }}
+              style={{
+                borderLeft: `3px solid ${cat.color}`,
+                paddingLeft: "8px",
+              }}
             >
               <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
                 {cat.name}
@@ -188,16 +209,13 @@ function ActivityList({
                         onClick={() => onActivitySelect(act.activity_id)}
                         className={`
                           rounded-full px-3 py-1 text-xs font-medium transition-all
-                          ${isSelected
-                            ? "text-white shadow-sm scale-105"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          ${
+                            isSelected
+                              ? "text-white shadow-sm scale-105"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                           }
                         `}
-                        style={
-                          isSelected
-                            ? { backgroundColor: cat.color }
-                            : {}
-                        }
+                        style={isSelected ? { backgroundColor: cat.color } : {}}
                       >
                         {act.name}
                       </button>
@@ -255,7 +273,7 @@ export default function ActivitySelector({
     const hierarchyWithoutPrimary = buildActivityHierarchy(
       lookupData,
       searchQuery,
-      pendingEntry.primary_activity_id
+      pendingEntry.primary_activity_id,
     );
     return (
       <ActivityList
@@ -271,7 +289,7 @@ export default function ActivitySelector({
           <button
             type="button"
             onClick={() => onStepComplete({ secondary_activity_id: null })}
-            className="w-full rounded-lg border-2 border-dashed border-slate-200 py-2 text-sm font-medium text-slate-400 hover:border-slate-300 hover:text-slate-500 transition-colors"
+            className="w-full rounded-lg border-2 border-slate-400 py-2 text-sm font-medium text-slate-600 hover:border-slate-600 hover:text-slate-800 transition-colors"
           >
             Keine Nebentätigkeit
           </button>
@@ -297,9 +315,10 @@ export default function ActivitySelector({
               className={`
                 flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-6
                 font-medium transition-all
-                ${isSelected
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                ${
+                  isSelected
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                 }
               `}
             >
@@ -317,19 +336,23 @@ export default function ActivitySelector({
     return (
       <div className="space-y-2">
         {lookupData.digitalMediaTypes.map((type) => {
-          const isSelected = pendingEntry.digital_media_type_id === type.digital_media_type_id;
+          const isSelected =
+            pendingEntry.digital_media_type_id === type.digital_media_type_id;
           return (
             <button
               key={type.digital_media_type_id}
               type="button"
               onClick={() =>
-                onStepComplete({ digital_media_type_id: type.digital_media_type_id })
+                onStepComplete({
+                  digital_media_type_id: type.digital_media_type_id,
+                })
               }
               className={`
                 w-full rounded-lg border px-4 py-3 text-left text-sm font-medium transition-all
-                ${isSelected
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                ${
+                  isSelected
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                 }
               `}
             >
@@ -341,24 +364,28 @@ export default function ActivitySelector({
     );
   }
 
-  // Step 5: where was the user? (single choice)
+  // Step 5: where was the user? (2-column grid so all options fit without scrolling)
   function renderLocationStep() {
     return (
-      <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
         {lookupData.locationTransports.map((loc) => {
-          const isSelected = pendingEntry.location_transport_id === loc.location_transport_id;
+          const isSelected =
+            pendingEntry.location_transport_id === loc.location_transport_id;
           return (
             <button
               key={loc.location_transport_id}
               type="button"
               onClick={() =>
-                onStepComplete({ location_transport_id: loc.location_transport_id })
+                onStepComplete({
+                  location_transport_id: loc.location_transport_id,
+                })
               }
               className={`
-                w-full rounded-lg border px-4 py-3 text-left text-sm font-medium transition-all
-                ${isSelected
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                rounded-lg border px-3 py-2 text-left text-xs font-medium leading-tight transition-all
+                ${
+                  isSelected
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                 }
               `}
             >
@@ -399,9 +426,10 @@ export default function ActivitySelector({
                 className={`
                   w-full rounded-lg border px-4 py-3 text-left text-sm font-medium
                   flex items-center justify-between transition-all
-                  ${isSelected
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                  ${
+                    isSelected
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                   }
                 `}
               >
@@ -418,7 +446,12 @@ export default function ActivitySelector({
         {/* _advance flag tells the parent this is a step transition, not a toggle update */}
         <button
           type="button"
-          onClick={() => onStepComplete({ social_context_ids: [...selectedIds], _advance: true } as any)}
+          onClick={() =>
+            onStepComplete({
+              social_context_ids: [...selectedIds],
+              _advance: true,
+            } as any)
+          }
           className="w-full rounded-lg bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
         >
           Weiter
@@ -432,7 +465,8 @@ export default function ActivitySelector({
     return (
       <div className="space-y-2">
         {lookupData.satisfactions.map((sat) => {
-          const isSelected = pendingEntry.satisfaction_id === sat.satisfaction_id;
+          const isSelected =
+            pendingEntry.satisfaction_id === sat.satisfaction_id;
           return (
             <button
               key={sat.satisfaction_id}
@@ -442,9 +476,10 @@ export default function ActivitySelector({
               }
               className={`
                 w-full rounded-lg border px-4 py-3 text-left text-sm font-medium transition-all
-                ${isSelected
-                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                ${
+                  isSelected
+                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                 }
               `}
             >
@@ -459,13 +494,20 @@ export default function ActivitySelector({
   // Render the correct step content
   function renderStepContent() {
     switch (step) {
-      case "primary_activity":   return renderPrimaryActivityStep();
-      case "secondary_activity": return renderSecondaryActivityStep();
-      case "digital_media":      return renderDigitalMediaStep();
-      case "digital_media_type": return renderDigitalMediaTypeStep();
-      case "location_transport": return renderLocationStep();
-      case "social_context":     return renderSocialContextStep();
-      case "satisfaction":       return renderSatisfactionStep();
+      case "primary_activity":
+        return renderPrimaryActivityStep();
+      case "secondary_activity":
+        return renderSecondaryActivityStep();
+      case "digital_media":
+        return renderDigitalMediaStep();
+      case "digital_media_type":
+        return renderDigitalMediaTypeStep();
+      case "location_transport":
+        return renderLocationStep();
+      case "social_context":
+        return renderSocialContextStep();
+      case "satisfaction":
+        return renderSatisfactionStep();
     }
   }
 
@@ -476,7 +518,6 @@ export default function ActivitySelector({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-
       {/* Header: selected time range + cancel button */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <span className="text-xs font-medium text-slate-400">
@@ -510,9 +551,7 @@ export default function ActivitySelector({
       </div>
 
       {/* Step content (scrollable if needed) */}
-      <div className="px-4 pb-4">
-        {renderStepContent()}
-      </div>
+      <div className="px-4 pb-4">{renderStepContent()}</div>
 
       {/* Footer: back button (hidden only on the first step) */}
       {!isFirstStep && (

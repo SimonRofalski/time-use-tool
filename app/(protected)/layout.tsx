@@ -7,6 +7,9 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import EnrollmentModal from "@/app/components/EnrollmentModal";
 import ProfileDetailsForm from "@/app/components/ProfileDetailsForm";
+import KursuebersichtTab from "@/app/components/admin/KursuebersichtTab";
+import NutzeruebersichtTab from "@/app/components/admin/NutzeruebersichtTab";
+import StatistikenTab from "@/app/components/admin/StatistikenTab";
 import {
   BarChart3,
   BookOpen,
@@ -90,8 +93,12 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
   const [adminMode, setAdminMode] = useState(false);
   const [activeAdminTab, setActiveAdminTab] = useState("kursuebersicht");
+  // Role fetched from profiles.role (the authoritative source — not JWT metadata)
+  const [profileRole, setProfileRole] = useState<string>("user");
+  const [profileFirstName, setProfileFirstName] = useState("");
+  const [profileLastName, setProfileLastName] = useState("");
 
-  const userRole = getUserRole(user);
+  const isAdmin = profileRole === "admin";
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -189,6 +196,27 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setNeedsProfileDetails(null);
     setIsEnrolled(null);
 
+    // Fetch role from profiles table — this is the authoritative source
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("role, first_name, last_name")
+      .eq("id", authUser.id)
+      .single();
+    const role = profileData?.role ?? "user";
+    setProfileRole(role);
+    setProfileFirstName(profileData?.first_name ?? "");
+    setProfileLastName(profileData?.last_name ?? "");
+
+    // Admins skip profile completion and course enrollment requirements
+    if (role === "admin") {
+      setNeedsProfileDetails(false);
+      setIsEnrolled(true);
+      setProfileModalMandatory(false);
+      setProfileModalOpen(false);
+      setAccessCheckReady(true);
+      return;
+    }
+
     const hasProfileDetails = await checkProfileDetails(authUser.id);
     setNeedsProfileDetails(!hasProfileDetails);
 
@@ -240,6 +268,15 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       return;
     }
 
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("id", user.id)
+      .single();
+
+    setProfileFirstName(profileData?.first_name ?? "");
+    setProfileLastName(profileData?.last_name ?? "");
+
     setProfileModalOpen(false);
     setProfileModalMandatory(false);
     setNeedsProfileDetails(false);
@@ -256,6 +293,8 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setProfileFormIsEditing(false);
     setProfileModalMandatory(false);
     setProfileModalOpen(false);
+    setProfileFirstName("");
+    setProfileLastName("");
     router.push("/");
   }
 
@@ -294,6 +333,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     return null;
   }
 
+  const fullName = [profileFirstName, profileLastName]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950/95">
@@ -307,37 +351,38 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
-            {adminMode ? (
-              <button
-                type="button"
-                aria-label="Zurück zum Zeittagebuch"
-                className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
-                onClick={() => {
-                  setAdminMode(false);
-                  setSettingsOpen(false);
-                }}
-              >
-                <Clock size={16} />
-                <span className="text-[10px] font-medium leading-none">
-                  Zeittagebuch
-                </span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                aria-label="Admin-Center öffnen"
-                className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
-                onClick={() => {
-                  setAdminMode(true);
-                  setSettingsOpen(false);
-                }}
-              >
-                <ShieldCheck size={16} />
-                <span className="text-[10px] font-medium leading-none">
-                  Admin-Center
-                </span>
-              </button>
-            )}
+            {isAdmin &&
+              (adminMode ? (
+                <button
+                  type="button"
+                  aria-label="Zurück zum Zeittagebuch"
+                  className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                  onClick={() => {
+                    setAdminMode(false);
+                    setSettingsOpen(false);
+                  }}
+                >
+                  <Clock size={16} />
+                  <span className="text-[10px] font-medium leading-none">
+                    Zeittagebuch
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="Admin-Center öffnen"
+                  className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                  onClick={() => {
+                    setAdminMode(true);
+                    setSettingsOpen(false);
+                  }}
+                >
+                  <ShieldCheck size={16} />
+                  <span className="text-[10px] font-medium leading-none">
+                    Admin-Center
+                  </span>
+                </button>
+              ))}
 
             <div className="relative" ref={profileMenuRef}>
               <div className="group relative">
@@ -362,10 +407,10 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                 <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900">
                   <div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800">
                     <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {user.email}
+                      {fullName || "Profilname fehlt"}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      {userRole}
+                    <p className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500">
+                      {user.email}
                     </p>
                   </div>
 
@@ -578,33 +623,27 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       {adminMode ? (
         <main className="mx-auto max-w-7xl px-4 py-6">
           {activeAdminTab === "kursuebersicht" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+              <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Kursübersicht
               </h3>
-              <p className="mt-2 text-slate-500 dark:text-slate-400">
-                Hier erscheint die Kursübersicht. Platzhalter.
-              </p>
+              <KursuebersichtTab />
             </div>
           )}
           {activeAdminTab === "nutzeruebersicht" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+              <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Nutzerübersicht
               </h3>
-              <p className="mt-2 text-slate-500 dark:text-slate-400">
-                Hier erscheint die Nutzerübersicht. Platzhalter.
-              </p>
+              <NutzeruebersichtTab />
             </div>
           )}
           {activeAdminTab === "statistiken" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+              <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Statistiken
               </h3>
-              <p className="mt-2 text-slate-500 dark:text-slate-400">
-                Hier erscheinen die Statistiken. Platzhalter.
-              </p>
+              <StatistikenTab />
             </div>
           )}
         </main>
