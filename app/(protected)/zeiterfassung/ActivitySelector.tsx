@@ -151,7 +151,7 @@ function ActivityList({
       />
 
       {/* Scrollable activity list grouped by category and subcategory */}
-      <div className="overflow-y-auto space-y-3" style={{ maxHeight: "380px" }}>
+      <div className="overflow-y-auto scrollbar-thin space-y-3" style={{ maxHeight: "380px" }}>
         {hierarchy.length === 0 && (
           <p className="text-center text-sm text-slate-400 py-6">
             Keine Tätigkeiten gefunden.
