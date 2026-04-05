@@ -36,32 +36,3 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
-
-/* Slim, styled scrollbar */
-.scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
-}
-.scrollbar-thin::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 999px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8;
-}
-html.dark .scrollbar-thin {
-  scrollbar-color: #334155 transparent;
-}
-html.dark .scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: #334155;
-}
-html.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: #475569;
-}

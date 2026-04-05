@@ -16,7 +16,7 @@ function generateAllSlots(): string[] {
   for (let hour = 0; hour < 24; hour++) {
     for (let min = 0; min < 60; min += 10) {
       slots.push(
-        `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`
+        `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`,
       );
     }
   }
@@ -31,11 +31,16 @@ function getSlotsForEntry(startTime: string, endTime: string): string[] {
   const [startHour, startMin] = startTime.split(":").map(Number);
   const [endHour, endMin] = endTime.split(":").map(Number);
   const startTotal = startHour * 60 + startMin;
-  const endTotal = (endHour === 0 && endMin === 0 && startTotal > 0) ? 1440 : endHour * 60 + endMin;
+  const endTotal =
+    endHour === 0 && endMin === 0 && startTotal > 0
+      ? 1440
+      : endHour * 60 + endMin;
 
   for (let min = startTotal; min < endTotal; min += 10) {
     slots.push(
-      `${Math.floor(min / 60).toString().padStart(2, "0")}:${(min % 60).toString().padStart(2, "0")}`
+      `${Math.floor(min / 60)
+        .toString()
+        .padStart(2, "0")}:${(min % 60).toString().padStart(2, "0")}`,
     );
   }
   return slots;
@@ -43,7 +48,7 @@ function getSlotsForEntry(startTime: string, endTime: string): string[] {
 
 // Builds a map from slot string → TimeEntryRecord for O(1) lookup per cell
 function buildSlotToEntryMap(
-  entries: TimeEntryRecord[]
+  entries: TimeEntryRecord[],
 ): Map<string, TimeEntryRecord> {
   const map = new Map<string, TimeEntryRecord>();
   for (const entry of entries) {
@@ -58,12 +63,12 @@ function buildSlotToEntryMap(
 function getCategoryIdForActivity(
   activityId: number,
   activities: LookupData["activities"],
-  subcategories: LookupData["subcategories"]
+  subcategories: LookupData["subcategories"],
 ): number | null {
   const activity = activities.find((a) => a.activity_id === activityId);
   if (!activity) return null;
   const subcategory = subcategories.find(
-    (s) => s.subcategory_id === activity.subcategory_id
+    (s) => s.subcategory_id === activity.subcategory_id,
   );
   return subcategory?.category_id ?? null;
 }
@@ -72,12 +77,12 @@ function getCategoryIdForActivity(
 // Single activity: solid color | Primary + secondary: top/bottom split
 function getCellStyle(
   entry: TimeEntryRecord,
-  lookupData: LookupData
+  lookupData: LookupData,
 ): React.CSSProperties {
   const primaryCatId = getCategoryIdForActivity(
     entry.primary_activity_id,
     lookupData.activities,
-    lookupData.subcategories
+    lookupData.subcategories,
   );
   const primaryColor = primaryCatId
     ? getCategoryColor(primaryCatId, lookupData.categories)
@@ -91,7 +96,7 @@ function getCellStyle(
   const secondaryCatId = getCategoryIdForActivity(
     entry.secondary_activity_id,
     lookupData.activities,
-    lookupData.subcategories
+    lookupData.subcategories,
   );
   const secondaryColor = secondaryCatId
     ? getCategoryColor(secondaryCatId, lookupData.categories)
@@ -106,7 +111,9 @@ function getCellStyle(
 function getSlotTooltip(slot: string): string {
   const [hour, min] = slot.split(":").map(Number);
   const endTotal = hour * 60 + min + 10;
-  const endStr = `${Math.floor(endTotal / 60).toString().padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}`;
+  const endStr = `${Math.floor(endTotal / 60)
+    .toString()
+    .padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}`;
   return `${slot} – ${endStr}`;
 }
 
@@ -127,14 +134,14 @@ function getSlotsInRange(anchorSlot: string, currentSlot: string): Set<string> {
 const MINUTE_LABELS = [":00", ":10", ":20", ":30", ":40", ":50"];
 // Labels shown on the left side (one per row = one per hour)
 const HOUR_LABELS = Array.from({ length: 24 }, (_, i) =>
-  i.toString().padStart(2, "0")
+  i.toString().padStart(2, "0"),
 );
 // Pre-generated slot list (stable, never changes)
 const ALL_SLOTS = generateAllSlots();
 
 type TimeGridProps = {
   existingEntries: TimeEntryRecord[];
-  selectedSlots: Set<string>;   // committed selection managed by parent
+  selectedSlots: Set<string>; // committed selection managed by parent
   lookupData: LookupData;
   onSlotsSelected: (slots: Set<string>) => void;
 };
@@ -155,7 +162,7 @@ export default function TimeGrid({
   // Pre-built slot → entry map so each cell render is O(1)
   const slotToEntry = useMemo(
     () => buildSlotToEntryMap(existingEntries),
-    [existingEntries]
+    [existingEntries],
   );
 
   // Global mouseup: finalizes the drag and commits the current live range to the parent
@@ -195,7 +202,7 @@ export default function TimeGrid({
 
   return (
     <div
-      className="overflow-y-auto scrollbar-thin rounded-xl border border-slate-200 bg-white shadow-sm select-none"
+      className="overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm select-none"
       style={{ maxHeight: "calc(100vh - 230px)" }}
     >
       {/* Sticky header row: minute-offset labels */}
@@ -242,11 +249,12 @@ export default function TimeGrid({
                   onMouseEnter={() => handleCellMouseEnter(slot)}
                   className={`
                     rounded-sm cursor-pointer transition-all duration-75
-                    ${isHighlighted
-                      ? "ring-2 ring-blue-500 ring-inset brightness-75"
-                      : isFilled
-                        ? "hover:brightness-90"
-                        : "bg-slate-100 hover:bg-slate-200"
+                    ${
+                      isHighlighted
+                        ? "ring-2 ring-blue-500 ring-inset brightness-75"
+                        : isFilled
+                          ? "hover:brightness-90"
+                          : "bg-slate-100 hover:bg-slate-200"
                     }
                   `}
                   style={{
