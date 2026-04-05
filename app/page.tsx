@@ -292,11 +292,6 @@ export default function Home() {
                 >
                   Zurück zur Anmeldung
                 </button>
-                {mode === "signup" && (
-                  <p className="text-center text-xs text-slate-500">
-                    Bereits registriert?
-                  </p>
-                )}
               </>
             )}
           </div>
