@@ -13,6 +13,7 @@ import {
   Pie,
   Legend,
   CartesianGrid,
+  LabelList,
 } from "recharts";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
@@ -41,6 +42,7 @@ type CourseProgressData = {
 type ActivityData = {
   name: string;
   count: number;
+  label: string; // e.g. "42 (15%)"
 };
 
 type CategoryData = {
@@ -52,6 +54,7 @@ type CategoryData = {
 type SatisfactionData = {
   name: string;
   count: number;
+  label: string; // e.g. "42 (15%)"
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -169,12 +172,14 @@ function buildTopActivities(
       counts[e.primary_activity_id] = (counts[e.primary_activity_id] ?? 0) + 1;
     }
   }
+  const total = Object.values(counts).reduce((s, c) => s + c, 0);
   return Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 7)
     .map(([id, count]) => ({
       name: truncate(activityById[Number(id)] ?? `#${id}`, 28),
       count,
+      label: total > 0 ? `${count} (${Math.round((count / total) * 100)}%)` : `${count}`,
     }))
     .reverse(); // smallest at top so the largest bar reads last (natural reading order)
 }
@@ -214,10 +219,18 @@ function buildSatisfactionData(
       counts[e.satisfaction_id] = (counts[e.satisfaction_id] ?? 0) + 1;
     }
   }
+  const total = Object.values(counts).reduce((s, c) => s + c, 0);
   // Return in DB order (typically worst → best)
   return satisfactions
     .filter((s) => counts[s.satisfaction_id] != null)
-    .map((s) => ({ name: truncate(s.name, 20), count: counts[s.satisfaction_id] }));
+    .map((s) => {
+      const count = counts[s.satisfaction_id];
+      return {
+        name: truncate(s.name, 20),
+        count,
+        label: total > 0 ? `${count} (${Math.round((count / total) * 100)}%)` : `${count}`,
+      };
+    });
 }
 
 // ─── Custom tooltips ──────────────────────────────────────────────────────────
@@ -314,12 +327,12 @@ export default function StatistikenTab() {
     ] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_active", true),
       supabase.from("course").select("course_id, name, start_date, end_date, is_locked"),
-      supabase.from("user_course").select("profiles_id, course_id"),
+      supabase.from("user_course").select("profiles_id, course_id, is_excluded"),
       supabase.from("day").select("day_id, profiles_id, course_id, is_submitted"),
       supabase.from("time_entry").select("entry_id", { count: "exact", head: true }).gte("created_at", sevenDaysAgo),
       supabase.from("time_entry").select("entry_id", { count: "exact", head: true }),
       supabase.from("time_entry").select("entry_id, day_id, created_at").gte("created_at", fourteenDaysAgo),
-      supabase.from("time_entry").select("primary_activity_id, satisfaction_id, start_time, end_time").limit(100000),
+      supabase.from("time_entry").select("day_id, primary_activity_id, satisfaction_id, start_time, end_time").limit(100000),
       supabase.from("activity").select("activity_id, name, subcategory_id"),
       supabase.from("subcategory").select("subcategory_id, category_id"),
       supabase.from("category").select("category_id, name"),
@@ -344,12 +357,25 @@ export default function StatistikenTab() {
 
     // ── Build lookup maps ──────────────────────────────────────────────────────
 
+    // Profiles excluded from statistics by admin (is_excluded = true on user_course)
+    const excludedProfileIds = new Set<string>();
+    for (const uc of userCourses) {
+      if (uc.is_excluded) excludedProfileIds.add(uc.profiles_id);
+    }
+
+    // Filter days and entries to remove excluded users' data
+    const filteredDays = allDays.filter((d) => !excludedProfileIds.has(d.profiles_id));
+    const filteredDayIds = new Set(filteredDays.map((d) => d.day_id));
+    const filteredEntries = allEntries.filter((e) => filteredDayIds.has(e.day_id));
+
     const dayById: Record<number, { profiles_id: string }> = {};
     for (const d of allDays) dayById[d.day_id] = { profiles_id: d.profiles_id };
 
     const userCountByCourse: Record<number, number> = {};
     for (const uc of userCourses) {
-      userCountByCourse[uc.course_id] = (userCountByCourse[uc.course_id] ?? 0) + 1;
+      if (!uc.is_excluded) {
+        userCountByCourse[uc.course_id] = (userCountByCourse[uc.course_id] ?? 0) + 1;
+      }
     }
 
     const activityById: Record<number, string> = {};
@@ -381,10 +407,10 @@ export default function StatistikenTab() {
     // ── Charts ────────────────────────────────────────────────────────────────
 
     setTrendData(buildTrendData(recentEntries, dayById));
-    setCourseProgress(buildCourseProgress(courses, userCountByCourse, allDays));
-    setTopActivities(buildTopActivities(allEntries, activityById));
-    setCategoryData(buildCategoryDistribution(allEntries, activityToCategory, categoryById));
-    setSatisfactionData(buildSatisfactionData(allEntries, satisfactions));
+    setCourseProgress(buildCourseProgress(courses, userCountByCourse, filteredDays));
+    setTopActivities(buildTopActivities(filteredEntries, activityById));
+    setCategoryData(buildCategoryDistribution(filteredEntries, activityToCategory, categoryById));
+    setSatisfactionData(buildSatisfactionData(filteredEntries, satisfactions));
 
     setIsLoading(false);
   }
@@ -537,7 +563,7 @@ export default function StatistikenTab() {
               <BarChart
                 data={topActivities}
                 layout="vertical"
-                margin={{ top: 4, right: 24, left: 8, bottom: 0 }}
+                margin={{ top: 4, right: 90, left: 8, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
@@ -561,6 +587,11 @@ export default function StatistikenTab() {
                   {topActivities.map((_, index) => (
                     <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                   ))}
+                  <LabelList
+                    dataKey="label"
+                    position="right"
+                    style={{ fontSize: 10, fill: "#64748b" }}
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -605,8 +636,8 @@ export default function StatistikenTab() {
         {satisfactionData.length === 0 ? (
           <p className="py-10 text-center text-sm text-slate-400">Noch keine Einträge vorhanden.</p>
         ) : (
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={satisfactionData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={satisfactionData} margin={{ top: 24, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis
                 dataKey="name"
@@ -631,6 +662,11 @@ export default function StatistikenTab() {
                     fill={SATISFACTION_COLORS[index % SATISFACTION_COLORS.length]}
                   />
                 ))}
+                <LabelList
+                  dataKey="label"
+                  position="top"
+                  style={{ fontSize: 10, fill: "#64748b" }}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
