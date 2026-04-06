@@ -78,6 +78,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const supabase = getSupabaseBrowserClient();
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isEnrolled, setIsEnrolled] = useState<boolean | null>(null);
@@ -99,6 +100,27 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const [profileLastName, setProfileLastName] = useState("");
 
   const isAdmin = profileRole === "admin";
+
+  function handleMainTouchStart(e: React.TouchEvent) {
+    touchStartXRef.current = e.touches[0].clientX;
+  }
+
+  function handleMainTouchEnd(e: React.TouchEvent) {
+    if (touchStartXRef.current === null) return;
+    const diff = touchStartXRef.current - e.changedTouches[0].clientX;
+    touchStartXRef.current = null;
+    if (Math.abs(diff) < 60) return; // ignore small swipes
+    if (adminMode) {
+      const idx = adminTabs.findIndex((t) => t.id === activeAdminTab);
+      if (diff > 0 && idx < adminTabs.length - 1)
+        setActiveAdminTab(adminTabs[idx + 1].id);
+      if (diff < 0 && idx > 0) setActiveAdminTab(adminTabs[idx - 1].id);
+    } else {
+      const idx = tabs.findIndex((t) => t.path === pathname);
+      if (diff > 0 && idx < tabs.length - 1) router.push(tabs[idx + 1].path);
+      if (diff < 0 && idx > 0) router.push(tabs[idx - 1].path);
+    }
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -371,7 +393,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                 <button
                   type="button"
                   aria-label="Admin-Center öffnen"
-                  className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                  className="flex flex-col items-center gap-0.5 rounded-xl border border-blue-400 bg-blue-50 px-3 py-1.5 text-blue-600 transition-colors hover:border-blue-500 hover:bg-blue-100 hover:text-blue-700 dark:border-blue-600 dark:bg-blue-950 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:text-blue-300"
                   onClick={() => {
                     setAdminMode(true);
                     setSettingsOpen(false);
@@ -460,7 +482,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
       <nav className="sticky top-[73px] z-10 border-b border-slate-200 bg-white/95 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950/95">
         <div className="mx-auto max-w-7xl px-4">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+          <div className="flex">
             {adminMode
               ? adminTabs.map((tab) => {
                   const isActive = activeAdminTab === tab.id;
@@ -470,15 +492,19 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     <button
                       key={tab.id}
                       type="button"
-                      className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
                         isActive
                           ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
                           : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-100"
                       }`}
                       onClick={() => setActiveAdminTab(tab.id)}
                     >
-                      <Icon size={18} />
-                      <span>{tab.label}</span>
+                      <Icon size={16} className="shrink-0 sm:hidden" />
+                      <Icon size={18} className="shrink-0 hidden sm:block" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="sm:hidden text-xs font-semibold">
+                        {tab.label.charAt(0) + tab.label.slice(1).toLowerCase()}
+                      </span>
                     </button>
                   );
                 })
@@ -490,14 +516,18 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     <Link
                       key={tab.path}
                       href={tab.path}
-                      className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
                         isActive
                           ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
                           : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-100"
                       }`}
                     >
-                      <Icon size={18} />
-                      <span>{tab.label}</span>
+                      <Icon size={16} className="shrink-0 sm:hidden" />
+                      <Icon size={18} className="shrink-0 hidden sm:block" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="sm:hidden text-xs font-semibold">
+                        {tab.label.charAt(0) + tab.label.slice(1).toLowerCase()}
+                      </span>
                     </Link>
                   );
                 })}
@@ -621,7 +651,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       )}
 
       {adminMode ? (
-        <main className="mx-auto max-w-7xl px-4 py-6">
+        <main
+          className="mx-auto max-w-7xl px-4 py-6"
+          onTouchStart={handleMainTouchStart}
+          onTouchEnd={handleMainTouchEnd}
+        >
           {activeAdminTab === "kursuebersicht" && (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
               <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -648,7 +682,13 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
           )}
         </main>
       ) : (
-        <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+        <main
+          className="mx-auto max-w-7xl px-4 py-6"
+          onTouchStart={handleMainTouchStart}
+          onTouchEnd={handleMainTouchEnd}
+        >
+          {children}
+        </main>
       )}
 
       {needsProfileDetails === false && isEnrolled === false && (
