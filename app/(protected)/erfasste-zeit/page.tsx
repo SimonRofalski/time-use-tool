@@ -16,7 +16,10 @@ function calculateCoveredSlots(startTime: string, endTime: string): number {
   const [startHour, startMin] = startTime.split(":").map(Number);
   const [endHour, endMin] = endTime.split(":").map(Number);
   const startMinTotal = startHour * 60 + startMin;
-  const endMinTotal = (endHour === 0 && endMin === 0 && startMinTotal > 0) ? 1440 : endHour * 60 + endMin;
+  const endMinTotal =
+    endHour === 0 && endMin === 0 && startMinTotal > 0
+      ? 1440
+      : endHour * 60 + endMin;
   return Math.round((endMinTotal - startMinTotal) / 10);
 }
 
@@ -25,13 +28,13 @@ function calculateCoveredSlots(startTime: string, endTime: string): number {
 // The four possible states a diary day can be in
 type DayStatus =
   | "nicht_verfuegbar" // date is in the future
-  | "nicht_begonnen"   // date is today or past, but no entries yet
-  | "in_bearbeitung"   // some entries exist, but day not submitted yet
-  | "abgeschlossen";   // day has been submitted by the student
+  | "nicht_begonnen" // date is today or past, but no entries yet
+  | "in_bearbeitung" // some entries exist, but day not submitted yet
+  | "abgeschlossen"; // day has been submitted by the student
 
 // Represents one calendar day in the course, enriched with progress data
 type CourseDay = {
-  date: string;        // ISO format: "YYYY-MM-DD"
+  date: string; // ISO format: "YYYY-MM-DD"
   dayId: number | null; // null if no day record exists in the database yet
   entryCount: number;
   isSubmitted: boolean;
@@ -52,7 +55,7 @@ type CourseSummary = {
 function getDayStatus(
   date: string,
   entryCount: number,
-  isSubmitted: boolean
+  isSubmitted: boolean,
 ): DayStatus {
   // Compare date strings — ISO format sorts correctly as strings
   const todayDate = new Date().toISOString().split("T")[0];
@@ -91,11 +94,17 @@ function formatDateGerman(dateString: string): string {
 
 // Returns a compact two-part date label for carousel cards
 // e.g. "2026-03-28" → { weekday: "Sa.", dayMonth: "28. Mär." }
-function formatDateCompact(dateString: string): { weekday: string; dayMonth: string } {
+function formatDateCompact(dateString: string): {
+  weekday: string;
+  dayMonth: string;
+} {
   const date = new Date(dateString);
   return {
     weekday: date.toLocaleDateString("de-DE", { weekday: "short" }),
-    dayMonth: date.toLocaleDateString("de-DE", { day: "numeric", month: "short" }),
+    dayMonth: date.toLocaleDateString("de-DE", {
+      day: "numeric",
+      month: "short",
+    }),
   };
 }
 
@@ -147,10 +156,14 @@ function getStatusColors(status: DayStatus): {
 // Returns the German display label for a day status
 function getStatusLabel(status: DayStatus): string {
   switch (status) {
-    case "nicht_verfuegbar": return "Noch nicht verfügbar";
-    case "nicht_begonnen":   return "Nicht begonnen";
-    case "in_bearbeitung":   return "In Bearbeitung";
-    case "abgeschlossen":    return "Abgeschlossen";
+    case "nicht_verfuegbar":
+      return "Noch nicht verfügbar";
+    case "nicht_begonnen":
+      return "Nicht begonnen";
+    case "in_bearbeitung":
+      return "In Bearbeitung";
+    case "abgeschlossen":
+      return "Abgeschlossen";
   }
 }
 
@@ -168,21 +181,25 @@ function DayCarouselCard({
   const isAvailable = day.status !== "nicht_verfuegbar";
   const completionPercentage = Math.min(
     Math.round((day.entryCount / TOTAL_ENTRIES_PER_DAY) * 100),
-    100
+    100,
   );
   const { weekday, dayMonth } = formatDateCompact(day.date);
 
   return (
     <div
       className={`${colors.cardBg} flex-shrink-0 rounded-lg border border-slate-200 p-3 transition-shadow ${
-        isAvailable ? "cursor-pointer hover:shadow-md" : "cursor-default opacity-60"
+        isAvailable
+          ? "cursor-pointer hover:shadow-md"
+          : "cursor-default opacity-60"
       }`}
-      style={{ width: "160px", scrollSnapAlign: "start" }}
+      style={{ scrollSnapAlign: "start" }}
       onClick={isAvailable ? onClick : undefined}
     >
       {/* Date */}
       <p className="text-xs font-medium text-slate-400">{weekday}</p>
-      <p className="text-sm font-semibold text-slate-800 leading-tight">{dayMonth}</p>
+      <p className="text-sm font-semibold text-slate-800 leading-tight">
+        {dayMonth}
+      </p>
 
       {/* Status badge */}
       <span
@@ -201,8 +218,12 @@ function DayCarouselCard({
 
       {/* Percentage + entry count */}
       <div className="mt-1.5 flex items-center justify-between">
-        <p className="text-xs text-slate-400">{day.entryCount}/{TOTAL_ENTRIES_PER_DAY}</p>
-        <p className={`text-sm font-semibold ${colors.percentText}`}>{completionPercentage}%</p>
+        <p className="text-xs text-slate-400">
+          {day.entryCount}/{TOTAL_ENTRIES_PER_DAY}
+        </p>
+        <p className={`text-sm font-semibold ${colors.percentText}`}>
+          {completionPercentage}%
+        </p>
       </div>
     </div>
   );
@@ -222,7 +243,10 @@ function DayCarousel({
   function scroll(direction: "prev" | "next") {
     if (!scrollRef.current) return;
     scrollRef.current.scrollBy({
-      left: direction === "next" ? scrollRef.current.clientWidth : -scrollRef.current.clientWidth,
+      left:
+        direction === "next"
+          ? scrollRef.current.clientWidth
+          : -scrollRef.current.clientWidth,
       behavior: "smooth",
     });
   }
@@ -232,7 +256,7 @@ function DayCarousel({
       {/* Header row with day count and nav buttons */}
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm font-medium text-slate-600">{days.length} Tage</p>
-        <div className="flex gap-2">
+        <div className="hidden gap-2 md:flex">
           <button
             type="button"
             onClick={() => scroll("prev")}
@@ -252,10 +276,21 @@ function DayCarousel({
         </div>
       </div>
 
-      {/* Scrollable card row — scrollbar hidden, snap-to-start per card */}
+      {/* Mobile: all days visible in a responsive grid */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:hidden">
+        {days.map((day) => (
+          <DayCarouselCard
+            key={day.date}
+            day={day}
+            onClick={() => onDayClick(day.date)}
+          />
+        ))}
+      </div>
+
+      {/* Desktop: scrollable card row with nav buttons */}
       <div
         ref={scrollRef}
-        className="flex gap-3 overflow-x-auto pb-2"
+        className="hidden gap-3 overflow-x-auto pb-2 md:flex"
         style={{ scrollSnapType: "x mandatory", scrollbarWidth: "none" }}
       >
         {days.map((day) => (
@@ -275,19 +310,19 @@ function DayCarousel({
 function SummaryBar({ days }: { days: CourseDay[] }) {
   // Exclude future days from the summary counts
   const pastAndTodayDays = days.filter(
-    (day) => day.status !== "nicht_verfuegbar"
+    (day) => day.status !== "nicht_verfuegbar",
   );
 
   const completedCount = pastAndTodayDays.filter(
-    (day) => day.status === "abgeschlossen"
+    (day) => day.status === "abgeschlossen",
   ).length;
 
   const inProgressCount = pastAndTodayDays.filter(
-    (day) => day.status === "in_bearbeitung"
+    (day) => day.status === "in_bearbeitung",
   ).length;
 
   const notStartedCount = pastAndTodayDays.filter(
-    (day) => day.status === "nicht_begonnen"
+    (day) => day.status === "nicht_begonnen",
   ).length;
 
   return (
@@ -301,13 +336,17 @@ function SummaryBar({ days }: { days: CourseDay[] }) {
       {/* In-progress days */}
       <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-center">
         <p className="text-2xl font-bold text-orange-500">{inProgressCount}</p>
-        <p className="mt-1 text-xs font-medium text-orange-700">In Bearbeitung</p>
+        <p className="mt-1 text-xs font-medium text-orange-700">
+          In Bearbeitung
+        </p>
       </div>
 
       {/* Not started days */}
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center">
         <p className="text-2xl font-bold text-slate-500">{notStartedCount}</p>
-        <p className="mt-1 text-xs font-medium text-slate-600">Nicht begonnen</p>
+        <p className="mt-1 text-xs font-medium text-slate-600">
+          Nicht begonnen
+        </p>
       </div>
     </div>
   );
@@ -321,7 +360,9 @@ export default function ErfassteZeitPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [courseSummary, setCourseSummary] = useState<CourseSummary | null>(null);
+  const [courseSummary, setCourseSummary] = useState<CourseSummary | null>(
+    null,
+  );
   const [courseDays, setCourseDays] = useState<CourseDay[]>([]);
 
   // Load all overview data when the component mounts
@@ -353,7 +394,7 @@ export default function ErfassteZeitPage() {
 
     if (userCourseError || !userCourseData) {
       setErrorMessage(
-        "Kein Kurs gefunden. Bitte wenden Sie sich an Ihren Administrator."
+        "Kein Kurs gefunden. Bitte wenden Sie sich an Ihren Administrator.",
       );
       setIsLoading(false);
       return;
@@ -413,7 +454,10 @@ export default function ErfassteZeitPage() {
 
       // Sum covered slots per day instead of counting rows
       for (const row of entryRows ?? []) {
-        const coveredSlots = calculateCoveredSlots(row.start_time, row.end_time);
+        const coveredSlots = calculateCoveredSlots(
+          row.start_time,
+          row.end_time,
+        );
         entryCountByDayId[row.day_id] =
           (entryCountByDayId[row.day_id] ?? 0) + coveredSlots;
       }
@@ -426,7 +470,10 @@ export default function ErfassteZeitPage() {
     }
 
     // Step 7: generate the full date range from the course and merge with DB data
-    const allDates = generateDateRange(courseData.start_date, courseData.end_date);
+    const allDates = generateDateRange(
+      courseData.start_date,
+      courseData.end_date,
+    );
 
     const mergedCourseDays: CourseDay[] = allDates.map((date) => {
       const dayRecord = dayRecordByDate[date] ?? null;
@@ -476,15 +523,15 @@ export default function ErfassteZeitPage() {
     <div className="space-y-6">
       {/* Page header with course name and date range */}
       <div>
-        <h2 className="text-xl font-semibold text-slate-800">Übersicht</h2>
         {courseSummary && (
-          <p className="mt-1 text-sm text-slate-500">
-            {courseSummary.courseName}
-            {" · "}
-            {formatDateGerman(courseSummary.startDate)}
-            {" – "}
-            {formatDateGerman(courseSummary.endDate)}
-          </p>
+          <div className="mt-1 text-sm text-slate-500">
+            <p>{courseSummary.courseName}</p>
+            <p className="mt-1">
+              {formatDateGerman(courseSummary.startDate)}
+              {" – "}
+              {formatDateGerman(courseSummary.endDate)}
+            </p>
+          </div>
         )}
       </div>
 

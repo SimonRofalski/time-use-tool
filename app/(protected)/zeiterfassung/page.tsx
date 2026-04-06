@@ -702,12 +702,14 @@ export default function ZeiterfassungPage() {
             />
           ) : (
             <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-10 text-center">
-              <p className="text-2xl mb-3">👆</p>
-              <p className="text-sm font-medium text-slate-600">
-                Wähle einen oder mehrere Zeitslots im Raster aus
+              <p className="text-3xl mb-4">⏱️</p>
+              <p className="text-base font-semibold text-slate-700">
+                Zeitslot auswählen
               </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Klicken für einen Slot · Klicken und ziehen für mehrere
+              <p className="mt-2 text-sm text-slate-400 leading-relaxed">
+                Tippe auf einen Slot im Raster –
+                <br className="hidden sm:block" /> oder wische über mehrere auf
+                einmal.
               </p>
             </div>
           )}

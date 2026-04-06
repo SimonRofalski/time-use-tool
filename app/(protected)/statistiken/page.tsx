@@ -65,7 +65,8 @@ function calculateMinutes(startTime: string, endTime: string): number {
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
   const startMinTotal = sh * 60 + sm;
-  const endMinTotal = (eh === 0 && em === 0 && startMinTotal > 0) ? 1440 : eh * 60 + em;
+  const endMinTotal =
+    eh === 0 && em === 0 && startMinTotal > 0 ? 1440 : eh * 60 + em;
   return endMinTotal - startMinTotal;
 }
 
@@ -92,12 +93,17 @@ function buildZeitverteilungData(
   submittedDayIds: Set<number>,
   activities: ActivityLookup[],
   subcategories: SubcategoryLookup[],
-  categories: CategoryLookup[]
-): { categoryRows: CategoryRow[]; barData: DayBarData[]; categoryNames: string[] } {
-
+  categories: CategoryLookup[],
+): {
+  categoryRows: CategoryRow[];
+  barData: DayBarData[];
+  categoryNames: string[];
+} {
   // Build lookup maps for fast access by ID
   const activityMap = new Map(activities.map((a) => [a.activity_id, a]));
-  const subcategoryMap = new Map(subcategories.map((s) => [s.subcategory_id, s]));
+  const subcategoryMap = new Map(
+    subcategories.map((s) => [s.subcategory_id, s]),
+  );
   const categoryMap = new Map(categories.map((c) => [c.category_id, c]));
 
   // Accumulate minutes: category → subcategory → activity
@@ -132,7 +138,8 @@ function buildZeitverteilungData(
     // Accumulate into the tree
     if (!minuteTree[catId]) minuteTree[catId] = {};
     if (!minuteTree[catId][subId]) minuteTree[catId][subId] = {};
-    minuteTree[catId][subId][actId] = (minuteTree[catId][subId][actId] ?? 0) + minutes;
+    minuteTree[catId][subId][actId] =
+      (minuteTree[catId][subId][actId] ?? 0) + minutes;
 
     // Accumulate into daily map
     if (!dailyMinutes[date]) dailyMinutes[date] = {};
@@ -140,9 +147,16 @@ function buildZeitverteilungData(
   }
 
   // Total minutes across everything (for percentage calculation)
-  const grandTotal = Object.values(minuteTree).reduce((catSum, subs) =>
-    catSum + Object.values(subs).reduce((subSum, acts) =>
-      subSum + Object.values(acts).reduce((a, b) => a + b, 0), 0), 0);
+  const grandTotal = Object.values(minuteTree).reduce(
+    (catSum, subs) =>
+      catSum +
+      Object.values(subs).reduce(
+        (subSum, acts) =>
+          subSum + Object.values(acts).reduce((a, b) => a + b, 0),
+        0,
+      ),
+    0,
+  );
 
   // Build the CategoryRow array, sorted by total minutes descending
   const categoryRows: CategoryRow[] = categories
@@ -182,7 +196,10 @@ function buildZeitverteilungData(
         })
         .sort((a, b) => b.totalMinutes - a.totalMinutes);
 
-      const catTotal = subcategoryRows.reduce((s, sub) => s + sub.totalMinutes, 0);
+      const catTotal = subcategoryRows.reduce(
+        (s, sub) => s + sub.totalMinutes,
+        0,
+      );
       return {
         categoryId: cat.category_id,
         name: cat.name,
@@ -201,7 +218,7 @@ function buildZeitverteilungData(
   const today = new Date().toISOString().split("T")[0];
   const barData: DayBarData[] = allCourseDates.map((date) => {
     const isSubmittedDay = [...submittedDayIds].some(
-      (id) => dayIdToDate[id] === date
+      (id) => dayIdToDate[id] === date,
     );
 
     // Future or not-yet-submitted days: use a placeholder bar of 1440 minutes
@@ -230,7 +247,7 @@ function buildZeitverteilungData(
 function calcAverageHoursPerDay(
   entries: RawEntry[],
   submittedDayIds: Set<number>,
-  activityIdFilter: Set<number>
+  activityIdFilter: Set<number>,
 ): number {
   // Minutes per day: only count days where the activity appears
   const minutesByDay: Record<number, number> = {};
@@ -255,7 +272,7 @@ function calcAverageHoursPerDay(
 // Counts all time entries where digital_media_type_id matches, across submitted days.
 function calcSmartphoneHoursPerDay(
   entries: RawEntry[],
-  submittedDayIds: Set<number>
+  submittedDayIds: Set<number>,
 ): number {
   const totalDays = submittedDayIds.size;
   if (totalDays === 0) return 0;
@@ -286,7 +303,9 @@ export default function StatistikenPage() {
   const [categoryNames, setCategoryNames] = useState<string[]>([]);
 
   // Kursvergleich tab state
-  const [comparisonTopics, setComparisonTopics] = useState<ComparisonTopic[]>([]);
+  const [comparisonTopics, setComparisonTopics] = useState<ComparisonTopic[]>(
+    [],
+  );
   const [qualifyingUserCount, setQualifyingUserCount] = useState(0);
 
   useEffect(() => {
@@ -301,12 +320,18 @@ export default function StatistikenPage() {
 
     // Step 1: get the logged-in user
     const { data: authData } = await supabase.auth.getUser();
-    if (!authData.user) { router.push("/"); return; }
+    if (!authData.user) {
+      router.push("/");
+      return;
+    }
     const userId = authData.user.id;
 
     // Step 2: get course enrollment
     const { data: userCourse } = await supabase
-      .from("user_course").select("course_id").eq("profiles_id", userId).single();
+      .from("user_course")
+      .select("course_id")
+      .eq("profiles_id", userId)
+      .single();
     if (!userCourse) {
       setErrorMessage("Kein Kurs gefunden.");
       setIsLoading(false);
@@ -316,19 +341,34 @@ export default function StatistikenPage() {
 
     // Step 3: load course date range
     const { data: courseData } = await supabase
-      .from("course").select("start_date, end_date").eq("course_id", courseId).single();
+      .from("course")
+      .select("start_date, end_date")
+      .eq("course_id", courseId)
+      .single();
     if (!courseData) {
       setErrorMessage("Kursdaten konnten nicht geladen werden.");
       setIsLoading(false);
       return;
     }
-    const allCourseDates = generateDateRange(courseData.start_date, courseData.end_date);
+    const allCourseDates = generateDateRange(
+      courseData.start_date,
+      courseData.end_date,
+    );
 
     // Step 4: load lookup tables in parallel
     const [cats, subs, acts] = await Promise.all([
-      supabase.from("category").select("category_id, name").order("category_id"),
-      supabase.from("subcategory").select("subcategory_id, name, category_id").order("subcategory_id"),
-      supabase.from("activity").select("activity_id, name, subcategory_id").order("activity_id"),
+      supabase
+        .from("category")
+        .select("category_id, name")
+        .order("category_id"),
+      supabase
+        .from("subcategory")
+        .select("subcategory_id, name, category_id")
+        .order("subcategory_id"),
+      supabase
+        .from("activity")
+        .select("activity_id, name, subcategory_id")
+        .order("activity_id"),
     ]);
 
     const categories: CategoryLookup[] = cats.data ?? [];
@@ -354,7 +394,9 @@ export default function StatistikenPage() {
     if (myDayIds.length > 0) {
       const { data: entryData } = await supabase
         .from("time_entry")
-        .select("day_id, start_time, end_time, primary_activity_id, digital_media_type_id")
+        .select(
+          "day_id, start_time, end_time, primary_activity_id, digital_media_type_id",
+        )
         .in("day_id", myDayIds);
       myEntries = entryData ?? [];
     }
@@ -367,7 +409,7 @@ export default function StatistikenPage() {
       mySubmittedDayIds,
       activities,
       subcategories,
-      categories
+      categories,
     );
     setCategoryRows(zeitverteilungResult.categoryRows);
     setBarData(zeitverteilungResult.barData);
@@ -385,7 +427,9 @@ export default function StatistikenPage() {
 
     // De-duplicate: one entry per unique participant
     const allParticipantIds = [
-      ...new Set((allSubmittedDays ?? []).map((d: any) => d.profiles_id as string)),
+      ...new Set(
+        (allSubmittedDays ?? []).map((d: any) => d.profiles_id as string),
+      ),
     ];
 
     // Load submitted days for all participants
@@ -406,18 +450,22 @@ export default function StatistikenPage() {
     }
 
     const qualifyingUsers = Object.entries(submittedDaysByUser).filter(
-      ([, dayIds]) => dayIds.length >= MIN_DAYS_FOR_COMPARISON
+      ([, dayIds]) => dayIds.length >= MIN_DAYS_FOR_COMPARISON,
     );
     setQualifyingUserCount(qualifyingUsers.length);
 
     // Only build comparison if there are enough qualifying users
     if (qualifyingUsers.length >= 3) {
       // Load all time entries for all qualifying users' submitted days
-      const allQualifyingDayIds = qualifyingUsers.flatMap(([, dayIds]) => dayIds);
+      const allQualifyingDayIds = qualifyingUsers.flatMap(
+        ([, dayIds]) => dayIds,
+      );
 
       const { data: allEntries } = await supabase
         .from("time_entry")
-        .select("day_id, start_time, end_time, primary_activity_id, digital_media_type_id")
+        .select(
+          "day_id, start_time, end_time, primary_activity_id, digital_media_type_id",
+        )
         .in("day_id", allQualifyingDayIds);
 
       const rawAllEntries: RawEntry[] = allEntries ?? [];
@@ -429,17 +477,36 @@ export default function StatistikenPage() {
 
       for (const [profileId, dayIds] of qualifyingUsers) {
         const userDayIdSet = new Set(dayIds);
-        const userEntries = rawAllEntries.filter((e) => userDayIdSet.has(e.day_id));
+        const userEntries = rawAllEntries.filter((e) =>
+          userDayIdSet.has(e.day_id),
+        );
 
-        sleepValues.push(calcAverageHoursPerDay(userEntries, userDayIdSet, SLEEP_ACTIVITY_IDS));
-        sportValues.push(calcAverageHoursPerDay(userEntries, userDayIdSet, SPORT_ACTIVITY_IDS));
-        smartphoneValues.push(calcSmartphoneHoursPerDay(userEntries, userDayIdSet));
+        sleepValues.push(
+          calcAverageHoursPerDay(userEntries, userDayIdSet, SLEEP_ACTIVITY_IDS),
+        );
+        sportValues.push(
+          calcAverageHoursPerDay(userEntries, userDayIdSet, SPORT_ACTIVITY_IDS),
+        );
+        smartphoneValues.push(
+          calcSmartphoneHoursPerDay(userEntries, userDayIdSet),
+        );
       }
 
       // Get the current user's own values (use myEntries + mySubmittedDayIds)
-      const mySleeepValue = calcAverageHoursPerDay(myEntries, mySubmittedDayIds, SLEEP_ACTIVITY_IDS);
-      const mySportValue = calcAverageHoursPerDay(myEntries, mySubmittedDayIds, SPORT_ACTIVITY_IDS);
-      const mySmartphoneValue = calcSmartphoneHoursPerDay(myEntries, mySubmittedDayIds);
+      const mySleeepValue = calcAverageHoursPerDay(
+        myEntries,
+        mySubmittedDayIds,
+        SLEEP_ACTIVITY_IDS,
+      );
+      const mySportValue = calcAverageHoursPerDay(
+        myEntries,
+        mySubmittedDayIds,
+        SPORT_ACTIVITY_IDS,
+      );
+      const mySmartphoneValue = calcSmartphoneHoursPerDay(
+        myEntries,
+        mySubmittedDayIds,
+      );
 
       setComparisonTopics([
         {
@@ -477,8 +544,8 @@ export default function StatistikenPage() {
       prev.map((cat) =>
         cat.categoryId === categoryId
           ? { ...cat, isExpanded: !cat.isExpanded }
-          : cat
-      )
+          : cat,
+      ),
     );
   }
 
@@ -493,10 +560,10 @@ export default function StatistikenPage() {
               subcategories: cat.subcategories.map((sub) =>
                 sub.subcategoryId === subcategoryId
                   ? { ...sub, isExpanded: !sub.isExpanded }
-                  : sub
+                  : sub,
               ),
-            }
-      )
+            },
+      ),
     );
   }
 
@@ -520,14 +587,6 @@ export default function StatistikenPage() {
 
   return (
     <div className="space-y-5">
-      {/* Page header */}
-      <div>
-        <h2 className="text-xl font-semibold text-slate-800">Statistiken</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Basierend auf deinen eingereichten Tagen
-        </p>
-      </div>
-
       {/* Tab bar */}
       <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
         <button

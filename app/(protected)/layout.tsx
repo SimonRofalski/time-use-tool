@@ -11,11 +11,11 @@ import KursuebersichtTab from "@/app/components/admin/KursuebersichtTab";
 import NutzeruebersichtTab from "@/app/components/admin/NutzeruebersichtTab";
 import StatistikenTab from "@/app/components/admin/StatistikenTab";
 import {
+  ArrowLeft,
   BarChart3,
   BookOpen,
   Calendar,
   ClipboardList,
-  Clock,
   LogOut,
   Moon,
   Settings,
@@ -364,44 +364,46 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950/95">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.svg" alt="" className="h-8 w-8" />
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+            <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0" />
+            <h1 className="whitespace-nowrap text-base font-semibold text-slate-800 dark:text-slate-100 sm:text-lg">
               Time Use Tool
             </h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="ml-3 flex shrink-0 items-center gap-2">
             {isAdmin &&
               (adminMode ? (
                 <button
                   type="button"
                   aria-label="Zurück zum Zeittagebuch"
-                  className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                  className="inline-flex min-w-[5.9rem] items-center justify-center gap-1.5 rounded-2xl border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs font-semibold tracking-tight text-sky-700 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-500/60 dark:hover:bg-sky-500/15 sm:min-w-[7.75rem] sm:gap-2 sm:px-3.5 sm:text-sm"
                   onClick={() => {
                     setAdminMode(false);
                     setSettingsOpen(false);
                   }}
                 >
-                  <Clock size={16} />
-                  <span className="text-[10px] font-medium leading-none">
-                    Zeittagebuch
+                  <ArrowLeft size={16} className="shrink-0" />
+                  <span className="text-center leading-[1.05] sm:leading-none">
+                    <span className="block sm:inline">Zuruck zur</span>
+                    <span className="block sm:inline sm:ml-1">Eingabe</span>
                   </span>
                 </button>
               ) : (
                 <button
                   type="button"
                   aria-label="Admin-Center öffnen"
-                  className="flex flex-col items-center gap-0.5 rounded-xl border border-blue-400 bg-blue-50 px-3 py-1.5 text-blue-600 transition-colors hover:border-blue-500 hover:bg-blue-100 hover:text-blue-700 dark:border-blue-600 dark:bg-blue-950 dark:text-blue-400 dark:hover:border-blue-500 dark:hover:text-blue-300"
+                  className="inline-flex min-w-[5.9rem] items-center justify-center gap-1.5 rounded-2xl border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs font-semibold tracking-tight text-amber-800 shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100 hover:text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:border-amber-500/60 dark:hover:bg-amber-500/15 sm:min-w-[7.75rem] sm:gap-2 sm:px-3.5 sm:text-sm"
                   onClick={() => {
                     setAdminMode(true);
                     setSettingsOpen(false);
                   }}
                 >
-                  <ShieldCheck size={16} />
-                  <span className="text-[10px] font-medium leading-none">
-                    Admin-Center
+                  <ShieldCheck size={16} className="shrink-0" />
+                  <span className="text-center leading-[1.05] sm:leading-none">
+                    <span className="block sm:inline">Admin-</span>
+                    <span className="block sm:inline">Modus</span>
                   </span>
                 </button>
               ))}
