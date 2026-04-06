@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { ChevronRight } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import ConfirmModal from "./ConfirmModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,13 +14,20 @@ type CourseRow = {
   end_date: string;
   is_locked: boolean;
   accessCode: string | null;
+  anonymized_at: string | null;
   userCount: number;
 };
 
 type EnrolledUser = {
+  userCourseId: string;
   userId: string;
   email: string;
+  firstName: string | null;
+  lastName: string | null;
+  alias: string | null;
+  isExcluded: boolean;
   submittedDays: number;
+  courseTotalDays: number;
 };
 
 type DayRow = {
@@ -41,14 +49,30 @@ type EntryRow = {
 // Drill-down navigation state for the "Alle Kurse" sub-tab
 type DrillView =
   | { type: "list" }
-  | { type: "course"; courseId: number; courseName: string }
+  | {
+      type: "course";
+      courseId: number;
+      courseName: string;
+      courseTotalDays: number;
+      isAnonymized: boolean;
+    }
   | {
       type: "user";
       courseId: number;
       courseName: string;
+      courseTotalDays: number;
+      isAnonymized: boolean;
       userId: string;
-      userEmail: string;
+      userDisplayName: string;
     };
+
+type ConfirmModalState = {
+  title: string;
+  message: string;
+  variant: "danger" | "warning" | "default";
+  confirmLabel: string;
+  onConfirm: () => void;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,11 +84,26 @@ function formatDate(dateString: string): string {
   });
 }
 
+function courseDurationDays(startDate: string, endDate: string): number {
+  return (
+    Math.round(
+      (new Date(endDate).getTime() - new Date(startDate).getTime()) /
+        86_400_000,
+    ) + 1
+  );
+}
+
 function courseDurationLabel(startDate: string, endDate: string): string {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const days = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  const days = courseDurationDays(startDate, endDate);
   return `${days} Tag${days !== 1 ? "e" : ""}`;
+}
+
+function userDisplayName(user: EnrolledUser, isAnonymized: boolean): string {
+  if (isAnonymized && user.alias) return user.alias;
+  if (user.firstName || user.lastName) {
+    return [user.firstName, user.lastName].filter(Boolean).join(" ");
+  }
+  return user.email;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -102,6 +141,16 @@ export default function KursuebersichtTab() {
     new Set(),
   );
 
+  // ── Modals & inline edits ───────────────────────────────────────────────────
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(
+    null,
+  );
+  const [editingAccessCode, setEditingAccessCode] = useState<{
+    courseId: number;
+    value: string;
+  } | null>(null);
+  const [isAnonymizing, setIsAnonymizing] = useState(false);
+
   useEffect(() => {
     if (subTab === "alle" && view.type === "list") {
       void loadCourses();
@@ -116,7 +165,9 @@ export default function KursuebersichtTab() {
 
     const { data: courseData, error: courseErr } = await supabase
       .from("course")
-      .select("course_id, name, start_date, end_date, is_locked, accessCode")
+      .select(
+        "course_id, name, start_date, end_date, is_locked, accessCode, anonymized_at",
+      )
       .order("start_date", { ascending: false });
 
     if (courseErr || !courseData) {
@@ -125,7 +176,7 @@ export default function KursuebersichtTab() {
       return;
     }
 
-    // Count enrolled users per course client-side (avoids a GROUP BY query)
+    // Count enrolled users per course client-side
     const { data: userCourseData } = await supabase
       .from("user_course")
       .select("course_id");
@@ -144,13 +195,13 @@ export default function KursuebersichtTab() {
     setIsLoadingCourses(false);
   }
 
-  async function loadCourseUsers(courseId: number) {
+  async function loadCourseUsers(courseId: number, courseTotalDays: number) {
     setIsLoadingUsers(true);
     setCourseUsers([]);
 
     const { data: enrollments } = await supabase
       .from("user_course")
-      .select("profiles_id")
+      .select("user_course_id, profiles_id, is_excluded, alias")
       .eq("course_id", courseId);
 
     const userIds = (enrollments ?? []).map((e) => e.profiles_id);
@@ -160,7 +211,10 @@ export default function KursuebersichtTab() {
     }
 
     const [profilesRes, submittedDaysRes] = await Promise.all([
-      supabase.from("profiles").select("id, email").in("id", userIds),
+      supabase
+        .from("profiles")
+        .select("id, email, first_name, last_name")
+        .in("id", userIds),
       supabase
         .from("day")
         .select("profiles_id")
@@ -168,9 +222,16 @@ export default function KursuebersichtTab() {
         .eq("is_submitted", true),
     ]);
 
-    const emailById: Record<string, string> = {};
+    const profileById: Record<
+      string,
+      { email: string; firstName: string | null; lastName: string | null }
+    > = {};
     for (const p of profilesRes.data ?? []) {
-      emailById[p.id] = p.email ?? p.id.slice(0, 8) + "…";
+      profileById[p.id] = {
+        email: p.email ?? p.id.slice(0, 8) + "…",
+        firstName: p.first_name ?? null,
+        lastName: p.last_name ?? null,
+      };
     }
 
     const submittedByUser: Record<string, number> = {};
@@ -179,11 +240,29 @@ export default function KursuebersichtTab() {
         (submittedByUser[d.profiles_id] ?? 0) + 1;
     }
 
+    const ucById: Record<
+      string,
+      { userCourseId: string; isExcluded: boolean; alias: string | null }
+    > = {};
+    for (const e of enrollments ?? []) {
+      ucById[e.profiles_id] = {
+        userCourseId: e.user_course_id,
+        isExcluded: e.is_excluded ?? false,
+        alias: e.alias ?? null,
+      };
+    }
+
     setCourseUsers(
       userIds.map((id) => ({
+        userCourseId: ucById[id]?.userCourseId ?? "",
         userId: id,
-        email: emailById[id] ?? id.slice(0, 8) + "…",
+        email: profileById[id]?.email ?? id.slice(0, 8) + "…",
+        firstName: profileById[id]?.firstName ?? null,
+        lastName: profileById[id]?.lastName ?? null,
+        alias: ucById[id]?.alias ?? null,
+        isExcluded: ucById[id]?.isExcluded ?? false,
         submittedDays: submittedByUser[id] ?? 0,
+        courseTotalDays,
       })),
     );
     setIsLoadingUsers(false);
@@ -229,7 +308,6 @@ export default function KursuebersichtTab() {
       return;
     }
 
-    // Collect unique lookup IDs, then fetch names in parallel
     const activityIds = [
       ...new Set(
         [
@@ -331,12 +409,13 @@ export default function KursuebersichtTab() {
     if (isExpanding) void loadDayEntries(dayId);
   }
 
+  // ── Action handlers ───────────────────────────────────────────────────────────
+
   async function handleLockCourse(courseId: number) {
     const { error } = await supabase
       .from("course")
       .update({ is_locked: true })
       .eq("course_id", courseId);
-
     if (!error) {
       setCourses((prev) =>
         prev.map((c) =>
@@ -344,6 +423,100 @@ export default function KursuebersichtTab() {
         ),
       );
     }
+    setConfirmModal(null);
+  }
+
+  async function handleChangeAccessCode(courseId: number, newCode: string) {
+    const { error } = await supabase
+      .from("course")
+      .update({ accessCode: newCode })
+      .eq("course_id", courseId);
+    if (!error) {
+      setCourses((prev) =>
+        prev.map((c) =>
+          c.course_id === courseId ? { ...c, accessCode: newCode } : c,
+        ),
+      );
+      setEditingAccessCode(null);
+    }
+  }
+
+  async function handleKickUser(userCourseId: string, userId: string) {
+    const { error } = await supabase
+      .from("user_course")
+      .delete()
+      .eq("user_course_id", userCourseId);
+    if (!error) {
+      setCourseUsers((prev) => prev.filter((u) => u.userId !== userId));
+    }
+    setConfirmModal(null);
+  }
+
+  async function handleToggleExclude(user: EnrolledUser) {
+    const nowExcluded = !user.isExcluded;
+    const { error } = await supabase
+      .from("user_course")
+      .update({ is_excluded: nowExcluded })
+      .eq("user_course_id", user.userCourseId);
+
+    if (!error) {
+      setCourseUsers((prev) =>
+        prev.map((u) =>
+          u.userId === user.userId ? { ...u, isExcluded: nowExcluded } : u,
+        ),
+      );
+    }
+    setConfirmModal(null);
+  }
+
+  async function handleAnonymizeCourse(courseId: number) {
+    setIsAnonymizing(true);
+
+    // Sort users deterministically for stable alias assignment
+    const usersToAnonymize = [...courseUsers].sort((a, b) =>
+      a.userId.localeCompare(b.userId),
+    );
+
+    const updates = usersToAnonymize.map((u, i) => ({
+      userCourseId: u.userCourseId,
+      alias: `TN-${String(i + 1).padStart(4, "0")}`,
+    }));
+
+    await Promise.all(
+      updates.map(({ userCourseId, alias }) =>
+        supabase
+          .from("user_course")
+          .update({ alias })
+          .eq("user_course_id", userCourseId),
+      ),
+    );
+
+    const anonymizedAt = new Date().toISOString();
+    await supabase
+      .from("course")
+      .update({ anonymized_at: anonymizedAt })
+      .eq("course_id", courseId);
+
+    setCourses((prev) =>
+      prev.map((c) =>
+        c.course_id === courseId ? { ...c, anonymized_at: anonymizedAt } : c,
+      ),
+    );
+    setCourseUsers((prev) =>
+      prev.map((u) => {
+        const upd = updates.find((x) => x.userCourseId === u.userCourseId);
+        return upd ? { ...u, alias: upd.alias } : u;
+      }),
+    );
+    setView((prev) => {
+      if (prev.type === "course" && prev.courseId === courseId) {
+        return { ...prev, isAnonymized: true };
+      }
+      return prev;
+    });
+
+    setIsAnonymizing(false);
+    setConfirmModal(null);
   }
 
   async function handleCreateCourse(e: React.FormEvent) {
@@ -421,6 +594,8 @@ export default function KursuebersichtTab() {
                     type: "course",
                     courseId: view.courseId,
                     courseName: view.courseName,
+                    courseTotalDays: view.courseTotalDays,
+                    isAnonymized: view.isAnonymized,
                   });
                 }
               }}
@@ -430,7 +605,7 @@ export default function KursuebersichtTab() {
             </button>
             <ChevronRight size={14} className="shrink-0" />
             <span className="font-medium text-slate-800 truncate max-w-[200px]">
-              {view.userEmail}
+              {view.userDisplayName}
             </span>
           </>
         )}
@@ -539,132 +714,313 @@ export default function KursuebersichtTab() {
 
     return (
       <div className="space-y-3">
-        {courses.map((course) => (
-          <div
-            key={course.course_id}
-            className="rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
-          >
-            <div className="flex items-start justify-between gap-4">
-              {/* Clickable course name → drill into course detail */}
-              <button
-                type="button"
-                className="flex-1 text-left"
-                onClick={() => {
-                  setView({
-                    type: "course",
-                    courseId: course.course_id,
-                    courseName: course.name,
-                  });
-                  void loadCourseUsers(course.course_id);
-                }}
-              >
-                <p className="font-medium text-slate-800 hover:text-blue-600 transition-colors dark:text-slate-100">
-                  {course.name}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  {formatDate(course.start_date)} –{" "}
-                  {formatDate(course.end_date)}
-                  {" · "}
-                  {courseDurationLabel(course.start_date, course.end_date)}
-                  {" · "}
-                  {course.userCount} Teilnehmer
-                </p>
-              </button>
+        {courses.map((course) => {
+          const isEditingCode =
+            editingAccessCode?.courseId === course.course_id;
 
-              {/* Status badge + action button */}
-              <div className="flex shrink-0 items-center gap-2">
-                {course.is_locked ? (
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                    Abgeschlossen
-                  </span>
+          return (
+            <div
+              key={course.course_id}
+              className="rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900"
+            >
+              <div className="flex items-start justify-between gap-4">
+                {/* Left: clickable course name + metadata */}
+                <button
+                  type="button"
+                  className="flex-1 text-left"
+                  onClick={() => {
+                    const totalDays = courseDurationDays(
+                      course.start_date,
+                      course.end_date,
+                    );
+                    setView({
+                      type: "course",
+                      courseId: course.course_id,
+                      courseName: course.name,
+                      courseTotalDays: totalDays,
+                      isAnonymized: course.anonymized_at != null,
+                    });
+                    void loadCourseUsers(course.course_id, totalDays);
+                  }}
+                >
+                  <p className="font-medium text-slate-800 hover:text-blue-600 transition-colors dark:text-slate-100">
+                    {course.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    {formatDate(course.start_date)} –{" "}
+                    {formatDate(course.end_date)}
+                    {" · "}
+                    {courseDurationLabel(course.start_date, course.end_date)}
+                    {" · "}
+                    {course.userCount} Teilnehmer
+                  </p>
+                </button>
+
+                {/* Right: badges + actions */}
+                <div className="flex shrink-0 items-center gap-2">
+                  {course.anonymized_at && (
+                    <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                      Anonymisiert
+                    </span>
+                  )}
+                  {course.is_locked ? (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                      Abgeschlossen
+                    </span>
+                  ) : (
+                    <>
+                      <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        Aktiv
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setConfirmModal({
+                            title: `Kurs beenden`,
+                            message: `Soll der Kurs „${course.name}" wirklich beendet werden? Diese Aktion kann nicht rückgängig gemacht werden.`,
+                            variant: "danger",
+                            confirmLabel: "Beenden",
+                            onConfirm: () =>
+                              void handleLockCourse(course.course_id),
+                          })
+                        }
+                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                      >
+                        Kurs beenden
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Access code row */}
+              <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <span className="text-xs text-slate-400 dark:text-slate-500">
+                  Zugangscode:
+                </span>
+                {isEditingCode ? (
+                  <>
+                    <input
+                      type="text"
+                      value={editingAccessCode.value}
+                      onChange={(e) =>
+                        setEditingAccessCode({
+                          courseId: course.course_id,
+                          value: e.target.value,
+                        })
+                      }
+                      className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleChangeAccessCode(
+                          course.course_id,
+                          editingAccessCode.value.trim(),
+                        )
+                      }
+                      className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                    >
+                      Speichern
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingAccessCode(null)}
+                      className="text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      Abbrechen
+                    </button>
+                  </>
                 ) : (
                   <>
-                    <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      Aktiv
+                    <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      {course.accessCode ?? "–"}
                     </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `Kurs „${course.name}" wirklich beenden?`,
-                          )
-                        ) {
-                          void handleLockCourse(course.course_id);
-                        }
-                      }}
-                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                      onClick={() =>
+                        setEditingAccessCode({
+                          courseId: course.course_id,
+                          value: course.accessCode ?? "",
+                        })
+                      }
+                      className="text-xs text-slate-400 hover:text-slate-600 transition-colors dark:hover:text-slate-300"
                     >
-                      Kurs beenden
+                      Ändern
                     </button>
                   </>
                 )}
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }
 
   function renderCourseDetail() {
     if (view.type !== "course") return null;
-    if (isLoadingUsers)
-      return <p className="text-sm text-slate-500">Wird geladen…</p>;
-    if (courseUsers.length === 0) {
-      return (
-        <p className="text-sm text-slate-500">
-          Keine Teilnehmer in diesem Kurs.
-        </p>
-      );
-    }
+    const { isAnonymized } = view;
 
     return (
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                E-Mail
-              </th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Abgeschlossene Tage
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {courseUsers.map((u) => (
-              <tr
-                key={u.userId}
-                className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
-              >
-                <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (view.type === "course") {
-                        setView({
-                          type: "user",
-                          courseId: view.courseId,
-                          courseName: view.courseName,
-                          userId: u.userId,
-                          userEmail: u.email,
-                        });
-                        void loadUserDays(u.userId, view.courseId);
-                      }
-                    }}
-                    className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    {u.email}
-                  </button>
-                </td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                  {u.submittedDays}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-4">
+        {/* Course-level actions */}
+        {!isAnonymized && (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              disabled={isAnonymizing}
+              onClick={() =>
+                setConfirmModal({
+                  title: "Kurs anonymisieren",
+                  message: `Alle Teilnehmer erhalten ein Alias (TN-0001, TN-0002, …). Realnamen und E-Mail-Adressen werden in der Admin-Ansicht durch Aliases ersetzt. Diese Aktion kann nicht rückgängig gemacht werden.`,
+                  variant: "warning",
+                  confirmLabel: "Anonymisieren",
+                  onConfirm: () => void handleAnonymizeCourse(view.courseId),
+                })
+              }
+              className="rounded-lg border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-50 disabled:opacity-50 dark:border-violet-800 dark:text-violet-400 dark:hover:bg-violet-900/20"
+            >
+              {isAnonymizing ? "Anonymisiere…" : "Kurs anonymisieren"}
+            </button>
+          </div>
+        )}
+
+        {isLoadingUsers ? (
+          <p className="text-sm text-slate-500">Wird geladen…</p>
+        ) : courseUsers.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Keine Teilnehmer in diesem Kurs.
+          </p>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Teilnehmer
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Fortschritt
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Aktionen
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {courseUsers.map((u) => {
+                  const displayLabel = userDisplayName(u, isAnonymized);
+                  const showEmail =
+                    !isAnonymized && (u.firstName || u.lastName);
+
+                  return (
+                    <tr
+                      key={u.userId}
+                      className={`transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 ${
+                        u.isExcluded ? "opacity-50" : ""
+                      }`}
+                    >
+                      {/* Name / alias */}
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (view.type === "course") {
+                              setView({
+                                type: "user",
+                                courseId: view.courseId,
+                                courseName: view.courseName,
+                                courseTotalDays: view.courseTotalDays,
+                                isAnonymized: view.isAnonymized,
+                                userId: u.userId,
+                                userDisplayName: displayLabel,
+                              });
+                              void loadUserDays(u.userId, view.courseId);
+                            }
+                          }}
+                          className="text-left"
+                        >
+                          <p className="font-medium text-blue-600 hover:underline dark:text-blue-400">
+                            {displayLabel}
+                          </p>
+                          {showEmail && (
+                            <p className="text-xs text-slate-400 dark:text-slate-500">
+                              {u.email}
+                            </p>
+                          )}
+                        </button>
+                      </td>
+
+                      {/* X / Y progress */}
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                        {u.submittedDays}{" "}
+                        <span className="text-slate-400 dark:text-slate-500">
+                          / {u.courseTotalDays} Tage
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {/* Exclude toggle */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (u.isExcluded) {
+                                setConfirmModal({
+                                  title: "Ausschluss aufheben",
+                                  message: `Die Daten von ${displayLabel} werden wieder in den Statistiken berücksichtigt.`,
+                                  variant: "default",
+                                  confirmLabel: "Aufheben",
+                                  onConfirm: () => void handleToggleExclude(u),
+                                });
+                              } else {
+                                setConfirmModal({
+                                  title: "Aus Statistiken ausschliessen",
+                                  message: `Die Daten von ${displayLabel} werden aus allen Statistiken entfernt. Der Teilnehmer wird nicht informiert.`,
+                                  variant: "warning",
+                                  confirmLabel: "Ausschliessen",
+                                  onConfirm: () => void handleToggleExclude(u),
+                                });
+                              }
+                            }}
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                              u.isExcluded
+                                ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400"
+                                : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                            }`}
+                          >
+                            {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
+                          </button>
+
+                          {/* Kick user */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setConfirmModal({
+                                title: "Teilnehmer entfernen",
+                                message: `Soll ${displayLabel} wirklich aus dem Kurs entfernt werden? Die Zeiteinträge bleiben erhalten.`,
+                                variant: "danger",
+                                confirmLabel: "Entfernen",
+                                onConfirm: () =>
+                                  void handleKickUser(u.userCourseId, u.userId),
+                              })
+                            }
+                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                          >
+                            Entfernen
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     );
   }
@@ -693,7 +1049,6 @@ export default function KursuebersichtTab() {
               key={day.day_id}
               className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
             >
-              {/* Day row — click to expand */}
               <button
                 type="button"
                 className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
@@ -723,7 +1078,6 @@ export default function KursuebersichtTab() {
                 </span>
               </button>
 
-              {/* Expanded: time entry table */}
               {isExpanded && (
                 <div className="border-t border-slate-100 dark:border-slate-800">
                   {isLoadingEntries ? (
@@ -793,38 +1147,51 @@ export default function KursuebersichtTab() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div>
-      {/* Sub-tab bar */}
-      <div className="mb-6 flex gap-1 border-b border-slate-200 dark:border-slate-800">
-        {(["alle", "neu"] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => {
-              setSubTab(tab);
-              setView({ type: "list" });
-            }}
-            className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              subTab === tab
-                ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
-                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-            }`}
-          >
-            {tab === "alle" ? "Alle Kurse" : "Neuer Kurs"}
-          </button>
-        ))}
-      </div>
-
-      {subTab === "neu" && renderNewCourseForm()}
-
-      {subTab === "alle" && (
-        <div>
-          {renderBreadcrumb()}
-          {view.type === "list" && renderCourseList()}
-          {view.type === "course" && renderCourseDetail()}
-          {view.type === "user" && renderUserDetail()}
-        </div>
+    <>
+      {confirmModal && (
+        <ConfirmModal
+          title={confirmModal.title}
+          message={confirmModal.message}
+          variant={confirmModal.variant}
+          confirmLabel={confirmModal.confirmLabel}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
       )}
-    </div>
+
+      <div>
+        {/* Sub-tab bar */}
+        <div className="mb-6 flex gap-1 border-b border-slate-200 dark:border-slate-800">
+          {(["alle", "neu"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => {
+                setSubTab(tab);
+                setView({ type: "list" });
+              }}
+              className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                subTab === tab
+                  ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
+                  : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+              }`}
+            >
+              {tab === "alle" ? "Alle Kurse" : "Neuer Kurs"}
+            </button>
+          ))}
+        </div>
+
+        {subTab === "neu" && renderNewCourseForm()}
+
+        {subTab === "alle" && (
+          <div>
+            {renderBreadcrumb()}
+            {view.type === "list" && renderCourseList()}
+            {view.type === "course" && renderCourseDetail()}
+            {view.type === "user" && renderUserDetail()}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

@@ -3,14 +3,20 @@
 import { useState, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import ConfirmModal from "./ConfirmModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type UserRow = {
   userId: string;
+  userCourseId: string | null;
   email: string;
+  firstName: string | null;
+  lastName: string | null;
   courseName: string | null;
+  courseTotalDays: number;
   submittedDays: number;
+  isExcluded: boolean;
 };
 
 type Kpis = {
@@ -18,6 +24,31 @@ type Kpis = {
   totalSubmittedDays: number;
   avgCompletionRate: number; // 0–100, average across users who started at least one day
 };
+
+type ConfirmModalState = {
+  title: string;
+  message: string;
+  variant: "danger" | "warning" | "default";
+  confirmLabel: string;
+  onConfirm: () => void;
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function courseDurationDays(start: string, end: string): number {
+  return (
+    Math.round(
+      (new Date(end).getTime() - new Date(start).getTime()) / 86_400_000,
+    ) + 1
+  );
+}
+
+function displayName(u: UserRow): string {
+  if (u.firstName || u.lastName) {
+    return [u.firstName, u.lastName].filter(Boolean).join(" ");
+  }
+  return u.email;
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -29,6 +60,9 @@ export default function NutzeruebersichtTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(
+    null,
+  );
 
   useEffect(() => {
     void loadData();
@@ -41,7 +75,7 @@ export default function NutzeruebersichtTab() {
     // All active profiles (requires the admin RLS policy from the migration)
     const { data: profiles, error: profilesErr } = await supabase
       .from("profiles")
-      .select("id, email")
+      .select("id, email, first_name, last_name")
       .eq("is_active", true);
 
     if (profilesErr || !profiles) {
@@ -50,22 +84,52 @@ export default function NutzeruebersichtTab() {
       return;
     }
 
-    // Fetch enrollments with course names in one query via PostgREST FK join
+    // Fetch enrollments with course name + dates for total-days calculation
     const { data: userCourses } = await supabase
       .from("user_course")
-      .select("profiles_id, course:course_id(name)");
+      .select(
+        "user_course_id, profiles_id, is_excluded, course:course_id(name, start_date, end_date)",
+      );
 
-    const courseNameByUser: Record<string, string> = {};
+    const courseInfoByUser: Record<
+      string,
+      {
+        name: string;
+        totalDays: number;
+        userCourseId: string;
+        isExcluded: boolean;
+      }
+    > = {};
     for (const uc of userCourses ?? []) {
       const courseRaw = uc.course as unknown;
-      const courseName =
-        courseRaw && typeof courseRaw === "object" && "name" in courseRaw
-          ? (courseRaw as { name: string }).name
-          : Array.isArray(courseRaw) && courseRaw.length > 0
-          ? (courseRaw[0] as { name: string }).name
-          : null;
+      let courseName: string | null = null;
+      let totalDays = 0;
+
+      if (courseRaw && typeof courseRaw === "object" && "name" in courseRaw) {
+        const c = courseRaw as {
+          name: string;
+          start_date: string;
+          end_date: string;
+        };
+        courseName = c.name;
+        totalDays = courseDurationDays(c.start_date, c.end_date);
+      } else if (Array.isArray(courseRaw) && courseRaw.length > 0) {
+        const c = courseRaw[0] as {
+          name: string;
+          start_date: string;
+          end_date: string;
+        };
+        courseName = c.name;
+        totalDays = courseDurationDays(c.start_date, c.end_date);
+      }
+
       if (uc.profiles_id && courseName) {
-        courseNameByUser[uc.profiles_id] = courseName;
+        courseInfoByUser[uc.profiles_id] = {
+          name: courseName,
+          totalDays,
+          userCourseId: uc.user_course_id,
+          isExcluded: uc.is_excluded ?? false,
+        };
       }
     }
 
@@ -79,9 +143,11 @@ export default function NutzeruebersichtTab() {
     let totalSubmittedDays = 0;
 
     for (const d of allDays ?? []) {
-      totalDaysByUser[d.profiles_id] = (totalDaysByUser[d.profiles_id] ?? 0) + 1;
+      totalDaysByUser[d.profiles_id] =
+        (totalDaysByUser[d.profiles_id] ?? 0) + 1;
       if (d.is_submitted) {
-        submittedByUser[d.profiles_id] = (submittedByUser[d.profiles_id] ?? 0) + 1;
+        submittedByUser[d.profiles_id] =
+          (submittedByUser[d.profiles_id] ?? 0) + 1;
         totalSubmittedDays++;
       }
     }
@@ -94,7 +160,7 @@ export default function NutzeruebersichtTab() {
             usersWhoStarted.reduce((sum, uid) => {
               const submitted = submittedByUser[uid] ?? 0;
               return sum + (submitted / totalDaysByUser[uid]) * 100;
-            }, 0) / usersWhoStarted.length
+            }, 0) / usersWhoStarted.length,
           )
         : 0;
 
@@ -105,26 +171,79 @@ export default function NutzeruebersichtTab() {
     });
 
     setUsers(
-      profiles.map((p) => ({
-        userId: p.id,
-        email: p.email ?? p.id.slice(0, 8) + "…",
-        courseName: courseNameByUser[p.id] ?? null,
-        submittedDays: submittedByUser[p.id] ?? 0,
-      }))
+      profiles.map((p) => {
+        const info = courseInfoByUser[p.id];
+        return {
+          userId: p.id,
+          userCourseId: info?.userCourseId ?? null,
+          email: p.email ?? p.id.slice(0, 8) + "…",
+          firstName: p.first_name ?? null,
+          lastName: p.last_name ?? null,
+          courseName: info?.name ?? null,
+          courseTotalDays: info?.totalDays ?? 0,
+          submittedDays: submittedByUser[p.id] ?? 0,
+          isExcluded: info?.isExcluded ?? false,
+        };
+      }),
     );
 
     setIsLoading(false);
   }
 
-  // Filter applied client-side — searches email and course name
+  async function handleToggleExclude(user: UserRow) {
+    if (!user.userCourseId) return;
+
+    const nowExcluded = !user.isExcluded;
+    const { error } = await supabase
+      .from("user_course")
+      .update({ is_excluded: nowExcluded })
+      .eq("user_course_id", user.userCourseId);
+
+    if (!error) {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.userId === user.userId ? { ...u, isExcluded: nowExcluded } : u,
+        ),
+      );
+    }
+    setConfirmModal(null);
+  }
+
+  function openExcludeModal(user: UserRow) {
+    if (user.isExcluded) {
+      setConfirmModal({
+        title: "Ausschluss aufheben",
+        message: `Die Daten von ${displayName(user)} werden wieder in allen Statistiken berücksichtigt.`,
+        variant: "default",
+        confirmLabel: "Aufheben",
+        onConfirm: () => void handleToggleExclude(user),
+      });
+    } else {
+      setConfirmModal({
+        title: "Nutzer ausschliessen",
+        message: `Die Daten von ${displayName(user)} werden aus allen Statistiken entfernt. Der Nutzer wird darüber nicht informiert.`,
+        variant: "warning",
+        confirmLabel: "Ausschliessen",
+        onConfirm: () => void handleToggleExclude(user),
+      });
+    }
+  }
+
+  // Filter applied client-side — searches name, email and course name
   const filteredUsers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return users;
-    return users.filter(
-      (u) =>
+    return users.filter((u) => {
+      const name = [u.firstName, u.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return (
+        name.includes(q) ||
         u.email.toLowerCase().includes(q) ||
         (u.courseName?.toLowerCase().includes(q) ?? false)
-    );
+      );
+    });
   }, [users, searchQuery]);
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -146,107 +265,175 @@ export default function NutzeruebersichtTab() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* KPI cards */}
-      {kpis && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              Aktive Nutzer
-            </p>
-            <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
-              {kpis.totalUsers}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              Abgeschlossene Tage
-            </p>
-            <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
-              {kpis.totalSubmittedDays}
-            </p>
-            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">Gesamt aller Nutzer</p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              Ø Abschlussquote
-            </p>
-            <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
-              {kpis.avgCompletionRate}%
-            </p>
-            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-              Ø aller gestarteten Nutzer
-            </p>
-          </div>
-        </div>
+    <>
+      {confirmModal && (
+        <ConfirmModal
+          title={confirmModal.title}
+          message={confirmModal.message}
+          variant={confirmModal.variant}
+          confirmLabel={confirmModal.confirmLabel}
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+        />
       )}
 
-      {/* Search bar */}
-      <div className="relative">
-        <Search
-          size={15}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-        />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Nutzer suchen…"
-          className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-        />
-      </div>
+      <div className="space-y-6">
+        {/* KPI cards */}
+        {kpis && (
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Aktive Nutzer
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
+                {kpis.totalUsers}
+              </p>
+            </div>
 
-      {/* User table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                E-Mail
-              </th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Kurs
-              </th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Abgeschl. Tage
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {filteredUsers.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="px-4 py-10 text-center text-sm text-slate-400 dark:text-slate-500"
-                >
-                  {searchQuery.trim() ? "Kein Nutzer gefunden." : "Keine aktiven Nutzer vorhanden."}
-                </td>
+            <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Abgeschlossene Tage
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
+                {kpis.totalSubmittedDays}
+              </p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                Gesamt aller Nutzer
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Ø Abschlussquote
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
+                {kpis.avgCompletionRate}%
+              </p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                Ø aller gestarteten Nutzer
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Search bar */}
+        <div className="relative">
+          <Search
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Nutzer suchen…"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
+
+        {/* User table */}
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Nutzer
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Kurs
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Fortschritt
+                </th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Aktionen
+                </th>
               </tr>
-            ) : (
-              filteredUsers.map((u) => (
-                <tr
-                  key={u.userId}
-                  className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                >
-                  <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
-                    {u.email}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                    {u.courseName ?? (
-                      <span className="text-slate-300 dark:text-slate-600">–</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                    {u.submittedDays}
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredUsers.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-4 py-10 text-center text-sm text-slate-400 dark:text-slate-500"
+                  >
+                    {searchQuery.trim()
+                      ? "Kein Nutzer gefunden."
+                      : "Keine aktiven Nutzer vorhanden."}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                filteredUsers.map((u) => (
+                  <tr
+                    key={u.userId}
+                    className={`transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 ${
+                      u.isExcluded ? "opacity-50" : ""
+                    }`}
+                  >
+                    {/* Name + email */}
+                    <td className="px-4 py-3">
+                      {u.firstName || u.lastName ? (
+                        <>
+                          <p className="font-medium text-slate-800 dark:text-slate-100">
+                            {displayName(u)}
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">
+                            {u.email}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="font-medium text-slate-800 dark:text-slate-100">
+                          {u.email}
+                        </p>
+                      )}
+                    </td>
+
+                    {/* Course */}
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      {u.courseName ?? (
+                        <span className="text-slate-300 dark:text-slate-600">
+                          –
+                        </span>
+                      )}
+                    </td>
+
+                    {/* X / Y progress */}
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      {u.courseTotalDays > 0 ? (
+                        <span>
+                          {u.submittedDays}{" "}
+                          <span className="text-slate-400 dark:text-slate-500">
+                            / {u.courseTotalDays} Tage
+                          </span>
+                        </span>
+                      ) : (
+                        u.submittedDays
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-4 py-3">
+                      {u.userCourseId && (
+                        <button
+                          type="button"
+                          onClick={() => openExcludeModal(u)}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                            u.isExcluded
+                              ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400"
+                              : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                          }`}
+                        >
+                          {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

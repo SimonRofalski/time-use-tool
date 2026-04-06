@@ -305,7 +305,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
     if (profileFormIsEditing) {
       const shouldClose = window.confirm(
-        "Die Profilbearbeitung ist noch nicht gespeichert. Wirklich schließen?",
+        "Die Profilbearbeitung ist noch nicht gespeichert. Wirklich schliessen?",
       );
 
       if (!shouldClose) {
