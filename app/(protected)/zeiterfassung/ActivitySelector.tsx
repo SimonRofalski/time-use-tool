@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   type PendingEntry,
   type QuestionnaireStep,
@@ -9,6 +9,98 @@ import {
   getCategoryColor,
   CATEGORY_COLORS,
 } from "./types";
+
+const RECENT_PRIMARY_ACTIVITIES_KEY = "time-use-tool:recent-primary-activities";
+const RECENT_SECONDARY_ACTIVITIES_KEY =
+  "time-use-tool:recent-secondary-activities";
+const MAX_RECENT_ACTIVITIES = 20;
+
+type ActiveActivityNode = {
+  activity_id: number;
+  count: number;
+};
+
+function getTopCategories(
+  lookupData: LookupData,
+  recentActivityIds: number[],
+  excludeActivityId?: number | null,
+): Array<{
+  category_id: number;
+  name: string;
+  color: string;
+  topActivities: ActivityNode[];
+}> {
+  const activityIdCount = new Map<number, number>();
+  for (const id of recentActivityIds) {
+    if (id === excludeActivityId) {
+      continue;
+    }
+    activityIdCount.set(id, (activityIdCount.get(id) ?? 0) + 1);
+  }
+
+  const subcategoryToCategory = new Map<number, number>();
+  for (const subcategory of lookupData.subcategories) {
+    subcategoryToCategory.set(
+      subcategory.subcategory_id,
+      subcategory.category_id,
+    );
+  }
+
+  const activityToCategory = new Map<number, number>();
+  const categoryUsageCount = new Map<number, number>();
+  const categoryTopActivities = new Map<number, ActiveActivityNode[]>();
+
+  for (const activity of lookupData.activities) {
+    const categoryId = subcategoryToCategory.get(activity.subcategory_id);
+    if (categoryId) {
+      activityToCategory.set(activity.activity_id, categoryId);
+    }
+  }
+
+  for (const [activityId, count] of activityIdCount) {
+    const categoryId = activityToCategory.get(activityId);
+    if (!categoryId) continue;
+    categoryUsageCount.set(
+      categoryId,
+      (categoryUsageCount.get(categoryId) ?? 0) + count,
+    );
+    const activities = categoryTopActivities.get(categoryId) ?? [];
+    activities.push({ activity_id: activityId, count });
+    categoryTopActivities.set(categoryId, activities);
+  }
+
+  const topCategoryIds = [...categoryUsageCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([id]) => id);
+  const result = [];
+
+  for (const categoryId of topCategoryIds) {
+    const catData = lookupData.categories.find(
+      (c) => c.category_id === categoryId,
+    );
+    if (!catData) continue;
+    const catIndex = lookupData.categories.indexOf(catData);
+    const color = CATEGORY_COLORS[catIndex % CATEGORY_COLORS.length];
+    const activities = (categoryTopActivities.get(categoryId) ?? [])
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 2)
+      .map((a) => {
+        const act = lookupData.activities.find(
+          (x) => x.activity_id === a.activity_id,
+        );
+        return { activity_id: a.activity_id, name: act?.name ?? "" };
+      });
+    result.push({
+      category_id: categoryId,
+      name: catData.name,
+      color,
+      topActivities: activities,
+    });
+  }
+
+  return result;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,6 +233,8 @@ function formatSlotsRange(slots: Set<string>): string {
 // Renders category/subcategory headers with clickable activity buttons
 function ActivityList({
   hierarchy,
+  topCategories,
+  topCategoriesTitle,
   selectedActivityId,
   searchQuery,
   onSearchChange,
@@ -148,6 +242,13 @@ function ActivityList({
   topSlot,
 }: {
   hierarchy: CategoryNode[];
+  topCategories: Array<{
+    category_id: number;
+    name: string;
+    color: string;
+    topActivities: ActivityNode[];
+  }>;
+  topCategoriesTitle: string;
   selectedActivityId: number | null;
   searchQuery: string;
   onSearchChange: (q: string) => void;
@@ -159,58 +260,116 @@ function ActivityList({
       {/* Optional top content (e.g. "Keine Nebentätigkeit" button) */}
       {topSlot}
 
-      {/* Search input */}
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={(e) => onSearchChange(e.target.value)}
-        placeholder="Tätigkeit suchen..."
-        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-      />
-
       {/* Scrollable activity list grouped by category and subcategory */}
       <div
-        className="overflow-y-auto scrollbar-thin space-y-3"
+        className="overflow-y-auto overflow-x-hidden scrollbar-thin"
         style={{ maxHeight: "380px" }}
       >
-        {hierarchy.length === 0 && (
-          <p className="text-center text-sm text-slate-400 py-6">
-            Keine Tätigkeiten gefunden.
-          </p>
-        )}
+        <div className="-mx-1 mb-2 rounded-b-lg border-b border-slate-200 bg-white/95 px-1 pb-2 backdrop-blur">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Tätigkeit suchen..."
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+            />
 
-        {hierarchy.map((cat) => (
-          <div key={cat.category_id}>
-            {/* Category header with colored left border */}
-            <div
-              className="flex items-center gap-2 mb-1.5 px-1"
-              style={{
-                borderLeft: `3px solid ${cat.color}`,
-                paddingLeft: "8px",
-              }}
-            >
-              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                {cat.name}
-              </span>
-            </div>
-
-            {cat.subcategories.map((sub) => (
-              <div key={sub.subcategory_id} className="mb-2 pl-3">
-                {/* Subcategory label */}
-                <p className="text-xs font-medium text-slate-400 mb-1">
-                  {sub.name}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                {topCategoriesTitle}
+              </p>
+              {searchQuery.trim().length > 0 ? (
+                <p className="text-[11px] text-slate-400">
+                  Während der Suche ausgeblendet.
                 </p>
+              ) : topCategories.length === 0 ? (
+                <p className="text-[11px] text-slate-400">
+                  Noch keine Einträge vorhanden.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {topCategories.map((cat) => (
+                    <div
+                      key={cat.category_id}
+                      className="rounded-md border px-2 py-1"
+                      style={{
+                        borderLeft: `3px solid ${cat.color}`,
+                        backgroundColor: `${cat.color}0A`,
+                      }}
+                    >
+                      <p
+                        className="mb-1 text-[10px] font-medium"
+                        style={{ color: cat.color }}
+                      >
+                        {cat.name}
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {cat.topActivities.map((act) => {
+                          const isSelected =
+                            selectedActivityId === act.activity_id;
+                          return (
+                            <button
+                              key={act.activity_id}
+                              type="button"
+                              onClick={() => onActivitySelect(act.activity_id)}
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-all ${isSelected ? "text-white shadow-sm" : "bg-white text-slate-600 hover:bg-slate-100"}`}
+                              style={
+                                isSelected ? { backgroundColor: cat.color } : {}
+                              }
+                            >
+                              {act.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
-                {/* Activity buttons */}
-                <div className="flex flex-wrap gap-1.5">
-                  {sub.activities.map((act) => {
-                    const isSelected = selectedActivityId === act.activity_id;
-                    return (
-                      <button
-                        key={act.activity_id}
-                        type="button"
-                        onClick={() => onActivitySelect(act.activity_id)}
-                        className={`
+        <div className="space-y-3">
+          {hierarchy.length === 0 && (
+            <p className="text-center text-sm text-slate-400 py-6">
+              Keine Tätigkeiten gefunden.
+            </p>
+          )}
+
+          {hierarchy.map((cat) => (
+            <div key={cat.category_id}>
+              {/* Category header with colored left border */}
+              <div
+                className="flex items-center gap-2 mb-1.5 px-1"
+                style={{
+                  borderLeft: `3px solid ${cat.color}`,
+                  paddingLeft: "8px",
+                }}
+              >
+                <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  {cat.name}
+                </span>
+              </div>
+
+              {cat.subcategories.map((sub) => (
+                <div key={sub.subcategory_id} className="mb-2 pl-3">
+                  {/* Subcategory label */}
+                  <p className="text-xs font-medium text-slate-400 mb-1">
+                    {sub.name}
+                  </p>
+
+                  {/* Activity buttons */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {sub.activities.map((act) => {
+                      const isSelected = selectedActivityId === act.activity_id;
+                      return (
+                        <button
+                          key={act.activity_id}
+                          type="button"
+                          onClick={() => onActivitySelect(act.activity_id)}
+                          className={`
                           rounded-full px-3 py-1 text-xs font-medium transition-all
                           ${
                             isSelected
@@ -218,17 +377,20 @@ function ActivityList({
                               : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                           }
                         `}
-                        style={isSelected ? { backgroundColor: cat.color } : {}}
-                      >
-                        {act.name}
-                      </button>
-                    );
-                  })}
+                          style={
+                            isSelected ? { backgroundColor: cat.color } : {}
+                          }
+                        >
+                          {act.name}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ))}
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -247,6 +409,78 @@ export default function ActivitySelector({
 }: ActivitySelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [recentPrimaryActivityIds, setRecentPrimaryActivityIds] = useState<
+    number[]
+  >([]);
+  const [recentSecondaryActivityIds, setRecentSecondaryActivityIds] = useState<
+    number[]
+  >([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const loadRecentIds = (storageKey: string) => {
+        const raw = window.localStorage.getItem(storageKey);
+        if (!raw) {
+          return [] as number[];
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          return [] as number[];
+        }
+
+        return parsed
+          .map((value) => Number(value))
+          .filter((value) => Number.isInteger(value) && value > 0)
+          .slice(0, MAX_RECENT_ACTIVITIES);
+      };
+
+      setRecentPrimaryActivityIds(loadRecentIds(RECENT_PRIMARY_ACTIVITIES_KEY));
+      setRecentSecondaryActivityIds(
+        loadRecentIds(RECENT_SECONDARY_ACTIVITIES_KEY),
+      );
+    } catch {
+      setRecentPrimaryActivityIds([]);
+      setRecentSecondaryActivityIds([]);
+    }
+  }, []);
+
+  function updateRecentPrimaryActivities(activityId: number) {
+    setRecentPrimaryActivityIds((previous) => {
+      const next = [
+        activityId,
+        ...previous.filter((id) => id !== activityId),
+      ].slice(0, MAX_RECENT_ACTIVITIES);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          RECENT_PRIMARY_ACTIVITIES_KEY,
+          JSON.stringify(next),
+        );
+      }
+      return next;
+    });
+  }
+
+  function updateRecentSecondaryActivities(activityId: number) {
+    setRecentSecondaryActivityIds((previous) => {
+      const next = [
+        activityId,
+        ...previous.filter((id) => id !== activityId),
+      ].slice(0, MAX_RECENT_ACTIVITIES);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          RECENT_SECONDARY_ACTIVITIES_KEY,
+          JSON.stringify(next),
+        );
+      }
+      return next;
+    });
+  }
+
   // When step changes, reset the search field
   // (handled by the parent changing the step prop)
   const hierarchy = buildActivityHierarchy(lookupData, searchQuery);
@@ -255,13 +489,21 @@ export default function ActivitySelector({
 
   // Step 1: select the main (required) activity
   function renderPrimaryActivityStep() {
+    const topCategories = getTopCategories(
+      lookupData,
+      recentPrimaryActivityIds,
+    );
+
     return (
       <ActivityList
         hierarchy={hierarchy}
+        topCategories={topCategories}
+        topCategoriesTitle="Zuletzt verwendete Hauptkategorien"
         selectedActivityId={pendingEntry.primary_activity_id}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onActivitySelect={(activityId) => {
+          updateRecentPrimaryActivities(activityId);
           setSearchQuery("");
           onStepComplete({ primary_activity_id: activityId });
         }}
@@ -278,13 +520,22 @@ export default function ActivitySelector({
       searchQuery,
       pendingEntry.primary_activity_id,
     );
+    const topCategories = getTopCategories(
+      lookupData,
+      recentSecondaryActivityIds,
+      pendingEntry.primary_activity_id,
+    );
+
     return (
       <ActivityList
         hierarchy={hierarchyWithoutPrimary}
+        topCategories={topCategories}
+        topCategoriesTitle="Zuletzt verwendete Nebenkategorien"
         selectedActivityId={pendingEntry.secondary_activity_id}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onActivitySelect={(activityId) => {
+          updateRecentSecondaryActivities(activityId);
           setSearchQuery("");
           onStepComplete({ secondary_activity_id: activityId });
         }}
