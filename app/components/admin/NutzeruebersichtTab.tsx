@@ -36,7 +36,11 @@ type ConfirmModalState = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function courseDurationDays(start: string, end: string): number {
-  return Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86_400_000) + 1;
+  return (
+    Math.round(
+      (new Date(end).getTime() - new Date(start).getTime()) / 86_400_000,
+    ) + 1
+  );
 }
 
 function displayName(u: UserRow): string {
@@ -56,7 +60,9 @@ export default function NutzeruebersichtTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(
+    null,
+  );
 
   useEffect(() => {
     void loadData();
@@ -81,20 +87,38 @@ export default function NutzeruebersichtTab() {
     // Fetch enrollments with course name + dates for total-days calculation
     const { data: userCourses } = await supabase
       .from("user_course")
-      .select("user_course_id, profiles_id, is_excluded, course:course_id(name, start_date, end_date)");
+      .select(
+        "user_course_id, profiles_id, is_excluded, course:course_id(name, start_date, end_date)",
+      );
 
-    const courseInfoByUser: Record<string, { name: string; totalDays: number; userCourseId: string; isExcluded: boolean }> = {};
+    const courseInfoByUser: Record<
+      string,
+      {
+        name: string;
+        totalDays: number;
+        userCourseId: string;
+        isExcluded: boolean;
+      }
+    > = {};
     for (const uc of userCourses ?? []) {
       const courseRaw = uc.course as unknown;
       let courseName: string | null = null;
       let totalDays = 0;
 
       if (courseRaw && typeof courseRaw === "object" && "name" in courseRaw) {
-        const c = courseRaw as { name: string; start_date: string; end_date: string };
+        const c = courseRaw as {
+          name: string;
+          start_date: string;
+          end_date: string;
+        };
         courseName = c.name;
         totalDays = courseDurationDays(c.start_date, c.end_date);
       } else if (Array.isArray(courseRaw) && courseRaw.length > 0) {
-        const c = courseRaw[0] as { name: string; start_date: string; end_date: string };
+        const c = courseRaw[0] as {
+          name: string;
+          start_date: string;
+          end_date: string;
+        };
         courseName = c.name;
         totalDays = courseDurationDays(c.start_date, c.end_date);
       }
@@ -119,9 +143,11 @@ export default function NutzeruebersichtTab() {
     let totalSubmittedDays = 0;
 
     for (const d of allDays ?? []) {
-      totalDaysByUser[d.profiles_id] = (totalDaysByUser[d.profiles_id] ?? 0) + 1;
+      totalDaysByUser[d.profiles_id] =
+        (totalDaysByUser[d.profiles_id] ?? 0) + 1;
       if (d.is_submitted) {
-        submittedByUser[d.profiles_id] = (submittedByUser[d.profiles_id] ?? 0) + 1;
+        submittedByUser[d.profiles_id] =
+          (submittedByUser[d.profiles_id] ?? 0) + 1;
         totalSubmittedDays++;
       }
     }
@@ -134,7 +160,7 @@ export default function NutzeruebersichtTab() {
             usersWhoStarted.reduce((sum, uid) => {
               const submitted = submittedByUser[uid] ?? 0;
               return sum + (submitted / totalDaysByUser[uid]) * 100;
-            }, 0) / usersWhoStarted.length
+            }, 0) / usersWhoStarted.length,
           )
         : 0;
 
@@ -158,7 +184,7 @@ export default function NutzeruebersichtTab() {
           submittedDays: submittedByUser[p.id] ?? 0,
           isExcluded: info?.isExcluded ?? false,
         };
-      })
+      }),
     );
 
     setIsLoading(false);
@@ -176,8 +202,8 @@ export default function NutzeruebersichtTab() {
     if (!error) {
       setUsers((prev) =>
         prev.map((u) =>
-          u.userId === user.userId ? { ...u, isExcluded: nowExcluded } : u
-        )
+          u.userId === user.userId ? { ...u, isExcluded: nowExcluded } : u,
+        ),
       );
     }
     setConfirmModal(null);
@@ -194,10 +220,10 @@ export default function NutzeruebersichtTab() {
       });
     } else {
       setConfirmModal({
-        title: "Nutzer ausschließen",
+        title: "Nutzer ausschliessen",
         message: `Die Daten von ${displayName(user)} werden aus allen Statistiken entfernt. Der Nutzer wird darüber nicht informiert.`,
         variant: "warning",
-        confirmLabel: "Ausschließen",
+        confirmLabel: "Ausschliessen",
         onConfirm: () => void handleToggleExclude(user),
       });
     }
@@ -208,7 +234,10 @@ export default function NutzeruebersichtTab() {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return users;
     return users.filter((u) => {
-      const name = [u.firstName, u.lastName].filter(Boolean).join(" ").toLowerCase();
+      const name = [u.firstName, u.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
       return (
         name.includes(q) ||
         u.email.toLowerCase().includes(q) ||
@@ -268,7 +297,9 @@ export default function NutzeruebersichtTab() {
               <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
                 {kpis.totalSubmittedDays}
               </p>
-              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">Gesamt aller Nutzer</p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                Gesamt aller Nutzer
+              </p>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
@@ -326,7 +357,9 @@ export default function NutzeruebersichtTab() {
                     colSpan={4}
                     className="px-4 py-10 text-center text-sm text-slate-400 dark:text-slate-500"
                   >
-                    {searchQuery.trim() ? "Kein Nutzer gefunden." : "Keine aktiven Nutzer vorhanden."}
+                    {searchQuery.trim()
+                      ? "Kein Nutzer gefunden."
+                      : "Keine aktiven Nutzer vorhanden."}
                   </td>
                 </tr>
               ) : (
@@ -339,22 +372,28 @@ export default function NutzeruebersichtTab() {
                   >
                     {/* Name + email */}
                     <td className="px-4 py-3">
-                      {(u.firstName || u.lastName) ? (
+                      {u.firstName || u.lastName ? (
                         <>
                           <p className="font-medium text-slate-800 dark:text-slate-100">
                             {displayName(u)}
                           </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500">{u.email}</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">
+                            {u.email}
+                          </p>
                         </>
                       ) : (
-                        <p className="font-medium text-slate-800 dark:text-slate-100">{u.email}</p>
+                        <p className="font-medium text-slate-800 dark:text-slate-100">
+                          {u.email}
+                        </p>
                       )}
                     </td>
 
                     {/* Course */}
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                       {u.courseName ?? (
-                        <span className="text-slate-300 dark:text-slate-600">–</span>
+                        <span className="text-slate-300 dark:text-slate-600">
+                          –
+                        </span>
                       )}
                     </td>
 
@@ -384,7 +423,7 @@ export default function NutzeruebersichtTab() {
                               : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
                           }`}
                         >
-                          {u.isExcluded ? "Einschließen" : "Ausschließen"}
+                          {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
                         </button>
                       )}
                     </td>

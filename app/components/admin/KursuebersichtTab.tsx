@@ -85,7 +85,12 @@ function formatDate(dateString: string): string {
 }
 
 function courseDurationDays(startDate: string, endDate: string): number {
-  return Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86_400_000) + 1;
+  return (
+    Math.round(
+      (new Date(endDate).getTime() - new Date(startDate).getTime()) /
+        86_400_000,
+    ) + 1
+  );
 }
 
 function courseDurationLabel(startDate: string, endDate: string): string {
@@ -132,11 +137,18 @@ export default function KursuebersichtTab() {
   const [isLoadingDays, setIsLoadingDays] = useState(false);
   const [expandedDayIds, setExpandedDayIds] = useState<Set<number>>(new Set());
   const [dayEntries, setDayEntries] = useState<Record<number, EntryRow[]>>({});
-  const [loadingEntryDayIds, setLoadingEntryDayIds] = useState<Set<number>>(new Set());
+  const [loadingEntryDayIds, setLoadingEntryDayIds] = useState<Set<number>>(
+    new Set(),
+  );
 
   // ── Modals & inline edits ───────────────────────────────────────────────────
-  const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
-  const [editingAccessCode, setEditingAccessCode] = useState<{ courseId: number; value: string } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(
+    null,
+  );
+  const [editingAccessCode, setEditingAccessCode] = useState<{
+    courseId: number;
+    value: string;
+  } | null>(null);
   const [isAnonymizing, setIsAnonymizing] = useState(false);
 
   useEffect(() => {
@@ -153,7 +165,9 @@ export default function KursuebersichtTab() {
 
     const { data: courseData, error: courseErr } = await supabase
       .from("course")
-      .select("course_id, name, start_date, end_date, is_locked, accessCode, anonymized_at")
+      .select(
+        "course_id, name, start_date, end_date, is_locked, accessCode, anonymized_at",
+      )
       .order("start_date", { ascending: false });
 
     if (courseErr || !courseData) {
@@ -197,7 +211,10 @@ export default function KursuebersichtTab() {
     }
 
     const [profilesRes, submittedDaysRes] = await Promise.all([
-      supabase.from("profiles").select("id, email, first_name, last_name").in("id", userIds),
+      supabase
+        .from("profiles")
+        .select("id, email, first_name, last_name")
+        .in("id", userIds),
       supabase
         .from("day")
         .select("profiles_id")
@@ -205,7 +222,10 @@ export default function KursuebersichtTab() {
         .eq("is_submitted", true),
     ]);
 
-    const profileById: Record<string, { email: string; firstName: string | null; lastName: string | null }> = {};
+    const profileById: Record<
+      string,
+      { email: string; firstName: string | null; lastName: string | null }
+    > = {};
     for (const p of profilesRes.data ?? []) {
       profileById[p.id] = {
         email: p.email ?? p.id.slice(0, 8) + "…",
@@ -216,10 +236,14 @@ export default function KursuebersichtTab() {
 
     const submittedByUser: Record<string, number> = {};
     for (const d of submittedDaysRes.data ?? []) {
-      submittedByUser[d.profiles_id] = (submittedByUser[d.profiles_id] ?? 0) + 1;
+      submittedByUser[d.profiles_id] =
+        (submittedByUser[d.profiles_id] ?? 0) + 1;
     }
 
-    const ucById: Record<string, { userCourseId: string; isExcluded: boolean; alias: string | null }> = {};
+    const ucById: Record<
+      string,
+      { userCourseId: string; isExcluded: boolean; alias: string | null }
+    > = {};
     for (const e of enrollments ?? []) {
       ucById[e.profiles_id] = {
         userCourseId: e.user_course_id,
@@ -294,42 +318,76 @@ export default function KursuebersichtTab() {
     ];
     const locationIds = [
       ...new Set(
-        rawEntries.map((e) => e.location_transport_id).filter((id): id is number => id != null),
+        rawEntries
+          .map((e) => e.location_transport_id)
+          .filter((id): id is number => id != null),
       ),
     ];
     const satisfactionIds = [
       ...new Set(
-        rawEntries.map((e) => e.satisfaction_id).filter((id): id is number => id != null),
+        rawEntries
+          .map((e) => e.satisfaction_id)
+          .filter((id): id is number => id != null),
       ),
     ];
 
     const [activitiesRes, locationsRes, satisfactionsRes] = await Promise.all([
       activityIds.length > 0
-        ? supabase.from("activity").select("activity_id, name").in("activity_id", activityIds)
-        : Promise.resolve({ data: [] as { activity_id: number; name: string }[] }),
+        ? supabase
+            .from("activity")
+            .select("activity_id, name")
+            .in("activity_id", activityIds)
+        : Promise.resolve({
+            data: [] as { activity_id: number; name: string }[],
+          }),
       locationIds.length > 0
-        ? supabase.from("location_transport").select("location_transport_id, name").in("location_transport_id", locationIds)
-        : Promise.resolve({ data: [] as { location_transport_id: number; name: string }[] }),
+        ? supabase
+            .from("location_transport")
+            .select("location_transport_id, name")
+            .in("location_transport_id", locationIds)
+        : Promise.resolve({
+            data: [] as { location_transport_id: number; name: string }[],
+          }),
       satisfactionIds.length > 0
-        ? supabase.from("satisfaction").select("satisfaction_id, name").in("satisfaction_id", satisfactionIds)
-        : Promise.resolve({ data: [] as { satisfaction_id: number; name: string }[] }),
+        ? supabase
+            .from("satisfaction")
+            .select("satisfaction_id, name")
+            .in("satisfaction_id", satisfactionIds)
+        : Promise.resolve({
+            data: [] as { satisfaction_id: number; name: string }[],
+          }),
     ]);
 
     const activityMap: Record<number, string> = {};
-    for (const a of activitiesRes.data ?? []) activityMap[a.activity_id] = a.name;
+    for (const a of activitiesRes.data ?? [])
+      activityMap[a.activity_id] = a.name;
     const locationMap: Record<number, string> = {};
-    for (const l of locationsRes.data ?? []) locationMap[l.location_transport_id] = l.name;
+    for (const l of locationsRes.data ?? [])
+      locationMap[l.location_transport_id] = l.name;
     const satisfactionMap: Record<number, string> = {};
-    for (const s of satisfactionsRes.data ?? []) satisfactionMap[s.satisfaction_id] = s.name;
+    for (const s of satisfactionsRes.data ?? [])
+      satisfactionMap[s.satisfaction_id] = s.name;
 
     const entries: EntryRow[] = rawEntries.map((e) => ({
       entry_id: e.entry_id,
       start_time: e.start_time,
       end_time: e.end_time,
-      primaryActivity: e.primary_activity_id != null ? (activityMap[e.primary_activity_id] ?? null) : null,
-      secondaryActivity: e.secondary_activity_id != null ? (activityMap[e.secondary_activity_id] ?? null) : null,
-      locationTransport: e.location_transport_id != null ? (locationMap[e.location_transport_id] ?? null) : null,
-      satisfaction: e.satisfaction_id != null ? (satisfactionMap[e.satisfaction_id] ?? null) : null,
+      primaryActivity:
+        e.primary_activity_id != null
+          ? (activityMap[e.primary_activity_id] ?? null)
+          : null,
+      secondaryActivity:
+        e.secondary_activity_id != null
+          ? (activityMap[e.secondary_activity_id] ?? null)
+          : null,
+      locationTransport:
+        e.location_transport_id != null
+          ? (locationMap[e.location_transport_id] ?? null)
+          : null,
+      satisfaction:
+        e.satisfaction_id != null
+          ? (satisfactionMap[e.satisfaction_id] ?? null)
+          : null,
     }));
 
     setDayEntries((prev) => ({ ...prev, [dayId]: entries }));
@@ -354,23 +412,40 @@ export default function KursuebersichtTab() {
   // ── Action handlers ───────────────────────────────────────────────────────────
 
   async function handleLockCourse(courseId: number) {
-    const { error } = await supabase.from("course").update({ is_locked: true }).eq("course_id", courseId);
+    const { error } = await supabase
+      .from("course")
+      .update({ is_locked: true })
+      .eq("course_id", courseId);
     if (!error) {
-      setCourses((prev) => prev.map((c) => (c.course_id === courseId ? { ...c, is_locked: true } : c)));
+      setCourses((prev) =>
+        prev.map((c) =>
+          c.course_id === courseId ? { ...c, is_locked: true } : c,
+        ),
+      );
     }
     setConfirmModal(null);
   }
 
   async function handleChangeAccessCode(courseId: number, newCode: string) {
-    const { error } = await supabase.from("course").update({ accessCode: newCode }).eq("course_id", courseId);
+    const { error } = await supabase
+      .from("course")
+      .update({ accessCode: newCode })
+      .eq("course_id", courseId);
     if (!error) {
-      setCourses((prev) => prev.map((c) => (c.course_id === courseId ? { ...c, accessCode: newCode } : c)));
+      setCourses((prev) =>
+        prev.map((c) =>
+          c.course_id === courseId ? { ...c, accessCode: newCode } : c,
+        ),
+      );
       setEditingAccessCode(null);
     }
   }
 
   async function handleKickUser(userCourseId: string, userId: string) {
-    const { error } = await supabase.from("user_course").delete().eq("user_course_id", userCourseId);
+    const { error } = await supabase
+      .from("user_course")
+      .delete()
+      .eq("user_course_id", userCourseId);
     if (!error) {
       setCourseUsers((prev) => prev.filter((u) => u.userId !== userId));
     }
@@ -386,7 +461,9 @@ export default function KursuebersichtTab() {
 
     if (!error) {
       setCourseUsers((prev) =>
-        prev.map((u) => (u.userId === user.userId ? { ...u, isExcluded: nowExcluded } : u)),
+        prev.map((u) =>
+          u.userId === user.userId ? { ...u, isExcluded: nowExcluded } : u,
+        ),
       );
     }
     setConfirmModal(null);
@@ -396,7 +473,9 @@ export default function KursuebersichtTab() {
     setIsAnonymizing(true);
 
     // Sort users deterministically for stable alias assignment
-    const usersToAnonymize = [...courseUsers].sort((a, b) => a.userId.localeCompare(b.userId));
+    const usersToAnonymize = [...courseUsers].sort((a, b) =>
+      a.userId.localeCompare(b.userId),
+    );
 
     const updates = usersToAnonymize.map((u, i) => ({
       userCourseId: u.userCourseId,
@@ -405,15 +484,23 @@ export default function KursuebersichtTab() {
 
     await Promise.all(
       updates.map(({ userCourseId, alias }) =>
-        supabase.from("user_course").update({ alias }).eq("user_course_id", userCourseId),
+        supabase
+          .from("user_course")
+          .update({ alias })
+          .eq("user_course_id", userCourseId),
       ),
     );
 
     const anonymizedAt = new Date().toISOString();
-    await supabase.from("course").update({ anonymized_at: anonymizedAt }).eq("course_id", courseId);
+    await supabase
+      .from("course")
+      .update({ anonymized_at: anonymizedAt })
+      .eq("course_id", courseId);
 
     setCourses((prev) =>
-      prev.map((c) => (c.course_id === courseId ? { ...c, anonymized_at: anonymizedAt } : c)),
+      prev.map((c) =>
+        c.course_id === courseId ? { ...c, anonymized_at: anonymizedAt } : c,
+      ),
     );
     setCourseUsers((prev) =>
       prev.map((u) => {
@@ -438,7 +525,12 @@ export default function KursuebersichtTab() {
     setCreateError("");
     setCreateSuccess(false);
 
-    if (!newName.trim() || !newStartDate || !newEndDate || !newAccessCode.trim()) {
+    if (
+      !newName.trim() ||
+      !newStartDate ||
+      !newEndDate ||
+      !newAccessCode.trim()
+    ) {
       setCreateError("Bitte alle Felder ausfüllen.");
       setIsCreating(false);
       return;
@@ -486,7 +578,9 @@ export default function KursuebersichtTab() {
         {view.type === "course" && (
           <>
             <ChevronRight size={14} className="shrink-0" />
-            <span className="font-medium text-slate-800">{view.courseName}</span>
+            <span className="font-medium text-slate-800">
+              {view.courseName}
+            </span>
           </>
         )}
         {view.type === "user" && (
@@ -523,11 +617,17 @@ export default function KursuebersichtTab() {
     return (
       <form onSubmit={handleCreateCourse} className="max-w-md space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Kursname</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            Kursname
+          </label>
           <input
             type="text"
             value={newName}
-            onChange={(e) => { setNewName(e.target.value); setCreateError(""); setCreateSuccess(false); }}
+            onChange={(e) => {
+              setNewName(e.target.value);
+              setCreateError("");
+              setCreateSuccess(false);
+            }}
             placeholder="z. B. Sommersemester 2026"
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
@@ -535,31 +635,49 @@ export default function KursuebersichtTab() {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Startdatum</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Startdatum
+            </label>
             <input
               type="date"
               value={newStartDate}
-              onChange={(e) => { setNewStartDate(e.target.value); setCreateError(""); setCreateSuccess(false); }}
+              onChange={(e) => {
+                setNewStartDate(e.target.value);
+                setCreateError("");
+                setCreateSuccess(false);
+              }}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Enddatum</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Enddatum
+            </label>
             <input
               type="date"
               value={newEndDate}
-              onChange={(e) => { setNewEndDate(e.target.value); setCreateError(""); setCreateSuccess(false); }}
+              onChange={(e) => {
+                setNewEndDate(e.target.value);
+                setCreateError("");
+                setCreateSuccess(false);
+              }}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Zugangscode</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            Zugangscode
+          </label>
           <input
             type="text"
             value={newAccessCode}
-            onChange={(e) => { setNewAccessCode(e.target.value); setCreateError(""); setCreateSuccess(false); }}
+            onChange={(e) => {
+              setNewAccessCode(e.target.value);
+              setCreateError("");
+              setCreateSuccess(false);
+            }}
             placeholder="z. B. SS2026"
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
@@ -567,7 +685,9 @@ export default function KursuebersichtTab() {
 
         {createError && <p className="text-sm text-red-600">{createError}</p>}
         {createSuccess && (
-          <p className="text-sm text-green-600 font-medium">Kurs wurde erfolgreich erstellt.</p>
+          <p className="text-sm text-green-600 font-medium">
+            Kurs wurde erfolgreich erstellt.
+          </p>
         )}
 
         <button
@@ -582,16 +702,21 @@ export default function KursuebersichtTab() {
   }
 
   function renderCourseList() {
-    if (isLoadingCourses) return <p className="text-sm text-slate-500">Wird geladen…</p>;
-    if (coursesError) return <p className="text-sm text-red-600">{coursesError}</p>;
+    if (isLoadingCourses)
+      return <p className="text-sm text-slate-500">Wird geladen…</p>;
+    if (coursesError)
+      return <p className="text-sm text-red-600">{coursesError}</p>;
     if (courses.length === 0) {
-      return <p className="text-sm text-slate-500">Noch keine Kurse vorhanden.</p>;
+      return (
+        <p className="text-sm text-slate-500">Noch keine Kurse vorhanden.</p>
+      );
     }
 
     return (
       <div className="space-y-3">
         {courses.map((course) => {
-          const isEditingCode = editingAccessCode?.courseId === course.course_id;
+          const isEditingCode =
+            editingAccessCode?.courseId === course.course_id;
 
           return (
             <div
@@ -604,7 +729,10 @@ export default function KursuebersichtTab() {
                   type="button"
                   className="flex-1 text-left"
                   onClick={() => {
-                    const totalDays = courseDurationDays(course.start_date, course.end_date);
+                    const totalDays = courseDurationDays(
+                      course.start_date,
+                      course.end_date,
+                    );
                     setView({
                       type: "course",
                       courseId: course.course_id,
@@ -619,7 +747,8 @@ export default function KursuebersichtTab() {
                     {course.name}
                   </p>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {formatDate(course.start_date)} – {formatDate(course.end_date)}
+                    {formatDate(course.start_date)} –{" "}
+                    {formatDate(course.end_date)}
                     {" · "}
                     {courseDurationLabel(course.start_date, course.end_date)}
                     {" · "}
@@ -651,7 +780,8 @@ export default function KursuebersichtTab() {
                             message: `Soll der Kurs „${course.name}" wirklich beendet werden? Diese Aktion kann nicht rückgängig gemacht werden.`,
                             variant: "danger",
                             confirmLabel: "Beenden",
-                            onConfirm: () => void handleLockCourse(course.course_id),
+                            onConfirm: () =>
+                              void handleLockCourse(course.course_id),
                           })
                         }
                         className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
@@ -665,14 +795,19 @@ export default function KursuebersichtTab() {
 
               {/* Access code row */}
               <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-                <span className="text-xs text-slate-400 dark:text-slate-500">Zugangscode:</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500">
+                  Zugangscode:
+                </span>
                 {isEditingCode ? (
                   <>
                     <input
                       type="text"
                       value={editingAccessCode.value}
                       onChange={(e) =>
-                        setEditingAccessCode({ courseId: course.course_id, value: e.target.value })
+                        setEditingAccessCode({
+                          courseId: course.course_id,
+                          value: e.target.value,
+                        })
                       }
                       className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                       autoFocus
@@ -680,7 +815,10 @@ export default function KursuebersichtTab() {
                     <button
                       type="button"
                       onClick={() =>
-                        void handleChangeAccessCode(course.course_id, editingAccessCode.value.trim())
+                        void handleChangeAccessCode(
+                          course.course_id,
+                          editingAccessCode.value.trim(),
+                        )
                       }
                       className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
                     >
@@ -702,7 +840,10 @@ export default function KursuebersichtTab() {
                     <button
                       type="button"
                       onClick={() =>
-                        setEditingAccessCode({ courseId: course.course_id, value: course.accessCode ?? "" })
+                        setEditingAccessCode({
+                          courseId: course.course_id,
+                          value: course.accessCode ?? "",
+                        })
                       }
                       className="text-xs text-slate-400 hover:text-slate-600 transition-colors dark:hover:text-slate-300"
                     >
@@ -749,7 +890,9 @@ export default function KursuebersichtTab() {
         {isLoadingUsers ? (
           <p className="text-sm text-slate-500">Wird geladen…</p>
         ) : courseUsers.length === 0 ? (
-          <p className="text-sm text-slate-500">Keine Teilnehmer in diesem Kurs.</p>
+          <p className="text-sm text-slate-500">
+            Keine Teilnehmer in diesem Kurs.
+          </p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
             <table className="w-full text-sm">
@@ -769,7 +912,8 @@ export default function KursuebersichtTab() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {courseUsers.map((u) => {
                   const displayLabel = userDisplayName(u, isAnonymized);
-                  const showEmail = !isAnonymized && (u.firstName || u.lastName);
+                  const showEmail =
+                    !isAnonymized && (u.firstName || u.lastName);
 
                   return (
                     <tr
@@ -802,7 +946,9 @@ export default function KursuebersichtTab() {
                             {displayLabel}
                           </p>
                           {showEmail && (
-                            <p className="text-xs text-slate-400 dark:text-slate-500">{u.email}</p>
+                            <p className="text-xs text-slate-400 dark:text-slate-500">
+                              {u.email}
+                            </p>
                           )}
                         </button>
                       </td>
@@ -832,10 +978,10 @@ export default function KursuebersichtTab() {
                                 });
                               } else {
                                 setConfirmModal({
-                                  title: "Aus Statistiken ausschließen",
+                                  title: "Aus Statistiken ausschliessen",
                                   message: `Die Daten von ${displayLabel} werden aus allen Statistiken entfernt. Der Teilnehmer wird nicht informiert.`,
                                   variant: "warning",
-                                  confirmLabel: "Ausschließen",
+                                  confirmLabel: "Ausschliessen",
                                   onConfirm: () => void handleToggleExclude(u),
                                 });
                               }
@@ -846,7 +992,7 @@ export default function KursuebersichtTab() {
                                 : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
                             }`}
                           >
-                            {u.isExcluded ? "Einschließen" : "Ausschließen"}
+                            {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
                           </button>
 
                           {/* Kick user */}
@@ -858,7 +1004,8 @@ export default function KursuebersichtTab() {
                                 message: `Soll ${displayLabel} wirklich aus dem Kurs entfernt werden? Die Zeiteinträge bleiben erhalten.`,
                                 variant: "danger",
                                 confirmLabel: "Entfernen",
-                                onConfirm: () => void handleKickUser(u.userCourseId, u.userId),
+                                onConfirm: () =>
+                                  void handleKickUser(u.userCourseId, u.userId),
                               })
                             }
                             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
@@ -880,10 +1027,13 @@ export default function KursuebersichtTab() {
 
   function renderUserDetail() {
     if (view.type !== "user") return null;
-    if (isLoadingDays) return <p className="text-sm text-slate-500">Wird geladen…</p>;
+    if (isLoadingDays)
+      return <p className="text-sm text-slate-500">Wird geladen…</p>;
     if (userDays.length === 0) {
       return (
-        <p className="text-sm text-slate-500">Dieser Nutzer hat noch keine Tage erfasst.</p>
+        <p className="text-sm text-slate-500">
+          Dieser Nutzer hat noch keine Tage erfasst.
+        </p>
       );
     }
 
@@ -923,7 +1073,9 @@ export default function KursuebersichtTab() {
                     </span>
                   )}
                 </div>
-                <span className="text-slate-400 text-sm">{isExpanded ? "▲" : "▼"}</span>
+                <span className="text-slate-400 text-sm">
+                  {isExpanded ? "▲" : "▼"}
+                </span>
               </button>
 
               {isExpanded && (
@@ -931,22 +1083,28 @@ export default function KursuebersichtTab() {
                   {isLoadingEntries ? (
                     <p className="px-4 py-3 text-sm text-slate-500">Lädt…</p>
                   ) : !entries || entries.length === 0 ? (
-                    <p className="px-4 py-3 text-sm text-slate-400">Keine Einträge für diesen Tag.</p>
+                    <p className="px-4 py-3 text-sm text-slate-400">
+                      Keine Einträge für diesen Tag.
+                    </p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
-                            {["Zeit", "Haupttätigkeit", "Nebentätigkeit", "Ort / Transport", "Wohlbefinden"].map(
-                              (h) => (
-                                <th
-                                  key={h}
-                                  className="px-3 py-2 font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500"
-                                >
-                                  {h}
-                                </th>
-                              ),
-                            )}
+                            {[
+                              "Zeit",
+                              "Haupttätigkeit",
+                              "Nebentätigkeit",
+                              "Ort / Transport",
+                              "Wohlbefinden",
+                            ].map((h) => (
+                              <th
+                                key={h}
+                                className="px-3 py-2 font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500"
+                              >
+                                {h}
+                              </th>
+                            ))}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -956,7 +1114,8 @@ export default function KursuebersichtTab() {
                               className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
                             >
                               <td className="whitespace-nowrap px-3 py-2 font-mono text-slate-600 dark:text-slate-300">
-                                {entry.start_time.slice(0, 5)} – {entry.end_time.slice(0, 5)}
+                                {entry.start_time.slice(0, 5)} –{" "}
+                                {entry.end_time.slice(0, 5)}
                               </td>
                               <td className="px-3 py-2 text-slate-700 dark:text-slate-200">
                                 {entry.primaryActivity ?? "–"}
