@@ -266,19 +266,15 @@ export default function TimeGrid({
   return (
     <div
       ref={containerRef}
-      className="overflow-y-auto overflow-x-hidden scrollbar-thin rounded-xl border border-slate-200 bg-white shadow-sm select-none"
-      style={{ maxHeight: "calc(100vh - 230px)" }}
+      className="overflow-hidden overflow-x-hidden rounded-xl border border-slate-200 bg-white shadow-sm select-none md:overflow-y-auto md:scrollbar-thin md:max-h-[calc(100vh-230px)]"
     >
       {/* Sticky header row: minute-offset labels */}
-      <div
-        className="sticky top-0 z-10 grid bg-white border-b-2 border-slate-100"
-        style={{ gridTemplateColumns: "2rem repeat(6, 1fr)" }}
-      >
-        <div className="h-8" /> {/* empty corner above hour labels */}
+      <div className="grid grid-cols-[1.5rem_repeat(6,minmax(0,1fr))] border-b-2 border-slate-100 bg-white md:sticky md:top-0 md:z-10 md:grid-cols-[2rem_repeat(6,minmax(0,1fr))]">
+        <div className="h-6 md:h-8" /> {/* empty corner above hour labels */}
         {MINUTE_LABELS.map((label) => (
           <div
             key={label}
-            className="h-8 flex items-center justify-center text-xs font-semibold text-slate-400"
+            className="flex h-6 items-center justify-center text-[10px] font-semibold text-slate-400 md:h-8 md:text-xs"
           >
             {label}
           </div>
@@ -286,15 +282,14 @@ export default function TimeGrid({
       </div>
 
       {/* Grid body: 24 rows, one per hour */}
-      <div className="p-1.5 space-y-0.5">
+      <div className="space-y-px p-1 md:space-y-0.5 md:p-1.5">
         {HOUR_LABELS.map((hourLabel, hourIndex) => (
           <div
             key={hourLabel}
-            className="grid items-center"
-            style={{ gridTemplateColumns: "2rem repeat(6, 1fr)", gap: "2px" }}
+            className="grid grid-cols-[1.5rem_repeat(6,minmax(0,1fr))] items-center gap-px md:grid-cols-[2rem_repeat(6,minmax(0,1fr))] md:gap-[2px]"
           >
             {/* Hour label on the left */}
-            <div className="text-xs font-medium text-slate-400 text-right pr-1.5 leading-none">
+            <div className="pr-1 text-right text-[10px] font-medium leading-none text-slate-400 md:pr-1.5 md:text-xs">
               {hourLabel}
             </div>
 
@@ -313,17 +308,17 @@ export default function TimeGrid({
                   onMouseDown={(e) => handleCellMouseDown(slot, e)}
                   onMouseEnter={() => handleCellMouseEnter(slot)}
                   className={`
-                    rounded-sm cursor-pointer transition-all duration-75
+                    cursor-pointer rounded-sm transition-all duration-75
                     ${
                       isHighlighted
-                        ? "ring-2 ring-blue-500 ring-inset brightness-75"
+                        ? "ring-1 ring-blue-500 ring-inset brightness-75 md:ring-2"
                         : isFilled
                           ? "hover:brightness-90"
                           : "bg-slate-100 hover:bg-slate-200"
                     }
                   `}
                   style={{
-                    height: "26px",
+                    height: "18px",
                     ...(isFilled ? getCellStyle(entry, lookupData) : {}),
                   }}
                 />
