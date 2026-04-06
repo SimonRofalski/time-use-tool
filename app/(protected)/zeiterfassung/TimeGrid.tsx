@@ -158,6 +158,10 @@ export default function TimeGrid({
   const anchorSlotRef = useRef<string | null>(null);
   // State drives visual update during drag (separate from ref for rendering)
   const [liveDraggingSlots, setLiveDraggingSlots] = useState(new Set<string>());
+  // Mirror ref so non-React touch listeners always read the latest value
+  const liveDraggingSlotsRef = useRef(new Set<string>());
+  // Ref to the scrollable container for attaching non-passive touch listeners
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Pre-built slot → entry map so each cell render is O(1)
   const slotToEntry = useMemo(
@@ -165,26 +169,85 @@ export default function TimeGrid({
     [existingEntries],
   );
 
+  // Keeps both state and ref in sync
+  function setDragging(slots: Set<string>) {
+    liveDraggingSlotsRef.current = slots;
+    setLiveDraggingSlots(new Set(slots));
+  }
+
   // Global mouseup: finalizes the drag and commits the current live range to the parent
   // Attached to document so mouseup outside the grid still ends the drag
   useEffect(() => {
     function handleGlobalMouseUp() {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
-      onSlotsSelected(new Set(liveDraggingSlots));
+      onSlotsSelected(new Set(liveDraggingSlotsRef.current));
       anchorSlotRef.current = null;
+      liveDraggingSlotsRef.current = new Set();
       setLiveDraggingSlots(new Set());
     }
     document.addEventListener("mouseup", handleGlobalMouseUp);
     return () => document.removeEventListener("mouseup", handleGlobalMouseUp);
-  }, [onSlotsSelected, liveDraggingSlots]);
+  }, [onSlotsSelected]);
+
+  // Touch handlers attached with { passive: false } so preventDefault() blocks
+  // the page from scrolling while the user is dragging across cells
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    function slotFromPoint(x: number, y: number): string | null {
+      const el = document.elementFromPoint(x, y);
+      return (
+        (el?.closest("[data-slot]") as HTMLElement | null)?.dataset.slot ?? null
+      );
+    }
+
+    function handleTouchStart(e: TouchEvent) {
+      const slot = slotFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+      if (!slot) return;
+      e.preventDefault();
+      isDraggingRef.current = true;
+      anchorSlotRef.current = slot;
+      setDragging(new Set([slot]));
+    }
+
+    function handleTouchMove(e: TouchEvent) {
+      if (!isDraggingRef.current || !anchorSlotRef.current) return;
+      e.preventDefault();
+      const slot = slotFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+      if (slot) setDragging(getSlotsInRange(anchorSlotRef.current, slot));
+    }
+
+    function handleTouchEnd() {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      onSlotsSelected(new Set(liveDraggingSlotsRef.current));
+      anchorSlotRef.current = null;
+      liveDraggingSlotsRef.current = new Set();
+      setLiveDraggingSlots(new Set());
+    }
+
+    container.addEventListener("touchstart", handleTouchStart, {
+      passive: false,
+    });
+    container.addEventListener("touchmove", handleTouchMove, {
+      passive: false,
+    });
+    container.addEventListener("touchend", handleTouchEnd);
+    return () => {
+      container.removeEventListener("touchstart", handleTouchStart);
+      container.removeEventListener("touchmove", handleTouchMove);
+      container.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [onSlotsSelected]);
 
   // Start drag: record the anchor slot and initialise a single-slot selection
   function handleCellMouseDown(slot: string, event: React.MouseEvent) {
     event.preventDefault(); // prevent browser text-selection during drag
     isDraggingRef.current = true;
     anchorSlotRef.current = slot;
-    setLiveDraggingSlots(new Set([slot]));
+    setDragging(new Set([slot]));
   }
 
   // Extend drag: recalculate the full range from anchor to the current slot
@@ -192,7 +255,7 @@ export default function TimeGrid({
   // not just the ones the mouse physically passed over
   function handleCellMouseEnter(slot: string) {
     if (!isDraggingRef.current || !anchorSlotRef.current) return;
-    setLiveDraggingSlots(getSlotsInRange(anchorSlotRef.current, slot));
+    setDragging(getSlotsInRange(anchorSlotRef.current, slot));
   }
 
   // A cell is highlighted if it is being dragged over OR in the committed selection
@@ -202,7 +265,8 @@ export default function TimeGrid({
 
   return (
     <div
-      className="overflow-y-auto scrollbar-thin rounded-xl border border-slate-200 bg-white shadow-sm select-none"
+      ref={containerRef}
+      className="overflow-y-auto overflow-x-hidden scrollbar-thin rounded-xl border border-slate-200 bg-white shadow-sm select-none"
       style={{ maxHeight: "calc(100vh - 230px)" }}
     >
       {/* Sticky header row: minute-offset labels */}
@@ -244,6 +308,7 @@ export default function TimeGrid({
               return (
                 <div
                   key={slot}
+                  data-slot={slot}
                   title={getSlotTooltip(slot)}
                   onMouseDown={(e) => handleCellMouseDown(slot, e)}
                   onMouseEnter={() => handleCellMouseEnter(slot)}

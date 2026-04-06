@@ -51,7 +51,8 @@ function calculateCoveredSlots(startTime: string, endTime: string): number {
   const [sh, sm] = startTime.split(":").map(Number);
   const [eh, em] = endTime.split(":").map(Number);
   const startMinTotal = sh * 60 + sm;
-  const endMinTotal = (eh === 0 && em === 0 && startMinTotal > 0) ? 1440 : eh * 60 + em;
+  const endMinTotal =
+    eh === 0 && em === 0 && startMinTotal > 0 ? 1440 : eh * 60 + em;
   return Math.round((endMinTotal - startMinTotal) / 10);
 }
 
@@ -63,23 +64,34 @@ function getSlotEndTime(slot: string): string {
   const [h, m] = slot.split(":").map(Number);
   const endTotal = h * 60 + m + 10;
   if (endTotal >= 1440) return "00:00:00";
-  return `${Math.floor(endTotal / 60).toString().padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}:00`;
+  return `${Math.floor(endTotal / 60)
+    .toString()
+    .padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}:00`;
 }
 
 // Determines the next questionnaire step based on the current step and pending data
 // Returns null when all steps are complete and the entry should be saved
 function getNextStep(
   currentStep: QuestionnaireStep,
-  entry: PendingEntry
+  entry: PendingEntry,
 ): QuestionnaireStep | null {
   switch (currentStep) {
-    case "primary_activity":   return "secondary_activity";
-    case "secondary_activity": return "digital_media";
-    case "digital_media":      return entry.digital_media_used ? "digital_media_type" : "location_transport";
-    case "digital_media_type": return "location_transport";
-    case "location_transport": return "social_context";
-    case "social_context":     return "satisfaction";
-    case "satisfaction":       return null;
+    case "primary_activity":
+      return "secondary_activity";
+    case "secondary_activity":
+      return "digital_media";
+    case "digital_media":
+      return entry.digital_media_used
+        ? "digital_media_type"
+        : "location_transport";
+    case "digital_media_type":
+      return "location_transport";
+    case "location_transport":
+      return "social_context";
+    case "social_context":
+      return "satisfaction";
+    case "satisfaction":
+      return null;
   }
 }
 
@@ -102,13 +114,13 @@ function createEmptyPendingEntry(slots: string[]): PendingEntry {
 // Mixed selections (some filled, some empty, or different data) always return null.
 function getPreloadedEntry(
   selectedSlots: Set<string>,
-  existingEntries: TimeEntryRecord[]
+  existingEntries: TimeEntryRecord[],
 ): PendingEntry | null {
   const slotList = [...selectedSlots].sort();
 
   // Match existing entries by start_time (one entry per slot)
   const matchingEntries = existingEntries.filter((e) =>
-    slotList.includes(e.start_time)
+    slotList.includes(e.start_time),
   );
 
   // No existing data → fresh entry
@@ -126,7 +138,7 @@ function getPreloadedEntry(
       e.satisfaction_id === first.satisfaction_id &&
       e.location_transport_id === first.location_transport_id &&
       e.digital_media_used === first.digital_media_used &&
-      e.digital_media_type_id === first.digital_media_type_id
+      e.digital_media_type_id === first.digital_media_type_id,
   );
 
   if (!allIdentical) return null;
@@ -157,7 +169,8 @@ function mapRawEntryToRecord(raw: any): TimeEntryRecord {
     digital_media_used: raw.digital_media_used,
     digital_media_type_id: raw.digital_media_type_id ?? null,
     social_context_ids:
-      raw.time_entry_social_context?.map((sc: any) => sc.social_context_id) ?? [],
+      raw.time_entry_social_context?.map((sc: any) => sc.social_context_id) ??
+      [],
   };
 }
 
@@ -180,7 +193,7 @@ function CompletionBar({
   const canGoNext = currentIndex < allDates.length - 1;
   const progressPercent = Math.min(
     Math.round((coveredSlots / TOTAL_SLOTS_PER_DAY) * 100),
-    100
+    100,
   );
 
   return (
@@ -245,7 +258,9 @@ export default function ZeiterfassungPage() {
   // Grid + questionnaire
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [pendingEntry, setPendingEntry] = useState<PendingEntry | null>(null);
-  const [currentStep, setCurrentStep] = useState<QuestionnaireStep | null>(null);
+  const [currentStep, setCurrentStep] = useState<QuestionnaireStep | null>(
+    null,
+  );
   const [stepHistory, setStepHistory] = useState<QuestionnaireStep[]>([]);
 
   // Lookup data (reference tables)
@@ -254,6 +269,7 @@ export default function ZeiterfassungPage() {
   // UI state
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [gridCollapsed, setGridCollapsed] = useState(false);
 
   useEffect(() => {
     loadPageData();
@@ -272,24 +288,37 @@ export default function ZeiterfassungPage() {
     setIsLoading(true);
 
     const { data: authData } = await supabase.auth.getUser();
-    if (!authData.user) { router.push("/"); return; }
+    if (!authData.user) {
+      router.push("/");
+      return;
+    }
     const uid = authData.user.id;
     setUserId(uid);
 
     // Get course enrollment
     const { data: userCourse } = await supabase
-      .from("user_course").select("course_id").eq("profiles_id", uid).single();
+      .from("user_course")
+      .select("course_id")
+      .eq("profiles_id", uid)
+      .single();
     if (!userCourse) {
-      setErrorMessage("Kein Kurs gefunden."); setIsLoading(false); return;
+      setErrorMessage("Kein Kurs gefunden.");
+      setIsLoading(false);
+      return;
     }
     const cid = userCourse.course_id;
     setCourseId(cid);
 
     // Load course date range
     const { data: course } = await supabase
-      .from("course").select("start_date, end_date").eq("course_id", cid).single();
+      .from("course")
+      .select("start_date, end_date")
+      .eq("course_id", cid)
+      .single();
     if (!course) {
-      setErrorMessage("Kursdaten konnten nicht geladen werden."); setIsLoading(false); return;
+      setErrorMessage("Kursdaten konnten nicht geladen werden.");
+      setIsLoading(false);
+      return;
     }
     const dates = generateDateRange(course.start_date, course.end_date);
     setAllDates(dates);
@@ -299,9 +328,15 @@ export default function ZeiterfassungPage() {
       supabase.from("category").select("*").order("category_id"),
       supabase.from("subcategory").select("*").order("subcategory_id"),
       supabase.from("activity").select("*").order("activity_id"),
-      supabase.from("location_transport").select("*").order("location_transport_id"),
+      supabase
+        .from("location_transport")
+        .select("*")
+        .order("location_transport_id"),
       supabase.from("social_context").select("*").order("social_context_id"),
-      supabase.from("digital_media_type").select("*").order("digital_media_type_id"),
+      supabase
+        .from("digital_media_type")
+        .select("*")
+        .order("digital_media_type_id"),
       supabase.from("satisfaction").select("*").order("satisfaction_id"),
     ]);
     setLookupData({
@@ -325,12 +360,15 @@ export default function ZeiterfassungPage() {
       targetDate = today;
     } else {
       const { data: dayRecords } = await supabase
-        .from("day").select("date, is_complete")
-        .eq("profiles_id", uid).eq("course_id", cid);
+        .from("day")
+        .select("date, is_complete")
+        .eq("profiles_id", uid)
+        .eq("course_id", cid);
       const completedDates = new Set(
-        (dayRecords ?? []).filter((d) => d.is_complete).map((d) => d.date)
+        (dayRecords ?? []).filter((d) => d.is_complete).map((d) => d.date),
       );
-      targetDate = dates.find((d) => !completedDates.has(d)) ?? dates[dates.length - 1];
+      targetDate =
+        dates.find((d) => !completedDates.has(d)) ?? dates[dates.length - 1];
     }
 
     setCurrentDate(targetDate);
@@ -342,8 +380,11 @@ export default function ZeiterfassungPage() {
     if (!userId || courseId === null) return;
 
     const { data: dayRecord } = await supabase
-      .from("day").select("day_id")
-      .eq("profiles_id", userId).eq("course_id", courseId).eq("date", date)
+      .from("day")
+      .select("day_id")
+      .eq("profiles_id", userId)
+      .eq("course_id", courseId)
+      .eq("date", date)
       .single();
 
     const loadedDayId = dayRecord?.day_id ?? null;
@@ -361,23 +402,29 @@ export default function ZeiterfassungPage() {
   async function loadEntriesForDay(targetDayId: number) {
     const { data: rawEntries, error } = await supabase
       .from("time_entry")
-      .select(`
+      .select(
+        `
         entry_id, day_id, start_time, end_time,
         primary_activity_id, secondary_activity_id,
         satisfaction_id, location_transport_id,
         digital_media_used, digital_media_type_id,
         time_entry_social_context ( social_context_id )
-      `)
+      `,
+      )
       .eq("day_id", targetDayId);
 
-    if (error) { setErrorMessage("Einträge konnten nicht geladen werden."); return; }
+    if (error) {
+      setErrorMessage("Einträge konnten nicht geladen werden.");
+      return;
+    }
 
     const entries = (rawEntries ?? []).map(mapRawEntryToRecord);
     setExistingEntries(entries);
 
     // Update progress bar
     const totalCovered = entries.reduce(
-      (sum, e) => sum + calculateCoveredSlots(e.start_time, e.end_time), 0
+      (sum, e) => sum + calculateCoveredSlots(e.start_time, e.end_time),
+      0,
     );
     setCoveredSlots(totalCovered);
   }
@@ -394,7 +441,7 @@ export default function ZeiterfassungPage() {
       setCurrentStep("primary_activity");
       setStepHistory([]);
     },
-    [existingEntries]
+    [existingEntries],
   );
 
   // ── Questionnaire logic ───────────────────────────────────────────────────
@@ -420,7 +467,10 @@ export default function ZeiterfassungPage() {
 
     setPendingEntry(updatedEntry);
 
-    if (shouldSave) { saveEntry(updatedEntry); return; }
+    if (shouldSave) {
+      saveEntry(updatedEntry);
+      return;
+    }
 
     const nextStep = getNextStep(currentStep, updatedEntry);
     if (nextStep === null) {
@@ -479,7 +529,9 @@ export default function ZeiterfassungPage() {
       .select("entry_id");
 
     if (insertError || !newEntries) {
-      setErrorMessage(`Eintrag konnte nicht gespeichert werden: ${insertError?.message ?? "unbekannter Fehler"}`);
+      setErrorMessage(
+        `Eintrag konnte nicht gespeichert werden: ${insertError?.message ?? "unbekannter Fehler"}`,
+      );
       return;
     }
 
@@ -489,7 +541,7 @@ export default function ZeiterfassungPage() {
         finalEntry.social_context_ids.map((id) => ({
           entry_id: entry.entry_id,
           social_context_id: id,
-        }))
+        })),
       );
       await supabase.from("time_entry_social_context").insert(socialRows);
     }
@@ -511,7 +563,9 @@ export default function ZeiterfassungPage() {
       .single();
 
     if (error || !data) {
-      setErrorMessage(`Tageseintrag konnte nicht erstellt werden: ${error?.message ?? "unbekannter Fehler"}`);
+      setErrorMessage(
+        `Tageseintrag konnte nicht erstellt werden: ${error?.message ?? "unbekannter Fehler"}`,
+      );
       return null;
     }
     setDayId(data.day_id);
@@ -522,7 +576,7 @@ export default function ZeiterfassungPage() {
   // Social context records are deleted first due to the foreign key constraint
   async function deleteOverlappingEntries(
     activeDayId: number,
-    slots: string[]
+    slots: string[],
   ) {
     // existingEntries uses "HH:MM" — match directly against the slot strings
     const slotsSet = new Set(slots);
@@ -530,7 +584,10 @@ export default function ZeiterfassungPage() {
     if (toDelete.length === 0) return;
 
     const ids = toDelete.map((e) => e.entry_id);
-    await supabase.from("time_entry_social_context").delete().in("entry_id", ids);
+    await supabase
+      .from("time_entry_social_context")
+      .delete()
+      .in("entry_id", ids);
     await supabase.from("time_entry").delete().in("entry_id", ids);
   }
 
@@ -539,10 +596,13 @@ export default function ZeiterfassungPage() {
   // and editing it back below 144 slots un-submits it
   async function updateDayCompletion(activeDayId: number) {
     const { data: entries } = await supabase
-      .from("time_entry").select("start_time, end_time").eq("day_id", activeDayId);
+      .from("time_entry")
+      .select("start_time, end_time")
+      .eq("day_id", activeDayId);
 
     const totalCovered = (entries ?? []).reduce(
-      (sum, e) => sum + calculateCoveredSlots(e.start_time, e.end_time), 0
+      (sum, e) => sum + calculateCoveredSlots(e.start_time, e.end_time),
+      0,
     );
     const isComplete = totalCovered >= TOTAL_SLOTS_PER_DAY;
     await supabase
@@ -555,6 +615,7 @@ export default function ZeiterfassungPage() {
 
   function handleDateChange(date: string) {
     handleCancel(); // reset questionnaire state before switching days
+    setGridCollapsed(false);
     setCurrentDate(date);
     router.replace(`/zeiterfassung?date=${date}`);
   }
@@ -577,6 +638,9 @@ export default function ZeiterfassungPage() {
     );
   }
 
+  // Collapse grid on mobile when questionnaire opens, expand when it closes
+  const isQuestionnaireActive = !!(currentStep && pendingEntry);
+
   return (
     <div className="space-y-4">
       {/* Completion bar: date navigation + slot progress */}
@@ -587,22 +651,43 @@ export default function ZeiterfassungPage() {
         onDateChange={handleDateChange}
       />
 
-      {/* Two-column layout: grid (1/3) + questionnaire panel (2/3) */}
-      <div className="flex gap-4 items-start">
+      {/* Responsive layout: stacked on mobile, side-by-side on md+ */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-start">
+        {/* Left: 24×6 time grid — collapsible on mobile when questionnaire is active */}
+        <div className="w-full md:w-1/3 min-w-0">
+          {/* Mobile collapse toggle — only shown when questionnaire is open */}
+          {isQuestionnaireActive && (
+            <button
+              type="button"
+              className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 md:hidden"
+              onClick={() => setGridCollapsed((v) => !v)}
+            >
+              <span>Zeitraster</span>
+              <span className="text-slate-400 text-xs">
+                {gridCollapsed ? "▼ Aufklappen" : "▲ Einklappen"}
+              </span>
+            </button>
+          )}
 
-        {/* Left: 24×6 time grid */}
-        <div className="w-1/3 min-w-0">
-          <TimeGrid
-            existingEntries={existingEntries}
-            selectedSlots={selectedSlots}
-            lookupData={lookupData}
-            onSlotsSelected={handleSlotsSelected}
-          />
+          {/* Grid: always visible on md+, toggleable on mobile when questionnaire active */}
+          <div
+            className={`${isQuestionnaireActive && gridCollapsed ? "hidden" : "block"} md:block ${isQuestionnaireActive ? "mt-2 md:mt-0" : ""}`}
+          >
+            <TimeGrid
+              existingEntries={existingEntries}
+              selectedSlots={selectedSlots}
+              lookupData={lookupData}
+              onSlotsSelected={(slots) => {
+                setGridCollapsed(true);
+                handleSlotsSelected(slots);
+              }}
+            />
+          </div>
         </div>
 
         {/* Right: activity questionnaire or idle placeholder */}
-        <div className="w-2/3 min-w-0">
-          {currentStep && pendingEntry ? (
+        <div className="w-full md:w-2/3 min-w-0">
+          {isQuestionnaireActive ? (
             <ActivitySelector
               step={currentStep}
               pendingEntry={pendingEntry}
@@ -610,7 +695,10 @@ export default function ZeiterfassungPage() {
               lookupData={lookupData}
               onStepComplete={handleStepComplete}
               onBack={handleBack}
-              onCancel={handleCancel}
+              onCancel={() => {
+                setGridCollapsed(false);
+                handleCancel();
+              }}
             />
           ) : (
             <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-10 text-center">
