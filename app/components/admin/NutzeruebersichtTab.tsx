@@ -280,7 +280,7 @@ export default function NutzeruebersichtTab() {
       <div className="space-y-6">
         {/* KPI cards */}
         {kpis && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Aktive Nutzer
@@ -331,8 +331,82 @@ export default function NutzeruebersichtTab() {
           />
         </div>
 
-        {/* User table */}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+        {/* Mobile user cards */}
+        <div className="space-y-3 md:hidden">
+          {filteredUsers.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500">
+              {searchQuery.trim()
+                ? "Kein Nutzer gefunden."
+                : "Keine aktiven Nutzer vorhanden."}
+            </div>
+          ) : (
+            filteredUsers.map((u) => (
+              <div
+                key={u.userId}
+                className={`rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 ${
+                  u.isExcluded ? "opacity-50" : ""
+                }`}
+              >
+                <div className="space-y-1">
+                  {u.firstName || u.lastName ? (
+                    <>
+                      <p className="break-words font-medium text-slate-800 dark:text-slate-100">
+                        {displayName(u)}
+                      </p>
+                      <p className="break-all text-xs text-slate-400 dark:text-slate-500">
+                        {u.email}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="break-all font-medium text-slate-800 dark:text-slate-100">
+                      {u.email}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                      Kurs
+                    </p>
+                    <p className="mt-1 break-words text-slate-600 dark:text-slate-300">
+                      {u.courseName ?? "–"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                      Fortschritt
+                    </p>
+                    <p className="mt-1 break-words text-slate-600 dark:text-slate-300">
+                      {u.courseTotalDays > 0
+                        ? `${u.submittedDays} / ${u.courseTotalDays} Tage`
+                        : u.submittedDays}
+                    </p>
+                  </div>
+                </div>
+
+                {u.userCourseId && (
+                  <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => openExcludeModal(u)}
+                      className={`w-full rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                        u.isExcluded
+                          ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400"
+                          : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                      }`}
+                    >
+                      {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop user table */}
+        <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
