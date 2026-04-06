@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -94,14 +94,17 @@ function ChartTooltip({
 
   // Only show categories with actual time recorded
   const entries = payload.filter(
-    (p) => categoryNames.includes(p.dataKey) && p.value > 0
+    (p) => categoryNames.includes(p.dataKey) && p.value > 0,
   );
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg text-xs min-w-[160px]">
       <p className="font-semibold text-slate-700 mb-2">{label}</p>
       {entries.map((entry) => (
-        <div key={entry.dataKey} className="flex items-center justify-between gap-4 mb-1">
+        <div
+          key={entry.dataKey}
+          className="flex items-center justify-between gap-4 mb-1"
+        >
           <div className="flex items-center gap-1.5">
             <span
               className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
@@ -144,9 +147,15 @@ function SubcategoryAccordion({
           <div className="flex items-center gap-1.5 text-slate-600 text-sm">
             {sub.activities.length > 0 ? (
               sub.isExpanded ? (
-                <ChevronDown size={14} className="flex-shrink-0 text-slate-400" />
+                <ChevronDown
+                  size={14}
+                  className="flex-shrink-0 text-slate-400"
+                />
               ) : (
-                <ChevronRight size={14} className="flex-shrink-0 text-slate-400" />
+                <ChevronRight
+                  size={14}
+                  className="flex-shrink-0 text-slate-400"
+                />
               )
             ) : (
               <span className="w-3.5" />
@@ -234,7 +243,7 @@ export default function ZeitverteilungTab({
   // Total tracked minutes across all categories (for display in the table header)
   const grandTotalMinutes = categoryRows.reduce(
     (sum, row) => sum + row.totalMinutes,
-    0
+    0,
   );
 
   return (
@@ -282,7 +291,12 @@ export default function ZeitverteilungTab({
               />
 
               {/* Grey bar for unsubmitted days */}
-              <Bar dataKey="unsubmitted" stackId="a" fill={UNSUBMITTED_BAR_COLOR} radius={[3, 3, 0, 0]} />
+              <Bar
+                dataKey="unsubmitted"
+                stackId="a"
+                fill={UNSUBMITTED_BAR_COLOR}
+                radius={[3, 3, 0, 0]}
+              />
 
               {/* One stacked segment per category */}
               {categoryNames.map((name, index) => (
@@ -292,7 +306,9 @@ export default function ZeitverteilungTab({
                   stackId="a"
                   fill={getCategoryColor(index)}
                   radius={
-                    index === categoryNames.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]
+                    index === categoryNames.length - 1
+                      ? [3, 3, 0, 0]
+                      : [0, 0, 0, 0]
                   }
                 />
               ))}
@@ -349,10 +365,9 @@ export default function ZeitverteilungTab({
             </thead>
             <tbody className="divide-y divide-slate-50">
               {categoryRows.map((cat, catIndex) => (
-                <>
+                <Fragment key={cat.categoryId}>
                   {/* Category row */}
                   <tr
-                    key={cat.categoryId}
                     className="cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => onToggleCategory(cat.categoryId)}
                   >
@@ -361,14 +376,22 @@ export default function ZeitverteilungTab({
                         {/* Color dot */}
                         <span
                           className="inline-block w-3 h-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: getCategoryColor(catIndex) }}
+                          style={{
+                            backgroundColor: getCategoryColor(catIndex),
+                          }}
                         />
                         {/* Expand / collapse chevron */}
                         {cat.subcategories.length > 0 ? (
                           cat.isExpanded ? (
-                            <ChevronDown size={15} className="flex-shrink-0 text-slate-400" />
+                            <ChevronDown
+                              size={15}
+                              className="flex-shrink-0 text-slate-400"
+                            />
                           ) : (
-                            <ChevronRight size={15} className="flex-shrink-0 text-slate-400" />
+                            <ChevronRight
+                              size={15}
+                              className="flex-shrink-0 text-slate-400"
+                            />
                           )
                         ) : (
                           <span className="w-4" />
@@ -411,7 +434,7 @@ export default function ZeitverteilungTab({
                         }
                       />
                     ))}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

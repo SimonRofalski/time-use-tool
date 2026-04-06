@@ -11,11 +11,11 @@ import KursuebersichtTab from "@/app/components/admin/KursuebersichtTab";
 import NutzeruebersichtTab from "@/app/components/admin/NutzeruebersichtTab";
 import StatistikenTab from "@/app/components/admin/StatistikenTab";
 import {
+  ArrowLeft,
   BarChart3,
   BookOpen,
   Calendar,
   ClipboardList,
-  Clock,
   LogOut,
   Moon,
   Settings,
@@ -78,6 +78,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const supabase = getSupabaseBrowserClient();
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isEnrolled, setIsEnrolled] = useState<boolean | null>(null);
@@ -99,6 +100,27 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const [profileLastName, setProfileLastName] = useState("");
 
   const isAdmin = profileRole === "admin";
+
+  function handleMainTouchStart(e: React.TouchEvent) {
+    touchStartXRef.current = e.touches[0].clientX;
+  }
+
+  function handleMainTouchEnd(e: React.TouchEvent) {
+    if (touchStartXRef.current === null) return;
+    const diff = touchStartXRef.current - e.changedTouches[0].clientX;
+    touchStartXRef.current = null;
+    if (Math.abs(diff) < 60) return; // ignore small swipes
+    if (adminMode) {
+      const idx = adminTabs.findIndex((t) => t.id === activeAdminTab);
+      if (diff > 0 && idx < adminTabs.length - 1)
+        setActiveAdminTab(adminTabs[idx + 1].id);
+      if (diff < 0 && idx > 0) setActiveAdminTab(adminTabs[idx - 1].id);
+    } else {
+      const idx = tabs.findIndex((t) => t.path === pathname);
+      if (diff > 0 && idx < tabs.length - 1) router.push(tabs[idx + 1].path);
+      if (diff < 0 && idx > 0) router.push(tabs[idx - 1].path);
+    }
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -342,44 +364,46 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950/95">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.svg" alt="" className="h-8 w-8" />
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+            <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0" />
+            <h1 className="whitespace-nowrap text-base font-semibold text-slate-800 dark:text-slate-100 sm:text-lg">
               Time Use Tool
             </h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="ml-3 flex shrink-0 items-center gap-2">
             {isAdmin &&
               (adminMode ? (
                 <button
                   type="button"
                   aria-label="Zurück zum Zeittagebuch"
-                  className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                  className="inline-flex min-w-[5.9rem] items-center justify-center gap-1.5 rounded-2xl border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs font-semibold tracking-tight text-sky-700 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-500/60 dark:hover:bg-sky-500/15 sm:min-w-[7.75rem] sm:gap-2 sm:px-3.5 sm:text-sm"
                   onClick={() => {
                     setAdminMode(false);
                     setSettingsOpen(false);
                   }}
                 >
-                  <Clock size={16} />
-                  <span className="text-[10px] font-medium leading-none">
-                    Zeittagebuch
+                  <ArrowLeft size={16} className="shrink-0" />
+                  <span className="text-center leading-[1.05] sm:leading-none">
+                    <span className="block sm:inline">Zuruck zur</span>
+                    <span className="block sm:inline sm:ml-1">Eingabe</span>
                   </span>
                 </button>
               ) : (
                 <button
                   type="button"
                   aria-label="Admin-Center öffnen"
-                  className="flex flex-col items-center gap-0.5 rounded-xl border border-slate-200 px-3 py-1.5 text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                  className="inline-flex min-w-[5.9rem] items-center justify-center gap-1.5 rounded-2xl border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs font-semibold tracking-tight text-amber-800 shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100 hover:text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:border-amber-500/60 dark:hover:bg-amber-500/15 sm:min-w-[7.75rem] sm:gap-2 sm:px-3.5 sm:text-sm"
                   onClick={() => {
                     setAdminMode(true);
                     setSettingsOpen(false);
                   }}
                 >
-                  <ShieldCheck size={16} />
-                  <span className="text-[10px] font-medium leading-none">
-                    Admin-Center
+                  <ShieldCheck size={16} className="shrink-0" />
+                  <span className="text-center leading-[1.05] sm:leading-none">
+                    <span className="block sm:inline">Admin-</span>
+                    <span className="block sm:inline">Modus</span>
                   </span>
                 </button>
               ))}
@@ -460,7 +484,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
       <nav className="sticky top-[73px] z-10 border-b border-slate-200 bg-white/95 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950/95">
         <div className="mx-auto max-w-7xl px-4">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+          <div className="flex">
             {adminMode
               ? adminTabs.map((tab) => {
                   const isActive = activeAdminTab === tab.id;
@@ -470,15 +494,19 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     <button
                       key={tab.id}
                       type="button"
-                      className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
                         isActive
                           ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
                           : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-100"
                       }`}
                       onClick={() => setActiveAdminTab(tab.id)}
                     >
-                      <Icon size={18} />
-                      <span>{tab.label}</span>
+                      <Icon size={16} className="shrink-0 sm:hidden" />
+                      <Icon size={18} className="shrink-0 hidden sm:block" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="sm:hidden text-xs font-semibold">
+                        {tab.label.charAt(0) + tab.label.slice(1).toLowerCase()}
+                      </span>
                     </button>
                   );
                 })
@@ -490,14 +518,18 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     <Link
                       key={tab.path}
                       href={tab.path}
-                      className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
                         isActive
                           ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
                           : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-100"
                       }`}
                     >
-                      <Icon size={18} />
-                      <span>{tab.label}</span>
+                      <Icon size={16} className="shrink-0 sm:hidden" />
+                      <Icon size={18} className="shrink-0 hidden sm:block" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="sm:hidden text-xs font-semibold">
+                        {tab.label.charAt(0) + tab.label.slice(1).toLowerCase()}
+                      </span>
                     </Link>
                   );
                 })}
@@ -595,7 +627,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
               handleProfileModalClose();
             }}
           />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
             {!profileModalMandatory && (
               <div className="mb-4 flex justify-end">
                 <button
@@ -621,7 +653,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       )}
 
       {adminMode ? (
-        <main className="mx-auto max-w-7xl px-4 py-6">
+        <main
+          className="mx-auto max-w-7xl px-4 py-6"
+          onTouchStart={handleMainTouchStart}
+          onTouchEnd={handleMainTouchEnd}
+        >
           {activeAdminTab === "kursuebersicht" && (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
               <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -648,7 +684,13 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
           )}
         </main>
       ) : (
-        <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+        <main
+          className="mx-auto max-w-7xl px-4 py-6"
+          onTouchStart={handleMainTouchStart}
+          onTouchEnd={handleMainTouchEnd}
+        >
+          {children}
+        </main>
       )}
 
       {needsProfileDetails === false && isEnrolled === false && (
