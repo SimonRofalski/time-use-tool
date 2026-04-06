@@ -291,7 +291,7 @@ function SearchableSelect({
         />
       </div>
       {open && !disabled && (
-        <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto scrollbar-thin rounded-xl border border-slate-200 bg-white shadow-lg">
           {filtered.length === 0 ? (
             <div className="px-4 py-3 text-sm text-slate-400">
               Keine Treffer

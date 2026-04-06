@@ -1087,7 +1087,7 @@ export default function KursuebersichtTab() {
                       Keine Einträge für diesen Tag.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto scrollbar-thin">
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">

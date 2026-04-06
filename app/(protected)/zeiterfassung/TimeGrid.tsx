@@ -202,7 +202,7 @@ export default function TimeGrid({
 
   return (
     <div
-      className="overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm select-none"
+      className="overflow-y-auto scrollbar-thin rounded-xl border border-slate-200 bg-white shadow-sm select-none"
       style={{ maxHeight: "calc(100vh - 230px)" }}
     >
       {/* Sticky header row: minute-offset labels */}

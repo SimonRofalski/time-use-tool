@@ -595,7 +595,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
               handleProfileModalClose();
             }}
           />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
             {!profileModalMandatory && (
               <div className="mb-4 flex justify-end">
                 <button
