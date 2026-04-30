@@ -78,7 +78,6 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const supabase = getSupabaseBrowserClient();
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
-  const touchStartXRef = useRef<number | null>(null);
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isEnrolled, setIsEnrolled] = useState<boolean | null>(null);
@@ -100,27 +99,6 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const [profileLastName, setProfileLastName] = useState("");
 
   const isAdmin = profileRole === "admin";
-
-  function handleMainTouchStart(e: React.TouchEvent) {
-    touchStartXRef.current = e.touches[0].clientX;
-  }
-
-  function handleMainTouchEnd(e: React.TouchEvent) {
-    if (touchStartXRef.current === null) return;
-    const diff = touchStartXRef.current - e.changedTouches[0].clientX;
-    touchStartXRef.current = null;
-    if (Math.abs(diff) < 60) return; // ignore small swipes
-    if (adminMode) {
-      const idx = adminTabs.findIndex((t) => t.id === activeAdminTab);
-      if (diff > 0 && idx < adminTabs.length - 1)
-        setActiveAdminTab(adminTabs[idx + 1].id);
-      if (diff < 0 && idx > 0) setActiveAdminTab(adminTabs[idx - 1].id);
-    } else {
-      const idx = tabs.findIndex((t) => t.path === pathname);
-      if (diff > 0 && idx < tabs.length - 1) router.push(tabs[idx + 1].path);
-      if (diff < 0 && idx > 0) router.push(tabs[idx - 1].path);
-    }
-  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -653,11 +631,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       )}
 
       {adminMode ? (
-        <main
-          className="mx-auto max-w-7xl px-4 py-6"
-          onTouchStart={handleMainTouchStart}
-          onTouchEnd={handleMainTouchEnd}
-        >
+        <main className="mx-auto max-w-7xl px-4 py-6">
           {activeAdminTab === "kursuebersicht" && (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
               <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -684,13 +658,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
           )}
         </main>
       ) : (
-        <main
-          className="mx-auto max-w-7xl px-4 py-6"
-          onTouchStart={handleMainTouchStart}
-          onTouchEnd={handleMainTouchEnd}
-        >
-          {children}
-        </main>
+        <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
       )}
 
       {needsProfileDetails === false && isEnrolled === false && (
