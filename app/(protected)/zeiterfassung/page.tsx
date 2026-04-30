@@ -654,7 +654,7 @@ export default function ZeiterfassungPage() {
       {/* Responsive layout: stacked on mobile, side-by-side on md+ */}
       <div className="flex flex-col gap-4 md:flex-row md:items-start">
         {/* Left: 24×6 time grid — collapsible on mobile when questionnaire is active */}
-        <div className="w-full md:w-1/3 min-w-0">
+        <div className="w-full md:w-1/3 min-w-0 md:self-start">
           {/* Mobile collapse toggle — only shown when questionnaire is open */}
           {isQuestionnaireActive && (
             <button
@@ -707,9 +707,9 @@ export default function ZeiterfassungPage() {
                 Zeitslot auswählen
               </p>
               <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-                Tippe auf einen Slot im Raster –
-                <br className="hidden sm:block" /> oder wische über mehrere auf
-                einmal.
+                Markiere zuerst einen oder mehrere Slots im Raster.
+                <br className="hidden sm:block" /> Danach wählst du die passende
+                Kategorie als Kachel und direkt die Aktivität.
               </p>
             </div>
           )}
