@@ -385,8 +385,8 @@ export default function NutzeruebersichtTab() {
                   </div>
                 </div>
 
-                {u.userCourseId && (
-                  <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <div className="mt-4 space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  {u.userCourseId && (
                     <button
                       type="button"
                       onClick={() => openExcludeModal(u)}
@@ -398,8 +398,8 @@ export default function NutzeruebersichtTab() {
                     >
                       {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -487,19 +487,21 @@ export default function NutzeruebersichtTab() {
 
                     {/* Actions */}
                     <td className="px-4 py-3">
-                      {u.userCourseId && (
-                        <button
-                          type="button"
-                          onClick={() => openExcludeModal(u)}
-                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                            u.isExcluded
-                              ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400"
-                              : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
-                          }`}
-                        >
-                          {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
-                        </button>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {u.userCourseId && (
+                          <button
+                            type="button"
+                            onClick={() => openExcludeModal(u)}
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                              u.isExcluded
+                                ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400"
+                                : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                            }`}
+                          >
+                            {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

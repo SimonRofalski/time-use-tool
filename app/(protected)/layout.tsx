@@ -7,6 +7,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import EnrollmentModal from "@/app/components/EnrollmentModal";
 import ProfileDetailsForm from "@/app/components/ProfileDetailsForm";
+import SecurityQuestionsForm from "@/app/components/SecurityQuestionsForm";
 import KursuebersichtTab from "@/app/components/admin/KursuebersichtTab";
 import NutzeruebersichtTab from "@/app/components/admin/NutzeruebersichtTab";
 import StatistikenTab from "@/app/components/admin/StatistikenTab";
@@ -81,12 +82,19 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isEnrolled, setIsEnrolled] = useState<boolean | null>(null);
+  const [needsSecurityQuestions, setNeedsSecurityQuestions] = useState<
+    boolean | null
+  >(null);
   const [needsProfileDetails, setNeedsProfileDetails] = useState<
     boolean | null
   >(null);
   const [accessCheckReady, setAccessCheckReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [securityQuestionsModalOpen, setSecurityQuestionsModalOpen] =
+    useState(false);
+  const [securityQuestionsMandatory, setSecurityQuestionsMandatory] =
+    useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileModalMandatory, setProfileModalMandatory] = useState(false);
   const [profileFormIsEditing, setProfileFormIsEditing] = useState(false);
@@ -193,6 +201,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   async function initializeUserAccess(authUser: SupabaseUser) {
     setUser(authUser);
     setAccessCheckReady(false);
+    setNeedsSecurityQuestions(null);
     setNeedsProfileDetails(null);
     setIsEnrolled(null);
 
@@ -209,13 +218,36 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
     // Admins skip profile completion and course enrollment requirements
     if (role === "admin") {
+      setNeedsSecurityQuestions(false);
       setNeedsProfileDetails(false);
       setIsEnrolled(true);
+      setSecurityQuestionsMandatory(false);
+      setSecurityQuestionsModalOpen(false);
       setProfileModalMandatory(false);
       setProfileModalOpen(false);
       setAccessCheckReady(true);
       return;
     }
+
+    const hasSecurityQuestions = await checkSecurityQuestions(authUser.id);
+    setNeedsSecurityQuestions(!hasSecurityQuestions);
+
+    if (!hasSecurityQuestions) {
+      setProfileMenuOpen(false);
+      setSettingsOpen(false);
+      setSecurityQuestionsMandatory(true);
+      setSecurityQuestionsModalOpen(true);
+      setProfileModalMandatory(false);
+      setProfileModalOpen(false);
+      // Prevent null-guard from blocking render while modal is open
+      setNeedsProfileDetails(false);
+      setIsEnrolled(false);
+      setAccessCheckReady(true);
+      return;
+    }
+
+    setSecurityQuestionsMandatory(false);
+    setSecurityQuestionsModalOpen(false);
 
     const hasProfileDetails = await checkProfileDetails(authUser.id);
     setNeedsProfileDetails(!hasProfileDetails);
@@ -247,6 +279,19 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     }
 
     return (data?.length ?? 0) > 0;
+  }
+
+  async function checkSecurityQuestions(userId: string) {
+    const { data, error } = await supabase
+      .from("user_security_question")
+      .select("user_security_question_id")
+      .eq("profiles_id", userId);
+
+    if (error) {
+      return false;
+    }
+
+    return (data?.length ?? 0) === 2;
   }
 
   async function checkEnrollment(userId: string) {
@@ -285,11 +330,41 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setAccessCheckReady(true);
   }
 
+  async function handleSecurityQuestionsSaved() {
+    if (!user) {
+      return;
+    }
+
+    setSecurityQuestionsModalOpen(false);
+    setSecurityQuestionsMandatory(false);
+    setNeedsSecurityQuestions(false);
+    setAccessCheckReady(false);
+
+    const hasProfileDetails = await checkProfileDetails(user.id);
+    setNeedsProfileDetails(!hasProfileDetails);
+
+    if (!hasProfileDetails) {
+      setProfileModalMandatory(true);
+      setProfileModalOpen(true);
+      setIsEnrolled(null);
+      setAccessCheckReady(true);
+      return;
+    }
+
+    setProfileModalMandatory(false);
+    setProfileModalOpen(false);
+    await checkEnrollment(user.id);
+    setAccessCheckReady(true);
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut();
     setAccessCheckReady(false);
+    setNeedsSecurityQuestions(null);
     setNeedsProfileDetails(null);
     setIsEnrolled(null);
+    setSecurityQuestionsMandatory(false);
+    setSecurityQuestionsModalOpen(false);
     setProfileFormIsEditing(false);
     setProfileModalMandatory(false);
     setProfileModalOpen(false);
@@ -317,6 +392,14 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setProfileModalOpen(false);
   }
 
+  function handleSecurityQuestionsModalClose() {
+    if (securityQuestionsMandatory) {
+      return;
+    }
+
+    setSecurityQuestionsModalOpen(false);
+  }
+
   function openProfileModal() {
     setProfileMenuOpen(false);
     setProfileModalMandatory(false);
@@ -324,11 +407,18 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setProfileModalOpen(true);
   }
 
+  function openSecurityQuestionsModal() {
+    setProfileMenuOpen(false);
+    setSecurityQuestionsMandatory(false);
+    setSecurityQuestionsModalOpen(true);
+  }
+
   if (
     !user ||
     !accessCheckReady ||
+    needsSecurityQuestions === null ||
     needsProfileDetails === null ||
-    (!needsProfileDetails && isEnrolled === null)
+    (!needsSecurityQuestions && !needsProfileDetails && isEnrolled === null)
   ) {
     return null;
   }
@@ -423,6 +513,14 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                   >
                     <User size={16} />
                     Persönliche Angaben
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                    onClick={openSecurityQuestionsModal}
+                  >
+                    <ShieldCheck size={16} />
+                    Sicherheitsfragen
                   </button>
                   <button
                     type="button"
@@ -630,6 +728,35 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      {securityQuestionsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+          {!securityQuestionsMandatory && (
+            <div
+              className="absolute inset-0"
+              onClick={handleSecurityQuestionsModalClose}
+            />
+          )}
+          <div className="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+            {!securityQuestionsMandatory && (
+              <div className="mb-4 flex justify-end">
+                <button
+                  type="button"
+                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                  onClick={handleSecurityQuestionsModalClose}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            )}
+            <SecurityQuestionsForm
+              allowEditToggle={!securityQuestionsMandatory}
+              requireCompletion={securityQuestionsMandatory}
+              onSaved={handleSecurityQuestionsSaved}
+            />
+          </div>
+        </div>
+      )}
+
       {adminMode ? (
         <main className="mx-auto max-w-7xl px-4 py-6">
           {activeAdminTab === "kursuebersicht" && (
@@ -661,9 +788,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
         <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
       )}
 
-      {needsProfileDetails === false && isEnrolled === false && (
-        <EnrollmentModal userId={user.id} onEnrolled={handleEnrolled} />
-      )}
+      {needsSecurityQuestions === false &&
+        needsProfileDetails === false &&
+        isEnrolled === false && (
+          <EnrollmentModal userId={user.id} onEnrolled={handleEnrolled} />
+        )}
     </div>
   );
 }
