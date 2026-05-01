@@ -240,40 +240,11 @@ function DayCarousel({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  function scroll(direction: "prev" | "next") {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollBy({
-      left:
-        direction === "next"
-          ? scrollRef.current.clientWidth
-          : -scrollRef.current.clientWidth,
-      behavior: "smooth",
-    });
-  }
-
   return (
     <div>
-      {/* Header row with day count and nav buttons */}
-      <div className="mb-3 flex items-center justify-between">
+      {/* Header row with day count */}
+      <div className="mb-3 flex items-center">
         <p className="text-sm font-medium text-slate-600">{days.length} Tage</p>
-        <div className="hidden gap-2 md:flex">
-          <button
-            type="button"
-            onClick={() => scroll("prev")}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-800"
-            aria-label="Vorherige Tage"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            onClick={() => scroll("next")}
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-800"
-            aria-label="Nächste Tage"
-          >
-            ›
-          </button>
-        </div>
       </div>
 
       {/* Mobile: all days visible in a responsive grid */}
@@ -326,25 +297,27 @@ function SummaryBar({ days }: { days: CourseDay[] }) {
   ).length;
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="flex flex-wrap items-stretch gap-2">
       {/* Completed days */}
-      <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center">
-        <p className="text-2xl font-bold text-green-600">{completedCount}</p>
-        <p className="mt-1 text-xs font-medium text-green-700">Abgeschlossen</p>
+      <div className="w-full rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-center sm:w-[220px]">
+        <p className="text-xl font-bold text-green-600">{completedCount}</p>
+        <p className="mt-0.5 text-xs font-medium text-green-700">
+          Abgeschlossen
+        </p>
       </div>
 
       {/* In-progress days */}
-      <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-center">
-        <p className="text-2xl font-bold text-orange-500">{inProgressCount}</p>
-        <p className="mt-1 text-xs font-medium text-orange-700">
+      <div className="w-full rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-center sm:w-[220px]">
+        <p className="text-xl font-bold text-orange-500">{inProgressCount}</p>
+        <p className="mt-0.5 text-xs font-medium text-orange-700">
           In Bearbeitung
         </p>
       </div>
 
       {/* Not started days */}
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center">
-        <p className="text-2xl font-bold text-slate-500">{notStartedCount}</p>
-        <p className="mt-1 text-xs font-medium text-slate-600">
+      <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-center sm:w-[220px]">
+        <p className="text-xl font-bold text-slate-500">{notStartedCount}</p>
+        <p className="mt-0.5 text-xs font-medium text-slate-600">
           Nicht begonnen
         </p>
       </div>
@@ -520,7 +493,7 @@ export default function ErfassteZeitPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Page header with course name and date range */}
       <div>
         {courseSummary && (
@@ -535,11 +508,11 @@ export default function ErfassteZeitPage() {
         )}
       </div>
 
+      {/* Compact status summary above the week overview */}
+      <SummaryBar days={courseDays} />
+
       {/* Horizontal carousel of all days in the course */}
       <DayCarousel days={courseDays} onDayClick={handleDayClick} />
-
-      {/* Summary containers at the bottom */}
-      <SummaryBar days={courseDays} />
     </div>
   );
 }

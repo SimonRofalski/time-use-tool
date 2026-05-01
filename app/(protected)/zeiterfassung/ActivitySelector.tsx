@@ -10,6 +10,7 @@ import {
   Bus,
   Calendar,
   Car,
+  Check,
   Clock3,
   CookingPot,
   Dumbbell,
@@ -18,6 +19,9 @@ import {
   Gamepad2,
   GraduationCap,
   HandHeart,
+  Heart,
+  UserCheck,
+  UserX,
   Headphones,
   HeartPulse,
   Home,
@@ -25,6 +29,7 @@ import {
   Laptop,
   MapPin,
   MessageCircle,
+  HelpCircle,
   MoonStar,
   Music,
   Newspaper,
@@ -32,6 +37,8 @@ import {
   Pencil,
   Scissors,
   Search,
+  Smartphone,
+  Tablet,
   ShoppingBag,
   Sparkles,
   Timer,
@@ -41,6 +48,9 @@ import {
   type LucideIcon,
   UtensilsCrossed,
   Users,
+  UserRound,
+  Watch,
+  Gauge,
   Wrench,
 } from "lucide-react";
 import {
@@ -141,13 +151,13 @@ function getStepQuestion(step: QuestionnaireStep): string {
     case "secondary_activity":
       return "Hast du gleichzeitig eine Nebentätigkeit ausgeführt?";
     case "digital_media":
-      return "Hast du während dieser Zeit ein elektronisches Gerät benutzt?";
+      return "Hast du für die Aktivität ein IT-Gerät (z.B. Smartphone, Tablet oder ähnlich) genutzt?";
     case "digital_media_type":
-      return "Welches Gerät hast du hauptsächlich benutzt?";
+      return "Welche Geräte hast du genutzt?";
     case "location_transport":
       return "Wo warst du während dieser Zeit?";
     case "social_context":
-      return "Mit wem warst du während dieser Zeit?";
+      return "War jemand anders mit dabei?";
     case "satisfaction":
       return "Wie hast du dich während dieser Zeit gefühlt?";
   }
@@ -347,16 +357,32 @@ function ActivityList({
       {topSlot}
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-        <label className="relative block">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={searchPlaceholder}
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          />
-        </label>
+        <div className="flex items-center gap-2">
+          {!isSearching && activeCategory && (
+            <button
+              type="button"
+              onClick={() => onActiveCategoryChange(null)}
+              className="flex shrink-0 flex-col items-center gap-0.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-400 hover:text-slate-800"
+            >
+              <span>←</span>
+              <span className="text-[10px] font-normal text-slate-400 leading-none">
+                Kategorien
+              </span>
+            </button>
+          )}
+          <label className="relative block flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={
+                activeCategory ? activeCategory.name : searchPlaceholder
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+        </div>
       </div>
 
       <div
@@ -441,26 +467,11 @@ function ActivityList({
 
         {((!isSearching && activeCategory) || isSearching) && (
           <div className="space-y-4">
-            {!isSearching && activeCategory && (
-              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => onActiveCategoryChange(null)}
-                  className="text-xs font-medium text-slate-500 transition-colors hover:text-slate-700"
-                >
-                  ← Alle Kategorien
-                </button>
-                <div className="flex items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: activeCategory.color }}
-                  />
-                  <h4 className="text-sm font-semibold text-slate-900">
-                    {activeCategory.name}
-                  </h4>
-                </div>
-              </div>
-            )}
+            {
+              !isSearching &&
+                activeCategory &&
+                null /* back button now in search bar */
+            }
 
             {(isSearching
               ? hierarchy
@@ -472,29 +483,41 @@ function ActivityList({
                 key={category.category_id}
                 className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
               >
-                <div
-                  className="mb-4 flex items-center gap-3 rounded-xl px-3 py-2"
-                  style={{ backgroundColor: `${category.color}10` }}
-                >
-                  <span
-                    className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: category.color }}
-                  />
-                  <span className="text-sm font-semibold text-slate-800">
-                    {category.name}
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    {countActivities(category.subcategories)} Treffer
-                  </span>
-                </div>
+                {isSearching && (
+                  <div
+                    className="mb-4 flex items-center gap-3 rounded-xl px-3 py-2"
+                    style={{ backgroundColor: `${category.color}10` }}
+                  >
+                    <span
+                      className="h-3 w-3 rounded-full"
+                      style={{ backgroundColor: category.color }}
+                    />
+                    <span className="text-sm font-semibold text-slate-800">
+                      {category.name}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {countActivities(category.subcategories)} Treffer
+                    </span>
+                  </div>
+                )}
 
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {category.subcategories.map((subcategory) => (
-                    <div key={subcategory.subcategory_id}>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    <div
+                      key={subcategory.subcategory_id}
+                      className="rounded-xl border p-3"
+                      style={{
+                        borderColor: `${category.color}30`,
+                        backgroundColor: `${category.color}07`,
+                      }}
+                    >
+                      <p
+                        className="mb-2 text-xs font-semibold uppercase tracking-wide"
+                        style={{ color: `${category.color}99` }}
+                      >
                         {subcategory.name}
                       </p>
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-2">
                         {subcategory.activities.map((activity) => {
                           const isSelected =
                             selectedActivityId === activity.activity_id;
@@ -508,7 +531,7 @@ function ActivityList({
                               className={`rounded-2xl border px-4 py-3 text-sm font-medium leading-snug transition-all ${
                                 isSelected
                                   ? "border-transparent text-white shadow-sm"
-                                  : "border-transparent text-slate-700 hover:opacity-80"
+                                  : "border-white text-slate-700 hover:opacity-80"
                               }`}
                               style={
                                 isSelected
@@ -652,34 +675,126 @@ export default function ActivitySelector({
   }
 
   // Step 4 (conditional): which type of device was used?
+  function getDigitalMediaTypeVisual(typeName: string): {
+    icon: LucideIcon;
+    chipClass: string;
+  } {
+    const normalized = normalizeLabel(typeName);
+
+    if (normalized.includes("smartphone")) {
+      return {
+        icon: Smartphone,
+        chipClass: "bg-cyan-50 text-cyan-700 ring-cyan-100",
+      };
+    }
+    if (normalized.includes("computer") || normalized.includes("laptop")) {
+      return {
+        icon: Laptop,
+        chipClass: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+      };
+    }
+    if (normalized.includes("tablet")) {
+      return {
+        icon: Tablet,
+        chipClass: "bg-violet-50 text-violet-700 ring-violet-100",
+      };
+    }
+    if (normalized.includes("tv") || normalized.includes("streaming")) {
+      return {
+        icon: Tv,
+        chipClass: "bg-orange-50 text-orange-700 ring-orange-100",
+      };
+    }
+    if (normalized.includes("spielkonsole") || normalized.includes("konsole")) {
+      return {
+        icon: Gamepad2,
+        chipClass: "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-100",
+      };
+    }
+    if (normalized.includes("smartwatch") || normalized.includes("wearable")) {
+      return {
+        icon: Watch,
+        chipClass: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+      };
+    }
+
+    return {
+      icon: HelpCircle,
+      chipClass: "bg-slate-100 text-slate-700 ring-slate-200",
+    };
+  }
+
   function renderDigitalMediaTypeStep() {
+    const filteredTypes = lookupData.digitalMediaTypes.filter((type) => {
+      const normalized = normalizeLabel(type.name);
+      // "Kein IT-Hilfsmittel" is redundant because previous step already asks this.
+      return !normalized.includes("kein it") && !normalized.includes("ohne it");
+    });
+
+    const selectedIds = new Set(pendingEntry.digital_media_type_ids);
+
+    function toggleDevice(id: number) {
+      const updated = new Set(selectedIds);
+      if (updated.has(id)) {
+        updated.delete(id);
+      } else {
+        updated.add(id);
+      }
+      onStepComplete({ digital_media_type_ids: [...updated] });
+    }
+
     return (
-      <div className="space-y-2">
-        {lookupData.digitalMediaTypes.map((type) => {
-          const isSelected =
-            pendingEntry.digital_media_type_id === type.digital_media_type_id;
-          return (
-            <button
-              key={type.digital_media_type_id}
-              type="button"
-              onClick={() =>
-                onStepComplete({
-                  digital_media_type_id: type.digital_media_type_id,
-                })
-              }
-              className={`
-                w-full rounded-lg border px-4 py-3 text-left text-sm font-medium transition-all
-                ${
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {filteredTypes.map((type) => {
+            const isSelected = selectedIds.has(type.digital_media_type_id);
+            const { icon: IconComponent, chipClass } =
+              getDigitalMediaTypeVisual(type.name);
+
+            return (
+              <button
+                key={type.digital_media_type_id}
+                type="button"
+                onClick={() => toggleDevice(type.digital_media_type_id)}
+                className={`flex flex-col items-start gap-2 rounded-xl border-2 p-3 text-left transition-all ${
                   isSelected
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                }
-              `}
-            >
-              {type.name}
-            </button>
-          );
-        })}
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <div className="relative">
+                  <span
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg ring-1 ${isSelected ? "bg-blue-100 text-blue-600 ring-blue-200" : chipClass}`}
+                  >
+                    <IconComponent className="h-4 w-4" />
+                  </span>
+                  {isSelected && (
+                    <Check className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-blue-500 text-white p-px" />
+                  )}
+                </div>
+                <span
+                  className={`text-sm font-medium leading-snug ${
+                    isSelected ? "text-blue-700" : "text-slate-700"
+                  }`}
+                >
+                  {type.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            onStepComplete({
+              digital_media_type_ids: [...selectedIds],
+              _advance: true,
+            } as any)
+          }
+          className="w-full rounded-lg bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
+        >
+          Weiter
+        </button>
       </div>
     );
   }
@@ -687,70 +802,130 @@ export default function ActivitySelector({
   // Helper: map location name to appropriate icon and category
   function getLocationMappings(locName: string): {
     icon: LucideIcon;
+    secondaryIcon?: LucideIcon;
     category: string;
+    chipClass: string;
   } {
     const normalized = locName.toLowerCase();
 
     // LOCATIONS (Orte)
-    if (normalized.includes("zuhause") || normalized.includes("zu hause"))
-      return { icon: Home, category: "Orte" };
-    if (
-      normalized.includes("wochenendhaus") ||
-      normalized.includes("ferienwohnung")
-    )
-      return { icon: Hotel, category: "Orte" };
-    if (normalized.includes("arbeitsplatz"))
-      return { icon: Briefcase, category: "Orte" };
+    // Must check "zuhause anderer" BEFORE the generic "zuhause" check
     if (
       normalized.includes("anderer person") ||
       normalized.includes("zuhause anderer")
     )
-      return { icon: Users, category: "Orte" };
+      return {
+        icon: Home,
+        secondaryIcon: UserRound,
+        category: "Orte",
+        chipClass: "bg-violet-50 text-violet-600 ring-violet-100",
+      };
+    if (normalized.includes("zuhause") || normalized.includes("zu hause"))
+      return {
+        icon: Home,
+        category: "Orte",
+        chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
+      };
+    if (
+      normalized.includes("wochenendhaus") ||
+      normalized.includes("ferienwohnung")
+    )
+      return {
+        icon: Hotel,
+        category: "Orte",
+        chipClass: "bg-cyan-50 text-cyan-600 ring-cyan-100",
+      };
+    if (normalized.includes("arbeitsplatz"))
+      return {
+        icon: Briefcase,
+        category: "Orte",
+        chipClass: "bg-amber-50 text-amber-600 ring-amber-100",
+      };
     if (
       normalized.includes("restaurant") ||
       normalized.includes("café") ||
       normalized.includes("cafe") ||
       normalized.includes("bar")
     )
-      return { icon: UtensilsCrossed, category: "Orte" };
+      return {
+        icon: UtensilsCrossed,
+        category: "Orte",
+        chipClass: "bg-rose-50 text-rose-600 ring-rose-100",
+      };
     if (
       normalized.includes("einkaufs") ||
       normalized.includes("markt") ||
       normalized.includes("geschäfte")
     )
-      return { icon: ShoppingBag, category: "Orte" };
+      return {
+        icon: ShoppingBag,
+        category: "Orte",
+        chipClass: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+      };
     if (normalized.includes("hotel") || normalized.includes("camping"))
-      return { icon: Hotel, category: "Orte" };
+      return {
+        icon: Hotel,
+        category: "Orte",
+        chipClass: "bg-sky-50 text-sky-600 ring-sky-100",
+      };
     if (
       normalized.includes("schule") ||
       normalized.includes("universität") ||
       normalized.includes("universitaet")
     )
-      return { icon: GraduationCap, category: "Orte" };
+      return {
+        icon: GraduationCap,
+        category: "Orte",
+        chipClass: "bg-indigo-50 text-indigo-600 ring-indigo-100",
+      };
     if (
       normalized.includes("spezifizierter ort") &&
       !normalized.includes("transport")
     )
-      return { icon: MapPin, category: "Orte" };
+      return {
+        icon: MapPin,
+        category: "Orte",
+        chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+      };
 
     // PRIVATE TRANSPORT (Private Verkehrsmittel)
     if (normalized.includes("zu fuß") || normalized.includes("zu fuss"))
-      return { icon: Footprints, category: "Private Verkehrsmittel" };
+      return {
+        icon: Footprints,
+        category: "Private Verkehrsmittel",
+        chipClass: "bg-green-50 text-green-600 ring-green-100",
+      };
     if (normalized.includes("fahrrad"))
-      return { icon: Bike, category: "Private Verkehrsmittel" };
+      return {
+        icon: Bike,
+        category: "Private Verkehrsmittel",
+        chipClass: "bg-lime-50 text-lime-600 ring-lime-100",
+      };
     if (
       normalized.includes("moped") ||
       normalized.includes("motorrad") ||
       normalized.includes("motorboot")
     )
-      return { icon: Car, category: "Private Verkehrsmittel" };
+      return {
+        icon: Gauge,
+        category: "Private Verkehrsmittel",
+        chipClass: "bg-orange-50 text-orange-600 ring-orange-100",
+      };
     if (normalized.includes("pkw") || normalized.includes("auto"))
-      return { icon: Car, category: "Private Verkehrsmittel" };
+      return {
+        icon: Car,
+        category: "Private Verkehrsmittel",
+        chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
+      };
     if (
       normalized.includes("spezifizierter transportmodus") &&
       !normalized.includes("öffentlich")
     )
-      return { icon: MapPin, category: "Private Verkehrsmittel" };
+      return {
+        icon: MapPin,
+        category: "Private Verkehrsmittel",
+        chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+      };
 
     // PUBLIC TRANSPORT (Öffentlicher Verkehr)
     if (
@@ -761,10 +936,18 @@ export default function ActivitySelector({
       normalized.includes("bahn") ||
       normalized.includes("tram")
     )
-      return { icon: Bus, category: "Öffentlicher Verkehr" };
+      return {
+        icon: Bus,
+        category: "Öffentlicher Verkehr",
+        chipClass: "bg-teal-50 text-teal-600 ring-teal-100",
+      };
 
     // DEFAULT (fallback, shouldn't really happen)
-    return { icon: MapPin, category: "Sonstiges" };
+    return {
+      icon: MapPin,
+      category: "Sonstiges",
+      chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+    };
   }
 
   // Helper: categorize locations/transport by ID range and assign icons
@@ -805,7 +988,10 @@ export default function ActivitySelector({
           if (!items || items.length === 0) return null;
 
           return (
-            <div key={category}>
+            <div
+              key={category}
+              className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"
+            >
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 {category}
               </h4>
@@ -814,10 +1000,11 @@ export default function ActivitySelector({
                   const isSelected =
                     pendingEntry.location_transport_id ===
                     loc.location_transport_id;
-                  const IconComponent = getLocationIcon(
-                    loc.location_transport_id,
-                    loc.name,
-                  );
+                  const {
+                    icon: IconComponent,
+                    secondaryIcon: SecondaryIcon,
+                    chipClass,
+                  } = getLocationMappings(loc.name);
 
                   return (
                     <button
@@ -831,10 +1018,17 @@ export default function ActivitySelector({
                       className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-all ${
                         isSelected
                           ? "border-blue-500 bg-blue-50"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          : "border-white bg-white hover:border-slate-300 hover:bg-slate-50"
                       }`}
                     >
-                      <IconComponent className="h-[18px] w-[18px] shrink-0 text-slate-600" />
+                      <div
+                        className={`relative shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-lg ring-1 ${chipClass}`}
+                      >
+                        <IconComponent className="h-[18px] w-[18px]" />
+                        {SecondaryIcon && (
+                          <SecondaryIcon className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white" />
+                        )}
+                      </div>
                       <span className="text-xs font-medium leading-snug text-slate-700">
                         {loc.name}
                       </span>
@@ -847,6 +1041,52 @@ export default function ActivitySelector({
         })}
       </div>
     );
+  }
+
+  // Helper: map social context name to icon + color
+  function getSocialContextVisual(name: string): {
+    icon: LucideIcon;
+    chipClass: string;
+  } {
+    const n = name.toLowerCase();
+    if (n.includes("alleine") || n.includes("allein"))
+      return {
+        icon: UserX,
+        chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+      };
+    if (n.includes("partner") || n.includes("ehepartner"))
+      return {
+        icon: Heart,
+        chipClass: "bg-rose-50 text-rose-500 ring-rose-100",
+      };
+    if (n.includes("eltern") || n.includes("mutter") || n.includes("vater"))
+      return {
+        icon: Users,
+        chipClass: "bg-amber-50 text-amber-600 ring-amber-100",
+      };
+    if (n.includes("bis 9") || n.includes("kind") || n.includes("baby"))
+      return {
+        icon: Baby,
+        chipClass: "bg-pink-50 text-pink-500 ring-pink-100",
+      };
+    if (n.includes("haushalt"))
+      return {
+        icon: Home,
+        chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
+      };
+    if (
+      n.includes("freunde") ||
+      n.includes("kollegen") ||
+      n.includes("bekannte")
+    )
+      return {
+        icon: UserCheck,
+        chipClass: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+      };
+    return {
+      icon: Users,
+      chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+    };
   }
 
   // Step 6: who was the user with? (multiple choice — needs explicit confirm)
@@ -867,28 +1107,34 @@ export default function ActivitySelector({
 
     return (
       <div className="space-y-3">
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-2">
           {lookupData.socialContexts.map((ctx) => {
             const isSelected = selectedIds.has(ctx.social_context_id);
+            const { icon: IconComponent, chipClass } = getSocialContextVisual(
+              ctx.name,
+            );
             return (
               <button
                 key={ctx.social_context_id}
                 type="button"
                 onClick={() => toggleSocialContext(ctx.social_context_id)}
-                className={`
-                  w-full rounded-lg border px-4 py-3 text-left text-sm font-medium
-                  flex items-center justify-between transition-all
-                  ${
-                    isSelected
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                  }
-                `}
+                className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-all ${
+                  isSelected
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                }`}
               >
-                <span>{ctx.name}</span>
-                {isSelected && (
-                  <span className="text-blue-500 font-bold">✓</span>
-                )}
+                <div
+                  className={`relative shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-lg ring-1 ${isSelected ? "bg-blue-100 text-blue-600 ring-blue-200" : chipClass}`}
+                >
+                  <IconComponent className="h-[18px] w-[18px]" />
+                  {isSelected && (
+                    <Check className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-blue-500 text-white p-px" />
+                  )}
+                </div>
+                <span className="text-xs font-medium leading-snug text-slate-700">
+                  {ctx.name}
+                </span>
               </button>
             );
           })}
@@ -1030,8 +1276,8 @@ export default function ActivitySelector({
       </div>
 
       {/* Question */}
-      <div className="px-4 pb-3">
-        <h3 className="text-sm font-semibold text-slate-800">
+      <div className="px-4 pb-4 pt-1">
+        <h3 className="text-lg font-bold text-slate-900 leading-snug">
           {getStepQuestion(step)}
         </h3>
       </div>

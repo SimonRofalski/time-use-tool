@@ -45,11 +45,11 @@ export default function Home() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) router.push("/zeiterfassung");
+      if (data.user) router.push("/erfasste-zeit");
     });
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        if (session?.user) router.push("/zeiterfassung");
+        if (session?.user) router.push("/erfasste-zeit");
       },
     );
     return () => listener?.subscription.unsubscribe();
@@ -113,7 +113,7 @@ export default function Home() {
         setStatus(error.message);
         setStatusTone("error");
       } else if (data.session) {
-        router.push("/zeiterfassung");
+        router.push("/erfasste-zeit");
       } else {
         setMode("signin");
         setPassword("");
@@ -136,7 +136,7 @@ export default function Home() {
           setStatusTone("error");
         }
       } else {
-        router.push("/zeiterfassung");
+        router.push("/erfasste-zeit");
       }
     }
   }
