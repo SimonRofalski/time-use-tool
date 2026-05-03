@@ -1341,6 +1341,7 @@ export default function KursuebersichtTab() {
         end_date: spanEnd,
         accessCode: newAccessCode.trim(),
         is_locked: false,
+        comparison_enabled: false,
       })
       .select("course_id")
       .single();
