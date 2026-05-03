@@ -219,7 +219,6 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
     // Admins skip profile completion and course enrollment requirements
     if (role === "admin") {
-      setActiveCourseName("");
       setNeedsSecurityQuestions(false);
       setNeedsProfileDetails(false);
       setIsEnrolled(true);
@@ -227,6 +226,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       setSecurityQuestionsModalOpen(false);
       setProfileModalMandatory(false);
       setProfileModalOpen(false);
+      await checkEnrollment(authUser.id);
       setAccessCheckReady(true);
       return;
     }
@@ -304,10 +304,15 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       .single();
 
     setIsEnrolled(!!data);
-    const courseName =
-      data && typeof data.course === "object" && data.course !== null
-        ? ((data.course as { name?: string }).name ?? "")
-        : "";
+    let courseName = "";
+    if (data?.course) {
+      const c = data.course;
+      if (Array.isArray(c)) {
+        courseName = (c[0] as { name?: string })?.name ?? "";
+      } else if (typeof c === "object" && c !== null) {
+        courseName = (c as { name?: string }).name ?? "";
+      }
+    }
     setActiveCourseName(courseName);
   }
 
@@ -442,20 +447,44 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950/95">
+      <header
+        className={`sticky top-0 z-20 border-b backdrop-blur transition-colors ${
+          adminMode
+            ? "border-amber-200 bg-amber-50/95 dark:border-amber-800/60 dark:bg-amber-950/90"
+            : "border-slate-200 bg-white/95 dark:border-slate-800 dark:bg-slate-950/95"
+        }`}
+      >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0" />
-            <h1 className="whitespace-nowrap text-base font-semibold text-slate-800 dark:text-slate-100 sm:text-lg">
+            <h1 className="shrink-0 whitespace-nowrap text-base font-semibold text-slate-800 dark:text-slate-100 sm:text-lg">
               Time Use Tool
             </h1>
             {activeCourseName && !adminMode && (
-              <span className="truncate text-xs font-medium text-slate-500 dark:text-slate-400 sm:text-sm">
-                {activeCourseName}
-              </span>
+              <>
+                <span className="shrink-0 text-slate-300 dark:text-slate-600">
+                  ·
+                </span>
+                <span className="min-w-0 truncate text-xs font-medium text-slate-500 dark:text-slate-400 sm:text-sm">
+                  {activeCourseName}
+                </span>
+              </>
             )}
           </div>
+
+          {/* Admin mode badge — centered */}
+          {adminMode && (
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-100 px-3 py-1 dark:border-amber-600/50 dark:bg-amber-900/40">
+              <ShieldCheck
+                size={13}
+                className="shrink-0 text-amber-700 dark:text-amber-400"
+              />
+              <span className="text-xs font-semibold tracking-wide text-amber-800 dark:text-amber-300">
+                Admin-Modus
+              </span>
+            </div>
+          )}
 
           <div className="ml-3 flex shrink-0 items-center gap-2">
             {isAdmin &&

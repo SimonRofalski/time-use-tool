@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ChevronRight, Plus, X } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import ConfirmModal from "./ConfirmModal";
+import UserStatsView from "./UserStatsView";
 import {
   type CoursePeriod,
   totalPeriodDays,
@@ -29,6 +30,7 @@ type CourseRow = {
   is_locked: boolean;
   accessCode: string | null;
   anonymized_at: string | null;
+  comparison_enabled: boolean;
   userCount: number;
   periods: CoursePeriodRow[];
 };
@@ -70,6 +72,7 @@ type DrillView =
       courseName: string;
       courseTotalDays: number;
       isAnonymized: boolean;
+      isComparisonEnabled: boolean;
     }
   | {
       type: "user";
@@ -77,6 +80,7 @@ type DrillView =
       courseName: string;
       courseTotalDays: number;
       isAnonymized: boolean;
+      isComparisonEnabled: boolean;
       userId: string;
       userDisplayName: string;
     };
@@ -156,6 +160,9 @@ export default function KursuebersichtTab() {
   const [loadingEntryDayIds, setLoadingEntryDayIds] = useState<Set<number>>(
     new Set(),
   );
+  const [userDetailView, setUserDetailView] = useState<"tage" | "statistiken">(
+    "tage",
+  );
 
   // ── Modals & inline edits ───────────────────────────────────────────────────
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(
@@ -182,7 +189,7 @@ export default function KursuebersichtTab() {
     const { data: courseData, error: courseErr } = await supabase
       .from("course")
       .select(
-        "course_id, name, start_date, end_date, is_locked, accessCode, anonymized_at",
+        "course_id, name, start_date, end_date, is_locked, accessCode, anonymized_at, comparison_enabled",
       )
       .order("start_date", { ascending: false });
 
@@ -548,6 +555,33 @@ export default function KursuebersichtTab() {
     setConfirmModal(null);
   }
 
+  async function handleToggleCourseComparison(
+    courseId: number,
+    enabled: boolean,
+  ) {
+    const { error } = await supabase
+      .from("course")
+      .update({ comparison_enabled: enabled })
+      .eq("course_id", courseId);
+    if (error) return;
+
+    setCourses((prev) =>
+      prev.map((c) =>
+        c.course_id === courseId ? { ...c, comparison_enabled: enabled } : c,
+      ),
+    );
+
+    setView((prev) => {
+      if (prev.type === "course" && prev.courseId === courseId) {
+        return { ...prev, isComparisonEnabled: enabled };
+      }
+      if (prev.type === "user" && prev.courseId === courseId) {
+        return { ...prev, isComparisonEnabled: enabled };
+      }
+      return prev;
+    });
+  }
+
   async function handleCreateCourse(e: React.FormEvent) {
     e.preventDefault();
     setIsCreating(true);
@@ -675,6 +709,7 @@ export default function KursuebersichtTab() {
                     courseName: view.courseName,
                     courseTotalDays: view.courseTotalDays,
                     isAnonymized: view.isAnonymized,
+                    isComparisonEnabled: view.isComparisonEnabled,
                   });
                 }
               }}
@@ -868,6 +903,7 @@ export default function KursuebersichtTab() {
                       courseName: course.name,
                       courseTotalDays: totalDays,
                       isAnonymized: course.anonymized_at != null,
+                      isComparisonEnabled: course.comparison_enabled,
                     });
                     void loadCourseUsers(course.course_id, totalDays);
                   }}
@@ -902,6 +938,15 @@ export default function KursuebersichtTab() {
                   {course.anonymized_at && (
                     <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 sm:px-2.5 sm:py-1 sm:text-xs">
                       Anonymisiert
+                    </span>
+                  )}
+                  {course.comparison_enabled ? (
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 sm:px-2.5 sm:py-1 sm:text-xs">
+                      Kursvergleich frei
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400 sm:px-2.5 sm:py-1 sm:text-xs">
+                      Kursvergleich gesperrt
                     </span>
                   )}
                   {course.is_locked ? (
@@ -1002,13 +1047,32 @@ export default function KursuebersichtTab() {
 
   function renderCourseDetail() {
     if (view.type !== "course") return null;
-    const { isAnonymized } = view;
+    const { isAnonymized, isComparisonEnabled } = view;
 
     return (
       <div className="space-y-4">
         {/* Course-level actions */}
-        {!isAnonymized && (
-          <div className="flex items-center justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              void handleToggleCourseComparison(
+                view.courseId,
+                !isComparisonEnabled,
+              )
+            }
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              isComparisonEnabled
+                ? "border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            }`}
+          >
+            {isComparisonEnabled
+              ? "Kursvergleich sperren"
+              : "Kursvergleich freigeben"}
+          </button>
+
+          {!isAnonymized && (
             <button
               type="button"
               disabled={isAnonymizing}
@@ -1025,8 +1089,8 @@ export default function KursuebersichtTab() {
             >
               {isAnonymizing ? "Anonymisiere…" : "Kurs anonymisieren"}
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
         {isLoadingUsers ? (
           <p className="text-sm text-slate-500">Wird geladen…</p>
@@ -1075,9 +1139,11 @@ export default function KursuebersichtTab() {
                                 courseName: view.courseName,
                                 courseTotalDays: view.courseTotalDays,
                                 isAnonymized: view.isAnonymized,
+                                isComparisonEnabled: view.isComparisonEnabled,
                                 userId: u.userId,
                                 userDisplayName: displayLabel,
                               });
+                              setUserDetailView("tage");
                               void loadUserDays(u.userId, view.courseId);
                             }
                           }}
@@ -1167,6 +1233,46 @@ export default function KursuebersichtTab() {
   }
 
   function renderUserDetail() {
+    if (view.type !== "user") return null;
+
+    return (
+      <div className="space-y-4">
+        {/* View toggle */}
+        <div className="flex gap-1 rounded-xl bg-slate-100 p-1 max-w-xs">
+          <button
+            type="button"
+            onClick={() => setUserDetailView("tage")}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
+              userDetailView === "tage"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Tagesübersicht
+          </button>
+          <button
+            type="button"
+            onClick={() => setUserDetailView("statistiken")}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
+              userDetailView === "statistiken"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Zeitverteilung
+          </button>
+        </div>
+
+        {userDetailView === "statistiken" ? (
+          <UserStatsView userId={view.userId} courseId={view.courseId} />
+        ) : (
+          renderUserDayList()
+        )}
+      </div>
+    );
+  }
+
+  function renderUserDayList() {
     if (view.type !== "user") return null;
     if (isLoadingDays)
       return <p className="text-sm text-slate-500">Wird geladen…</p>;

@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { totalPeriodDays } from "@/lib/course-periods";
+import { CATEGORY_COLORS } from "@/app/(protected)/zeiterfassung/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,9 +45,11 @@ type ActivityData = {
   name: string;
   count: number;
   label: string; // e.g. "42 (15%)"
+  categoryId: number;
 };
 
 type CategoryData = {
+  categoryId: number;
   name: string;
   minutes: number;
   color: string;
@@ -60,29 +63,7 @@ type SatisfactionData = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CHART_COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#06b6d4",
-  "#f97316",
-  "#84cc16",
-  "#ec4899",
-  "#6366f1",
-  "#14b8a6",
-  "#a855f7",
-];
-
-// For Wohlbefinden: red→green gradient (assumes satisfactions are ordered worst→best)
-const SATISFACTION_COLORS = [
-  "#ef4444",
-  "#f97316",
-  "#f59e0b",
-  "#84cc16",
-  "#10b981",
-];
+const CHART_COLORS = CATEGORY_COLORS;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -134,6 +115,18 @@ function timeToMinutes(t: string): number {
 // Truncates long strings for chart axis labels
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
+}
+
+function getCategoryColorById(categoryId: number): string {
+  if (categoryId <= 0) return "#94A3B8";
+  return CATEGORY_COLORS[(categoryId - 1) % CATEGORY_COLORS.length];
+}
+
+function getSatisfactionColor(index: number, total: number): string {
+  if (total <= 1) return "#f59e0b";
+  const t = index / (total - 1);
+  const hue = Math.round(0 + t * 120); // red -> green
+  return `hsl(${hue} 75% 48%)`;
 }
 
 // ─── Data processors ──────────────────────────────────────────────────────────
@@ -191,6 +184,7 @@ function buildCourseProgress(
 function buildTopActivities(
   entries: { primary_activity_id: number | null }[],
   activityById: Record<number, string>,
+  activityToCategory: Record<number, number>,
 ): ActivityData[] {
   const counts: Record<number, number> = {};
   for (const e of entries) {
@@ -209,6 +203,7 @@ function buildTopActivities(
         total > 0
           ? `${count} (${Math.round((count / total) * 100)}%)`
           : `${count}`,
+      categoryId: activityToCategory[Number(id)] ?? 0,
     }))
     .reverse(); // smallest at top so the largest bar reads last (natural reading order)
 }
@@ -235,10 +230,11 @@ function buildCategoryDistribution(
 
   return Object.entries(minutesByCategory)
     .sort((a, b) => b[1] - a[1])
-    .map(([id, minutes], index) => ({
+    .map(([id, minutes]) => ({
+      categoryId: Number(id),
       name: categoryById[Number(id)] ?? `#${id}`,
       minutes,
-      color: CHART_COLORS[index % CHART_COLORS.length],
+      color: getCategoryColorById(Number(id)),
     }));
 }
 
@@ -253,20 +249,18 @@ function buildSatisfactionData(
     }
   }
   const total = Object.values(counts).reduce((s, c) => s + c, 0);
-  // Return in DB order (typically worst → best)
-  return satisfactions
-    .filter((s) => counts[s.satisfaction_id] != null)
-    .map((s) => {
-      const count = counts[s.satisfaction_id];
-      return {
-        name: truncate(s.name, 20),
-        count,
-        label:
-          total > 0
-            ? `${count} (${Math.round((count / total) * 100)}%)`
-            : `${count}`,
-      };
-    });
+  // Return in DB order (typically worst → best), including zero values
+  return satisfactions.map((s) => {
+    const count = counts[s.satisfaction_id] ?? 0;
+    return {
+      name: truncate(s.name, 20),
+      count,
+      label:
+        total > 0
+          ? `${count} (${Math.round((count / total) * 100)}%)`
+          : `${count}`,
+    };
+  });
 }
 
 // ─── Custom tooltips ──────────────────────────────────────────────────────────
@@ -516,7 +510,9 @@ export default function StatistikenTab() {
     setCourseProgress(
       buildCourseProgress(courses, userCountByCourse, filteredDays),
     );
-    setTopActivities(buildTopActivities(filteredEntries, activityById));
+    setTopActivities(
+      buildTopActivities(filteredEntries, activityById, activityToCategory),
+    );
     setCategoryData(
       buildCategoryDistribution(
         filteredEntries,
@@ -630,7 +626,7 @@ export default function StatistikenTab() {
                 />
                 <Bar
                   dataKey="users"
-                  fill="#3b82f6"
+                  fill={CATEGORY_COLORS[0]}
                   radius={[4, 4, 0, 0]}
                   maxBarSize={40}
                 />
@@ -759,10 +755,10 @@ export default function StatistikenTab() {
                   }}
                 />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={24}>
-                  {topActivities.map((_, index) => (
+                  {topActivities.map((activity, index) => (
                     <Cell
                       key={index}
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
+                      fill={getCategoryColorById(activity.categoryId)}
                     />
                   ))}
                   <LabelList
@@ -852,9 +848,7 @@ export default function StatistikenTab() {
                 {satisfactionData.map((_, index) => (
                   <Cell
                     key={index}
-                    fill={
-                      SATISFACTION_COLORS[index % SATISFACTION_COLORS.length]
-                    }
+                    fill={getSatisfactionColor(index, satisfactionData.length)}
                   />
                 ))}
                 <LabelList

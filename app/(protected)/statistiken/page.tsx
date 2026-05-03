@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
@@ -12,6 +12,8 @@ import type {
   ActivityRow,
   DayBarData,
   ComparisonTopic,
+  ComparisonMetaStats,
+  MetaAggregates,
 } from "./types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -31,6 +33,7 @@ const MIN_DAYS_FOR_COMPARISON = 2;
 // ─── Types (local, only used in data loading) ─────────────────────────────────
 
 type Tab = "zeitverteilung" | "kursvergleich";
+type DayFilterMode = "alle" | "werktage" | "wochenende";
 
 // Raw time entry row as returned by Supabase for aggregation purposes
 type RawEntry = {
@@ -39,7 +42,10 @@ type RawEntry = {
   start_time: string;
   end_time: string;
   primary_activity_id: number | null;
+  location_transport_id: number | null;
+  satisfaction_id: number | null;
   digital_media_type_ids: number[];
+  social_context_ids: number[];
 };
 
 // Lookup row shapes
@@ -55,6 +61,22 @@ type SubcategoryLookup = {
 };
 type CategoryLookup = {
   category_id: number;
+  name: string;
+};
+type DigitalMediaTypeLookup = {
+  digital_media_type_id: number;
+  name: string;
+};
+type SocialContextLookup = {
+  social_context_id: number;
+  name: string;
+};
+type LocationTransportLookup = {
+  location_transport_id: number;
+  name: string;
+};
+type SatisfactionLookup = {
+  satisfaction_id: number;
   name: string;
 };
 
@@ -89,6 +111,81 @@ function normalizeDateOnly(value: string): string {
   return value.slice(0, 10);
 }
 
+function normalizeLabel(value: string): string {
+  return value
+    .toLowerCase()
+    .replaceAll("ä", "ae")
+    .replaceAll("ö", "oe")
+    .replaceAll("ü", "ue")
+    .replaceAll("ß", "ss");
+}
+
+function isWeekend(dateString: string): boolean {
+  const normalized = dateString.slice(0, 10);
+  const [year, month, day] = normalized.split("-").map(Number);
+  const d = new Date(year, month - 1, day);
+  return d.getDay() === 0 || d.getDay() === 6;
+}
+
+function getIsoWeekInfo(dateString: string): { key: string; label: string } {
+  const normalized = dateString.slice(0, 10);
+  const [year, month, day] = normalized.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayOfWeek);
+  const isoYear = date.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+  const isoWeek = Math.ceil(
+    ((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
+  return {
+    key: `${isoYear}-KW${String(isoWeek).padStart(2, "0")}`,
+    label: `KW ${isoWeek}`,
+  };
+}
+
+function isAloneContext(name: string): boolean {
+  const normalized = normalizeLabel(name);
+  return normalized.includes("allein") || normalized.includes("solo");
+}
+
+function isAtHomeLocation(name: string): boolean {
+  const normalized = normalizeLabel(name);
+  return (
+    normalized.includes("zu hause") ||
+    normalized.includes("zuhause") ||
+    normalized.includes("daheim") ||
+    normalized.includes("home")
+  );
+}
+
+function getSatisfactionRankFromName(name: string): number | null {
+  const normalized = normalizeLabel(name);
+
+  // Highest to lowest (5 -> 1)
+  if (normalized.includes("sehr gut")) return 5;
+  if (normalized === "gut" || normalized.includes(" gut")) return 4;
+  if (normalized.includes("mittel")) return 3;
+  if (normalized.includes("sehr schlecht")) return 1;
+  if (normalized.includes("schlecht")) return 2;
+
+  return null;
+}
+
+function formatAverageSatisfactionLabel(
+  weightedSum: number,
+  weight: number,
+  maxRank: number,
+): string {
+  if (weight <= 0 || maxRank <= 0) return "-";
+  const avgRank = weightedSum / weight;
+  // Keep percent consistent with the displayed 1-decimal average value.
+  const avgRankRounded = Number(avgRank.toFixed(1));
+  const ratio = avgRankRounded / maxRank;
+  const percent = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+  return `${avgRankRounded.toFixed(1)} / ${maxRank} (${percent}%)`;
+}
+
 // ─── Data aggregation helpers ─────────────────────────────────────────────────
 
 // Builds the drill-down category tree and bar chart data from raw time entries.
@@ -101,10 +198,16 @@ function buildZeitverteilungData(
   activities: ActivityLookup[],
   subcategories: SubcategoryLookup[],
   categories: CategoryLookup[],
+  digitalMediaById: Record<number, string>,
+  socialContextById: Record<number, string>,
+  locationById: Record<number, string>,
+  satisfactionRankById: Record<number, number>,
+  maxSatisfactionRank: number,
 ): {
   categoryRows: CategoryRow[];
   barData: DayBarData[];
   categoryNames: string[];
+  metaAggregates: MetaAggregates;
 } {
   // Build lookup maps for fast access by ID
   const activityMap = new Map(activities.map((a) => [a.activity_id, a]));
@@ -122,6 +225,27 @@ function buildZeitverteilungData(
   const dailyMinutes: Record<string, Record<number, number>> = {};
   const uncategorizedByDate: Record<string, number> = {};
   let uncategorizedTotal = 0;
+
+  const deviceMinutesByName: Record<string, number> = {};
+  const socialMinutesByName: Record<string, number> = {};
+  const locationMinutesByName: Record<string, number> = {};
+
+  const activityMetaById: Record<
+    number,
+    {
+      withDevicesMinutes: number;
+      withoutDevicesMinutes: number;
+      withPeopleMinutes: number;
+      aloneMinutes: number;
+      atHomeMinutes: number;
+      elsewhereMinutes: number;
+      satisfactionWeightedSum: number;
+      satisfactionWeight: number;
+    }
+  > = {};
+
+  let overallSatisfactionWeightedSum = 0;
+  let overallSatisfactionWeight = 0;
   const trackedDates = new Set(
     Object.values(dayIdToDate).map((d) => normalizeDateOnly(d)),
   );
@@ -140,6 +264,46 @@ function buildZeitverteilungData(
         : undefined;
 
     const minutes = calculateMinutes(entry.start_time, entry.end_time);
+
+    const deviceTypeIds = entry.digital_media_type_ids;
+    if (deviceTypeIds.length > 0) {
+      const split = minutes / deviceTypeIds.length;
+      for (const id of deviceTypeIds) {
+        const name = digitalMediaById[id] ?? `Gerät #${id}`;
+        deviceMinutesByName[name] = (deviceMinutesByName[name] ?? 0) + split;
+      }
+    } else {
+      deviceMinutesByName["Ohne IT-Gerät"] =
+        (deviceMinutesByName["Ohne IT-Gerät"] ?? 0) + minutes;
+    }
+
+    const contextIds = entry.social_context_ids;
+    if (contextIds.length > 0) {
+      const split = minutes / contextIds.length;
+      for (const id of contextIds) {
+        const name = socialContextById[id] ?? `Kontext #${id}`;
+        socialMinutesByName[name] = (socialMinutesByName[name] ?? 0) + split;
+      }
+    } else {
+      socialMinutesByName["Allein"] =
+        (socialMinutesByName["Allein"] ?? 0) + minutes;
+    }
+
+    const locationName =
+      entry.location_transport_id != null
+        ? (locationById[entry.location_transport_id] ??
+          `Ort #${entry.location_transport_id}`)
+        : "Unbekannt";
+    locationMinutesByName[locationName] =
+      (locationMinutesByName[locationName] ?? 0) + minutes;
+
+    if (entry.satisfaction_id != null) {
+      const rank = satisfactionRankById[entry.satisfaction_id];
+      if (rank != null) {
+        overallSatisfactionWeightedSum += rank * minutes;
+        overallSatisfactionWeight += minutes;
+      }
+    }
 
     if (!activity) {
       uncategorizedByDate[date] = (uncategorizedByDate[date] ?? 0) + minutes;
@@ -163,6 +327,48 @@ function buildZeitverteilungData(
     const catId = category.category_id;
     const subId = subcategory.subcategory_id;
     const actId = activity.activity_id;
+
+    if (!activityMetaById[actId]) {
+      activityMetaById[actId] = {
+        withDevicesMinutes: 0,
+        withoutDevicesMinutes: 0,
+        withPeopleMinutes: 0,
+        aloneMinutes: 0,
+        atHomeMinutes: 0,
+        elsewhereMinutes: 0,
+        satisfactionWeightedSum: 0,
+        satisfactionWeight: 0,
+      };
+    }
+    const activityMeta = activityMetaById[actId];
+
+    if (deviceTypeIds.length > 0) {
+      activityMeta.withDevicesMinutes += minutes;
+    } else {
+      activityMeta.withoutDevicesMinutes += minutes;
+    }
+
+    const contextNames = contextIds.map((id) => socialContextById[id] ?? "");
+    const hasOtherPeople = contextNames.some((name) => !isAloneContext(name));
+    if (hasOtherPeople) {
+      activityMeta.withPeopleMinutes += minutes;
+    } else {
+      activityMeta.aloneMinutes += minutes;
+    }
+
+    if (isAtHomeLocation(locationName)) {
+      activityMeta.atHomeMinutes += minutes;
+    } else {
+      activityMeta.elsewhereMinutes += minutes;
+    }
+
+    if (entry.satisfaction_id != null) {
+      const rank = satisfactionRankById[entry.satisfaction_id];
+      if (rank != null) {
+        activityMeta.satisfactionWeightedSum += rank * minutes;
+        activityMeta.satisfactionWeight += minutes;
+      }
+    }
 
     // Accumulate into the tree
     if (!minuteTree[catId]) minuteTree[catId] = {};
@@ -205,11 +411,27 @@ function buildZeitverteilungData(
             .filter((act) => actTree[act.activity_id])
             .map((act) => {
               const mins = actTree[act.activity_id];
+              const meta = activityMetaById[act.activity_id];
               return {
                 activityId: act.activity_id,
                 name: act.name,
                 totalMinutes: mins,
                 percentOfTotal: grandTotal > 0 ? (mins / grandTotal) * 100 : 0,
+                meta: {
+                  withDevicesMinutes: meta?.withDevicesMinutes ?? 0,
+                  withoutDevicesMinutes: meta?.withoutDevicesMinutes ?? 0,
+                  withPeopleMinutes: meta?.withPeopleMinutes ?? 0,
+                  aloneMinutes: meta?.aloneMinutes ?? 0,
+                  atHomeMinutes: meta?.atHomeMinutes ?? 0,
+                  elsewhereMinutes: meta?.elsewhereMinutes ?? 0,
+                  satisfactionWeightedSum: meta?.satisfactionWeightedSum ?? 0,
+                  satisfactionWeight: meta?.satisfactionWeight ?? 0,
+                  avgSatisfactionLabel: formatAverageSatisfactionLabel(
+                    meta?.satisfactionWeightedSum ?? 0,
+                    meta?.satisfactionWeight ?? 0,
+                    maxSatisfactionRank,
+                  ),
+                },
               };
             })
             .sort((a, b) => b.totalMinutes - a.totalMinutes);
@@ -220,7 +442,7 @@ function buildZeitverteilungData(
             name: sub.name,
             totalMinutes: subTotal,
             percentOfTotal: grandTotal > 0 ? (subTotal / grandTotal) * 100 : 0,
-            isExpanded: false,
+            isExpanded: true,
             activities: activityRows,
           };
         })
@@ -235,7 +457,7 @@ function buildZeitverteilungData(
         name: cat.name,
         totalMinutes: catTotal,
         percentOfTotal: grandTotal > 0 ? (catTotal / grandTotal) * 100 : 0,
-        isExpanded: false,
+        isExpanded: true,
         subcategories: subcategoryRows,
       };
     })
@@ -293,7 +515,24 @@ function buildZeitverteilungData(
     return dayEntry;
   });
 
-  return { categoryRows, barData, categoryNames };
+  const toSortedItems = (obj: Record<string, number>) =>
+    Object.entries(obj)
+      .map(([name, minutes]) => ({ name, minutes: Math.round(minutes) }))
+      .sort((a, b) => b.minutes - a.minutes)
+      .slice(0, 8);
+
+  const metaAggregates: MetaAggregates = {
+    devices: toSortedItems(deviceMinutesByName),
+    social: toSortedItems(socialMinutesByName),
+    locations: toSortedItems(locationMinutesByName),
+    avgSatisfactionLabel: formatAverageSatisfactionLabel(
+      overallSatisfactionWeightedSum,
+      overallSatisfactionWeight,
+      maxSatisfactionRank,
+    ),
+  };
+
+  return { categoryRows, barData, categoryNames, metaAggregates };
 }
 
 // Calculates average hours per day for a set of entries, filtered to a specific set of activity IDs.
@@ -345,6 +584,37 @@ function calcSmartphoneHoursPerDay(
   return totalMinutes / 60 / totalDays;
 }
 
+function pairPercent(leftMinutes: number, rightMinutes: number) {
+  const total = leftMinutes + rightMinutes;
+  if (total <= 0) return null;
+  const leftPercent = Math.round((leftMinutes / total) * 100);
+  return {
+    leftPercent,
+    rightPercent: 100 - leftPercent,
+  };
+}
+
+function filterDayIds(
+  dayIds: number[],
+  dayIdToDate: Record<number, string>,
+  weeksFilter: string[],
+  dayMode: DayFilterMode,
+): number[] {
+  const weekKeySet = new Set(weeksFilter);
+  return dayIds.filter((dayId) => {
+    const date = dayIdToDate[dayId];
+    if (!date) return false;
+
+    if (weekKeySet.size > 0 && !weekKeySet.has(getIsoWeekInfo(date).key)) {
+      return false;
+    }
+    if (dayMode === "werktage" && isWeekend(date)) return false;
+    if (dayMode === "wochenende" && !isWeekend(date)) return false;
+
+    return true;
+  });
+}
+
 // ─── Main page component ──────────────────────────────────────────────────────
 
 export default function StatistikenPage() {
@@ -354,16 +624,59 @@ export default function StatistikenPage() {
   const [activeTab, setActiveTab] = useState<Tab>("zeitverteilung");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isCourseComparisonEnabled, setIsCourseComparisonEnabled] =
+    useState(false);
 
   // Zeitverteilung tab state
   const [categoryRows, setCategoryRows] = useState<CategoryRow[]>([]);
   const [barData, setBarData] = useState<DayBarData[]>([]);
   const [categoryNames, setCategoryNames] = useState<string[]>([]);
+  const [metaAggregates, setMetaAggregates] = useState<MetaAggregates | null>(
+    null,
+  );
+  const [selectedWeeks, setSelectedWeeks] = useState<string[]>([]);
+  const [weekOptions, setWeekOptions] = useState<
+    { key: string; label: string }[]
+  >([]);
+  const [dayFilter, setDayFilter] = useState<DayFilterMode>("alle");
+
+  // Raw data kept for KW-filter recomputation
+  type RawDataSnapshot = {
+    myEntries: RawEntry[];
+    myDayIdToDate: Record<number, string>;
+    allCourseDates: string[];
+    trackedDayIds: Set<number>;
+    activities: ActivityLookup[];
+    subcategories: SubcategoryLookup[];
+    categories: CategoryLookup[];
+    digitalMediaById: Record<number, string>;
+    socialContextById: Record<number, string>;
+    locationById: Record<number, string>;
+    satisfactionRankById: Record<number, number>;
+    maxSatisfactionRank: number;
+  };
+  const rawDataRef = useRef<RawDataSnapshot | null>(null);
+
+  type RawComparisonSnapshot = {
+    userId: string;
+    qualifyingUsers: Array<[string, number[]]>;
+    rawAllEntries: RawEntry[];
+    dayIdToDate: Record<number, string>;
+    myEntries: RawEntry[];
+    mySubmittedDayIds: Set<number>;
+    socialContextById: Record<number, string>;
+    locationById: Record<number, string>;
+    satisfactionRankById: Record<number, number>;
+    maxSatisfactionRank: number;
+  };
+  const rawComparisonRef = useRef<RawComparisonSnapshot | null>(null);
 
   // Kursvergleich tab state
   const [comparisonTopics, setComparisonTopics] = useState<ComparisonTopic[]>(
     [],
   );
+  const [comparisonMetaStats, setComparisonMetaStats] =
+    useState<ComparisonMetaStats | null>(null);
   const [qualifyingUserCount, setQualifyingUserCount] = useState(0);
 
   useEffect(() => {
@@ -391,6 +704,285 @@ export default function StatistikenPage() {
     };
   }, []);
 
+  // Recomputes Zeitverteilung stats from raw data, filtered by KW and day-of-week
+  function computeAndSetStats(weeksFilter: string[], dayMode: DayFilterMode) {
+    const raw = rawDataRef.current;
+    if (!raw) return;
+
+    let filteredCourseDates = raw.allCourseDates;
+    let filteredTrackedDayIds = raw.trackedDayIds;
+
+    // Apply KW filter
+    if (weeksFilter.length > 0) {
+      const weekKeySet = new Set(weeksFilter);
+      filteredCourseDates = filteredCourseDates.filter((date) =>
+        weekKeySet.has(getIsoWeekInfo(date).key),
+      );
+      filteredTrackedDayIds = new Set(
+        [...filteredTrackedDayIds].filter((dayId) => {
+          const date = raw.myDayIdToDate[dayId];
+          return date != null && weekKeySet.has(getIsoWeekInfo(date).key);
+        }),
+      );
+    }
+
+    // Apply day-of-week filter
+    if (dayMode === "werktage") {
+      filteredCourseDates = filteredCourseDates.filter((d) => !isWeekend(d));
+      filteredTrackedDayIds = new Set(
+        [...filteredTrackedDayIds].filter((dayId) => {
+          const date = raw.myDayIdToDate[dayId];
+          return date != null && !isWeekend(date);
+        }),
+      );
+    } else if (dayMode === "wochenende") {
+      filteredCourseDates = filteredCourseDates.filter((d) => isWeekend(d));
+      filteredTrackedDayIds = new Set(
+        [...filteredTrackedDayIds].filter((dayId) => {
+          const date = raw.myDayIdToDate[dayId];
+          return date != null && isWeekend(date);
+        }),
+      );
+    }
+
+    const result = buildZeitverteilungData(
+      raw.myEntries,
+      raw.myDayIdToDate,
+      filteredCourseDates,
+      filteredTrackedDayIds,
+      raw.activities,
+      raw.subcategories,
+      raw.categories,
+      raw.digitalMediaById,
+      raw.socialContextById,
+      raw.locationById,
+      raw.satisfactionRankById,
+      raw.maxSatisfactionRank,
+    );
+    setCategoryRows(result.categoryRows);
+    setBarData(result.barData);
+    setCategoryNames(result.categoryNames);
+    setMetaAggregates(result.metaAggregates);
+  }
+
+  function computeAndSetComparison(
+    weeksFilter: string[],
+    dayMode: DayFilterMode,
+  ) {
+    const raw = rawComparisonRef.current;
+    if (!raw) return;
+
+    const filteredUsers = raw.qualifyingUsers
+      .map(([profileId, dayIds]) => {
+        const filteredDayIds = filterDayIds(
+          dayIds,
+          raw.dayIdToDate,
+          weeksFilter,
+          dayMode,
+        );
+        return [profileId, filteredDayIds] as const;
+      })
+      .filter(([, dayIds]) => dayIds.length >= MIN_DAYS_FOR_COMPARISON);
+
+    setQualifyingUserCount(filteredUsers.length);
+
+    if (filteredUsers.length < 3) {
+      setComparisonTopics([]);
+      setComparisonMetaStats(null);
+      return;
+    }
+
+    const sleepValues: number[] = [];
+    const sportValues: number[] = [];
+    const smartphoneValues: number[] = [];
+
+    let courseWithDevice = 0;
+    let courseWithoutDevice = 0;
+    let courseWithOthers = 0;
+    let courseAlone = 0;
+    let courseAtHome = 0;
+    let courseElsewhere = 0;
+    let courseSatisfactionWeightedSum = 0;
+    let courseSatisfactionWeight = 0;
+
+    for (const [profileId, dayIds] of filteredUsers) {
+      const dayIdSet = new Set(dayIds);
+      const userEntries = raw.rawAllEntries.filter((e) =>
+        dayIdSet.has(e.day_id),
+      );
+
+      sleepValues.push(
+        calcAverageHoursPerDay(userEntries, dayIdSet, SLEEP_ACTIVITY_IDS),
+      );
+      sportValues.push(
+        calcAverageHoursPerDay(userEntries, dayIdSet, SPORT_ACTIVITY_IDS),
+      );
+      smartphoneValues.push(calcSmartphoneHoursPerDay(userEntries, dayIdSet));
+
+      for (const entry of userEntries) {
+        const minutes = calculateMinutes(entry.start_time, entry.end_time);
+
+        if (entry.digital_media_type_ids.length > 0) {
+          courseWithDevice += minutes;
+        } else {
+          courseWithoutDevice += minutes;
+        }
+
+        const hasOtherPeople = entry.social_context_ids.some((id) => {
+          const name = raw.socialContextById[id] ?? "";
+          return !isAloneContext(name);
+        });
+        if (hasOtherPeople) {
+          courseWithOthers += minutes;
+        } else {
+          courseAlone += minutes;
+        }
+
+        const locationName =
+          entry.location_transport_id != null
+            ? (raw.locationById[entry.location_transport_id] ?? "")
+            : "";
+        if (isAtHomeLocation(locationName)) {
+          courseAtHome += minutes;
+        } else {
+          courseElsewhere += minutes;
+        }
+
+        if (entry.satisfaction_id != null) {
+          const rank = raw.satisfactionRankById[entry.satisfaction_id];
+          if (rank != null) {
+            courseSatisfactionWeightedSum += rank * minutes;
+            courseSatisfactionWeight += minutes;
+          }
+        }
+      }
+    }
+
+    const myFilteredSubmittedDayIds = new Set(
+      filterDayIds(
+        [...raw.mySubmittedDayIds],
+        raw.dayIdToDate,
+        weeksFilter,
+        dayMode,
+      ),
+    );
+
+    const mySleepValue = calcAverageHoursPerDay(
+      raw.myEntries,
+      myFilteredSubmittedDayIds,
+      SLEEP_ACTIVITY_IDS,
+    );
+    const mySportValue = calcAverageHoursPerDay(
+      raw.myEntries,
+      myFilteredSubmittedDayIds,
+      SPORT_ACTIVITY_IDS,
+    );
+    const mySmartphoneValue = calcSmartphoneHoursPerDay(
+      raw.myEntries,
+      myFilteredSubmittedDayIds,
+    );
+
+    let myWithDevice = 0;
+    let myWithoutDevice = 0;
+    let myWithOthers = 0;
+    let myAlone = 0;
+    let myAtHome = 0;
+    let myElsewhere = 0;
+    let mySatisfactionWeightedSum = 0;
+    let mySatisfactionWeight = 0;
+
+    for (const entry of raw.myEntries) {
+      if (!myFilteredSubmittedDayIds.has(entry.day_id)) continue;
+
+      const minutes = calculateMinutes(entry.start_time, entry.end_time);
+
+      if (entry.digital_media_type_ids.length > 0) {
+        myWithDevice += minutes;
+      } else {
+        myWithoutDevice += minutes;
+      }
+
+      const hasOtherPeople = entry.social_context_ids.some((id) => {
+        const name = raw.socialContextById[id] ?? "";
+        return !isAloneContext(name);
+      });
+      if (hasOtherPeople) {
+        myWithOthers += minutes;
+      } else {
+        myAlone += minutes;
+      }
+
+      const locationName =
+        entry.location_transport_id != null
+          ? (raw.locationById[entry.location_transport_id] ?? "")
+          : "";
+      if (isAtHomeLocation(locationName)) {
+        myAtHome += minutes;
+      } else {
+        myElsewhere += minutes;
+      }
+
+      if (entry.satisfaction_id != null) {
+        const rank = raw.satisfactionRankById[entry.satisfaction_id];
+        if (rank != null) {
+          mySatisfactionWeightedSum += rank * minutes;
+          mySatisfactionWeight += minutes;
+        }
+      }
+    }
+
+    setComparisonTopics([
+      {
+        key: "schlaf",
+        label: "Schlaf",
+        unit: "h/Tag",
+        allValues: sleepValues,
+        userValue: mySleepValue,
+      },
+      {
+        key: "sport",
+        label: "Sport & Bewegung",
+        unit: "h/Tag",
+        allValues: sportValues,
+        userValue: mySportValue,
+      },
+      {
+        key: "smartphone",
+        label: "Smartphone",
+        unit: "h/Tag",
+        allValues: smartphoneValues,
+        userValue: mySmartphoneValue,
+      },
+    ]);
+
+    setComparisonMetaStats({
+      itDevice: {
+        user: pairPercent(myWithDevice, myWithoutDevice),
+        course: pairPercent(courseWithDevice, courseWithoutDevice),
+      },
+      social: {
+        user: pairPercent(myWithOthers, myAlone),
+        course: pairPercent(courseWithOthers, courseAlone),
+      },
+      location: {
+        user: pairPercent(myAtHome, myElsewhere),
+        course: pairPercent(courseAtHome, courseElsewhere),
+      },
+      wellbeing: {
+        userLabel: formatAverageSatisfactionLabel(
+          mySatisfactionWeightedSum,
+          mySatisfactionWeight,
+          raw.maxSatisfactionRank,
+        ),
+        courseLabel: formatAverageSatisfactionLabel(
+          courseSatisfactionWeightedSum,
+          courseSatisfactionWeight,
+          raw.maxSatisfactionRank,
+        ),
+      },
+    });
+  }
+
   // ── Data loading ────────────────────────────────────────────────────────────
 
   async function loadAllData() {
@@ -417,6 +1009,13 @@ export default function StatistikenPage() {
       return;
     }
     const courseId = userCourse.course_id;
+
+    const { data: courseSettings } = await supabase
+      .from("course")
+      .select("comparison_enabled")
+      .eq("course_id", courseId)
+      .single();
+    setIsCourseComparisonEnabled(courseSettings?.comparison_enabled === true);
 
     // Step 3: load course date range via periods; fallback to legacy columns
     const { data: periodsData } = await supabase
@@ -446,22 +1045,47 @@ export default function StatistikenPage() {
     }
 
     // Step 4: load lookup tables in parallel
-    const [cats, subs, acts] = await Promise.all([
-      supabase
-        .from("category")
-        .select("category_id, name")
-        .order("category_id"),
-      supabase
-        .from("subcategory")
-        .select("subcategory_id, name, category_id")
-        .order("subcategory_id"),
-      supabase
-        .from("activity")
-        .select("activity_id, name, subcategory_id")
-        .order("activity_id"),
-    ]);
+    const [cats, subs, acts, mediaTypes, socialContexts, locations, sats] =
+      await Promise.all([
+        supabase
+          .from("category")
+          .select("category_id, name")
+          .order("category_id"),
+        supabase
+          .from("subcategory")
+          .select("subcategory_id, name, category_id")
+          .order("subcategory_id"),
+        supabase
+          .from("activity")
+          .select("activity_id, name, subcategory_id")
+          .order("activity_id"),
+        supabase
+          .from("digital_media_type")
+          .select("digital_media_type_id, name")
+          .order("digital_media_type_id"),
+        supabase
+          .from("social_context")
+          .select("social_context_id, name")
+          .order("social_context_id"),
+        supabase
+          .from("location_transport")
+          .select("location_transport_id, name")
+          .order("location_transport_id"),
+        supabase
+          .from("satisfaction")
+          .select("satisfaction_id, name")
+          .order("satisfaction_id"),
+      ]);
 
-    if (cats.error || subs.error || acts.error) {
+    if (
+      cats.error ||
+      subs.error ||
+      acts.error ||
+      mediaTypes.error ||
+      socialContexts.error ||
+      locations.error ||
+      sats.error
+    ) {
       setErrorMessage("Stammdaten konnten nicht geladen werden.");
       setIsLoading(false);
       return;
@@ -470,6 +1094,33 @@ export default function StatistikenPage() {
     const categories: CategoryLookup[] = cats.data ?? [];
     const subcategories: SubcategoryLookup[] = subs.data ?? [];
     const activities: ActivityLookup[] = acts.data ?? [];
+    const mediaTypeRows: DigitalMediaTypeLookup[] = mediaTypes.data ?? [];
+    const socialContextRows: SocialContextLookup[] = socialContexts.data ?? [];
+    const locationRows: LocationTransportLookup[] = locations.data ?? [];
+    const satisfactionRows: SatisfactionLookup[] = sats.data ?? [];
+
+    const digitalMediaById: Record<number, string> = {};
+    for (const item of mediaTypeRows) {
+      digitalMediaById[item.digital_media_type_id] = item.name;
+    }
+    const socialContextById: Record<number, string> = {};
+    for (const item of socialContextRows) {
+      socialContextById[item.social_context_id] = item.name;
+    }
+    const locationById: Record<number, string> = {};
+    for (const item of locationRows) {
+      locationById[item.location_transport_id] = item.name;
+    }
+    const satisfactionRankById: Record<number, number> = {};
+    let maxSatisfactionRank = 1;
+    satisfactionRows.forEach((item, index) => {
+      const derivedRank = getSatisfactionRankFromName(item.name);
+      const rank = derivedRank ?? index + 1;
+      satisfactionRankById[item.satisfaction_id] = rank;
+      if (rank > maxSatisfactionRank) {
+        maxSatisfactionRank = rank;
+      }
+    });
 
     // Step 5: load day records for this user in this course
     // Track submitted OR complete days to stay compatible with legacy rows.
@@ -493,7 +1144,7 @@ export default function StatistikenPage() {
       const { data: entryData } = await supabase
         .from("time_entry")
         .select(
-          "entry_id, day_id, start_time, end_time, primary_activity_id, time_entry_digital_media_type(digital_media_type_id)",
+          "entry_id, day_id, start_time, end_time, primary_activity_id, location_transport_id, satisfaction_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
         )
         .in("day_id", allMyDayIds);
       allMyEntries = (entryData ?? []).map((row: any) => ({
@@ -502,8 +1153,13 @@ export default function StatistikenPage() {
         start_time: row.start_time,
         end_time: row.end_time,
         primary_activity_id: row.primary_activity_id,
+        location_transport_id: row.location_transport_id,
+        satisfaction_id: row.satisfaction_id,
         digital_media_type_ids: (row.time_entry_digital_media_type ?? [])
           .map((m: any) => m.digital_media_type_id)
+          .filter((id: unknown) => typeof id === "number"),
+        social_context_ids: (row.time_entry_social_context ?? [])
+          .map((m: any) => m.social_context_id)
           .filter((id: unknown) => typeof id === "number"),
       }));
     }
@@ -530,10 +1186,45 @@ export default function StatistikenPage() {
       activities,
       subcategories,
       categories,
+      digitalMediaById,
+      socialContextById,
+      locationById,
+      satisfactionRankById,
+      maxSatisfactionRank,
     );
     setCategoryRows(zeitverteilungResult.categoryRows);
     setBarData(zeitverteilungResult.barData);
     setCategoryNames(zeitverteilungResult.categoryNames);
+    setMetaAggregates(zeitverteilungResult.metaAggregates);
+
+    // Store raw data for KW-filter recomputation
+    rawDataRef.current = {
+      myEntries,
+      myDayIdToDate,
+      allCourseDates,
+      trackedDayIds,
+      activities,
+      subcategories,
+      categories,
+      digitalMediaById,
+      socialContextById,
+      locationById,
+      satisfactionRankById,
+      maxSatisfactionRank,
+    };
+
+    // Build week options from all course dates
+    const weekOptionsList: { key: string; label: string }[] = [];
+    const seenWeekKeys = new Set<string>();
+    for (const date of zeitverteilungResult.barData.map((d) => d.date)) {
+      const info = getIsoWeekInfo(date);
+      if (!seenWeekKeys.has(info.key)) {
+        seenWeekKeys.add(info.key);
+        weekOptionsList.push(info);
+      }
+    }
+    setWeekOptions(weekOptionsList);
+    setSelectedWeeks([]);
 
     // Step 8: load course comparison data
     // Derive participant IDs from submitted day records instead of user_course.
@@ -555,7 +1246,7 @@ export default function StatistikenPage() {
     // Load submitted days for all participants
     const { data: allDays } = await supabase
       .from("day")
-      .select("day_id, profiles_id")
+      .select("day_id, profiles_id, date")
       .eq("course_id", courseId)
       .eq("is_submitted", true)
       .in("profiles_id", allParticipantIds);
@@ -572,10 +1263,17 @@ export default function StatistikenPage() {
     const qualifyingUsers = Object.entries(submittedDaysByUser).filter(
       ([, dayIds]) => dayIds.length >= MIN_DAYS_FOR_COMPARISON,
     );
-    setQualifyingUserCount(qualifyingUsers.length);
+
+    const comparisonDayIdToDate: Record<number, string> = {};
+    for (const day of allDays ?? []) {
+      comparisonDayIdToDate[day.day_id] = normalizeDateOnly(day.date);
+    }
 
     // Only build comparison if there are enough qualifying users
-    if (qualifyingUsers.length >= 3) {
+    if (
+      qualifyingUsers.length >= 3 &&
+      courseSettings?.comparison_enabled === true
+    ) {
       // Load all time entries for all qualifying users' submitted days
       const allQualifyingDayIds = qualifyingUsers.flatMap(
         ([, dayIds]) => dayIds,
@@ -584,7 +1282,7 @@ export default function StatistikenPage() {
       const { data: allEntries } = await supabase
         .from("time_entry")
         .select(
-          "entry_id, day_id, start_time, end_time, primary_activity_id, time_entry_digital_media_type(digital_media_type_id)",
+          "entry_id, day_id, start_time, end_time, primary_activity_id, location_transport_id, satisfaction_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
         )
         .in("day_id", allQualifyingDayIds);
 
@@ -594,78 +1292,68 @@ export default function StatistikenPage() {
         start_time: row.start_time,
         end_time: row.end_time,
         primary_activity_id: row.primary_activity_id,
+        location_transport_id: row.location_transport_id,
+        satisfaction_id: row.satisfaction_id,
         digital_media_type_ids: (row.time_entry_digital_media_type ?? [])
           .map((m: any) => m.digital_media_type_id)
           .filter((id: unknown) => typeof id === "number"),
+        social_context_ids: (row.time_entry_social_context ?? [])
+          .map((m: any) => m.social_context_id)
+          .filter((id: unknown) => typeof id === "number"),
       }));
 
-      // Calculate per-topic average hours/day for each qualifying user
-      const sleepValues: number[] = [];
-      const sportValues: number[] = [];
-      const smartphoneValues: number[] = [];
-
-      for (const [profileId, dayIds] of qualifyingUsers) {
-        const userDayIdSet = new Set(dayIds);
-        const userEntries = rawAllEntries.filter((e) =>
-          userDayIdSet.has(e.day_id),
-        );
-
-        sleepValues.push(
-          calcAverageHoursPerDay(userEntries, userDayIdSet, SLEEP_ACTIVITY_IDS),
-        );
-        sportValues.push(
-          calcAverageHoursPerDay(userEntries, userDayIdSet, SPORT_ACTIVITY_IDS),
-        );
-        smartphoneValues.push(
-          calcSmartphoneHoursPerDay(userEntries, userDayIdSet),
-        );
-      }
-
-      // Get the current user's own values (use myEntries + mySubmittedDayIds)
-      const mySleeepValue = calcAverageHoursPerDay(
+      rawComparisonRef.current = {
+        userId,
+        qualifyingUsers,
+        rawAllEntries,
+        dayIdToDate: comparisonDayIdToDate,
         myEntries,
-        submittedDayIds,
-        SLEEP_ACTIVITY_IDS,
+        mySubmittedDayIds: submittedDayIds,
+        socialContextById,
+        locationById,
+        satisfactionRankById,
+        maxSatisfactionRank,
+      };
+      computeAndSetComparison([], "alle");
+    } else {
+      rawComparisonRef.current = null;
+      setComparisonTopics([]);
+      setComparisonMetaStats(null);
+      setQualifyingUserCount(
+        courseSettings?.comparison_enabled === true
+          ? qualifyingUsers.length
+          : 0,
       );
-      const mySportValue = calcAverageHoursPerDay(
-        myEntries,
-        submittedDayIds,
-        SPORT_ACTIVITY_IDS,
-      );
-      const mySmartphoneValue = calcSmartphoneHoursPerDay(
-        myEntries,
-        submittedDayIds,
-      );
-
-      setComparisonTopics([
-        {
-          key: "schlaf",
-          label: "Schlaf",
-          unit: "h/Tag",
-          allValues: sleepValues,
-          userValue: mySleeepValue,
-        },
-        {
-          key: "sport",
-          label: "Sport & Bewegung",
-          unit: "h/Tag",
-          allValues: sportValues,
-          userValue: mySportValue,
-        },
-        {
-          key: "smartphone",
-          label: "Smartphone",
-          unit: "h/Tag",
-          allValues: smartphoneValues,
-          userValue: mySmartphoneValue,
-        },
-      ]);
     }
 
     setIsLoading(false);
   }
 
   // ── Accordion toggle handlers ───────────────────────────────────────────────
+
+  // KW filter handlers — recompute all stats for the selected weeks
+  function handleToggleWeek(weekKey: string) {
+    setSelectedWeeks((prev) => {
+      const next = prev.includes(weekKey)
+        ? prev.filter((k) => k !== weekKey)
+        : [...prev, weekKey];
+      computeAndSetStats(next, dayFilter);
+      computeAndSetComparison(next, dayFilter);
+      return next;
+    });
+  }
+
+  function handleClearWeeks() {
+    computeAndSetStats([], dayFilter);
+    computeAndSetComparison([], dayFilter);
+    setSelectedWeeks([]);
+  }
+
+  function handleSetDayFilter(mode: DayFilterMode) {
+    setDayFilter(mode);
+    computeAndSetStats(selectedWeeks, mode);
+    computeAndSetComparison(selectedWeeks, mode);
+  }
 
   // Toggles the expanded state of a category row in the drill-down table
   function handleToggleCategory(categoryId: number) {
@@ -717,30 +1405,32 @@ export default function StatistikenPage() {
   return (
     <div className="space-y-5">
       {/* Tab bar */}
-      <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-        <button
-          type="button"
-          onClick={() => setActiveTab("zeitverteilung")}
-          className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-            activeTab === "zeitverteilung"
-              ? "bg-white text-slate-800 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          Zeitverteilung
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("kursvergleich")}
-          className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-            activeTab === "kursvergleich"
-              ? "bg-white text-slate-800 shadow-sm"
-              : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          Kursvergleich
-        </button>
-      </div>
+      {isCourseComparisonEnabled && (
+        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab("zeitverteilung")}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
+              activeTab === "zeitverteilung"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Zeitverteilung
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("kursvergleich")}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
+              activeTab === "kursvergleich"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Kursvergleich
+          </button>
+        </div>
+      )}
 
       {/* Tab content */}
       {activeTab === "zeitverteilung" ? (
@@ -748,14 +1438,38 @@ export default function StatistikenPage() {
           barData={barData}
           categoryRows={categoryRows}
           categoryNames={categoryNames}
+          metaAggregates={metaAggregates}
+          selectedWeeks={selectedWeeks}
+          weekOptions={weekOptions}
+          dayFilter={dayFilter}
+          onToggleWeek={handleToggleWeek}
+          onClearWeeks={handleClearWeeks}
+          onSetDayFilter={handleSetDayFilter}
           onToggleCategory={handleToggleCategory}
           onToggleSubcategory={handleToggleSubcategory}
         />
-      ) : (
+      ) : isCourseComparisonEnabled ? (
         <KursvergleichTab
           topics={comparisonTopics}
+          metaStats={comparisonMetaStats}
           qualifyingUserCount={qualifyingUserCount}
+          selectedWeeks={selectedWeeks}
+          weekOptions={weekOptions}
+          dayFilter={dayFilter}
+          onToggleWeek={handleToggleWeek}
+          onClearWeeks={handleClearWeeks}
+          onSetDayFilter={handleSetDayFilter}
         />
+      ) : (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-6 text-center">
+          <p className="text-sm font-semibold text-amber-800">
+            Kursvergleich ist noch nicht freigeschaltet
+          </p>
+          <p className="mt-1 text-xs text-amber-700">
+            Bitte Kursleitung/Admin:in bitten, den Kursvergleich in der
+            Kursübersicht freizugeben.
+          </p>
+        </div>
       )}
     </div>
   );
