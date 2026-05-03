@@ -40,6 +40,7 @@ import {
 import type {
   CategoryRow,
   SubcategoryRow,
+  ActivityRow,
   DayBarData,
   MetaAggregates,
   ActivityMetaStats,
