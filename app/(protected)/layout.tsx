@@ -105,6 +105,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const [profileRole, setProfileRole] = useState<string>("user");
   const [profileFirstName, setProfileFirstName] = useState("");
   const [profileLastName, setProfileLastName] = useState("");
+  const [activeCourseName, setActiveCourseName] = useState("");
 
   const isAdmin = profileRole === "admin";
 
@@ -218,6 +219,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
     // Admins skip profile completion and course enrollment requirements
     if (role === "admin") {
+      setActiveCourseName("");
       setNeedsSecurityQuestions(false);
       setNeedsProfileDetails(false);
       setIsEnrolled(true);
@@ -297,14 +299,23 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   async function checkEnrollment(userId: string) {
     const { data } = await supabase
       .from("user_course")
-      .select("user_course_id")
+      .select("user_course_id, course:course_id(name)")
       .eq("profiles_id", userId)
       .single();
 
     setIsEnrolled(!!data);
+    const courseName =
+      data && typeof data.course === "object" && data.course !== null
+        ? ((data.course as { name?: string }).name ?? "")
+        : "";
+    setActiveCourseName(courseName);
   }
 
   function handleEnrolled() {
+    if (user) {
+      void checkEnrollment(user.id);
+      return;
+    }
     setIsEnrolled(true);
   }
 
@@ -370,6 +381,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setProfileModalOpen(false);
     setProfileFirstName("");
     setProfileLastName("");
+    setActiveCourseName("");
     router.push("/");
   }
 
@@ -438,6 +450,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
             <h1 className="whitespace-nowrap text-base font-semibold text-slate-800 dark:text-slate-100 sm:text-lg">
               Time Use Tool
             </h1>
+            {activeCourseName && !adminMode && (
+              <span className="truncate text-xs font-medium text-slate-500 dark:text-slate-400 sm:text-sm">
+                {activeCourseName}
+              </span>
+            )}
           </div>
 
           <div className="ml-3 flex shrink-0 items-center gap-2">

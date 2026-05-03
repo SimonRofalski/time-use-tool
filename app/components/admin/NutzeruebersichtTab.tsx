@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { totalPeriodDays } from "@/lib/course-periods";
 import ConfirmModal from "./ConfirmModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -84,11 +85,11 @@ export default function NutzeruebersichtTab() {
       return;
     }
 
-    // Fetch enrollments with course name + dates for total-days calculation
+    // Fetch enrollments with course name + dates + periods for total-days calculation
     const { data: userCourses } = await supabase
       .from("user_course")
       .select(
-        "user_course_id, profiles_id, is_excluded, course:course_id(name, start_date, end_date)",
+        "user_course_id, profiles_id, is_excluded, course:course_id(name, start_date, end_date, course_period(start_date, end_date))",
       );
 
     const courseInfoByUser: Record<
@@ -105,22 +106,38 @@ export default function NutzeruebersichtTab() {
       let courseName: string | null = null;
       let totalDays = 0;
 
+      const extractCourse = (c: {
+        name: string;
+        start_date: string;
+        end_date: string;
+        course_period?: { start_date: string; end_date: string }[] | null;
+      }) => {
+        courseName = c.name;
+        const coursePeriods = c.course_period ?? [];
+        totalDays =
+          coursePeriods.length > 0
+            ? totalPeriodDays(coursePeriods)
+            : courseDurationDays(c.start_date, c.end_date);
+      };
+
       if (courseRaw && typeof courseRaw === "object" && "name" in courseRaw) {
-        const c = courseRaw as {
-          name: string;
-          start_date: string;
-          end_date: string;
-        };
-        courseName = c.name;
-        totalDays = courseDurationDays(c.start_date, c.end_date);
+        extractCourse(
+          courseRaw as {
+            name: string;
+            start_date: string;
+            end_date: string;
+            course_period?: { start_date: string; end_date: string }[];
+          },
+        );
       } else if (Array.isArray(courseRaw) && courseRaw.length > 0) {
-        const c = courseRaw[0] as {
-          name: string;
-          start_date: string;
-          end_date: string;
-        };
-        courseName = c.name;
-        totalDays = courseDurationDays(c.start_date, c.end_date);
+        extractCourse(
+          courseRaw[0] as {
+            name: string;
+            start_date: string;
+            end_date: string;
+            course_period?: { start_date: string; end_date: string }[];
+          },
+        );
       }
 
       if (uc.profiles_id && courseName) {

@@ -11,24 +11,13 @@ import {
   type QuestionnaireStep,
   type LookupData,
 } from "./types";
+import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TOTAL_SLOTS_PER_DAY = 144;
 
 // ─── Pure helper functions ────────────────────────────────────────────────────
-
-// Generates every date string between startDate and endDate (inclusive)
-function generateDateRange(startDate: string, endDate: string): string[] {
-  const dates: string[] = [];
-  const current = new Date(startDate);
-  const last = new Date(endDate);
-  while (current <= last) {
-    dates.push(current.toISOString().split("T")[0]);
-    current.setDate(current.getDate() + 1);
-  }
-  return dates;
-}
 
 // Formats a date string to German long format: "Freitag, 28. März 2026"
 function formatDateGerman(dateString: string): string {
@@ -313,18 +302,27 @@ export default function ZeiterfassungPage() {
     const cid = userCourse.course_id;
     setCourseId(cid);
 
-    // Load course date range
-    const { data: course } = await supabase
-      .from("course")
-      .select("start_date, end_date")
+    // Load course date range (via periods; fallback to legacy columns)
+    const { data: periodsData } = await supabase
+      .from("course_period")
+      .select("start_date, end_date, sort_order")
       .eq("course_id", cid)
-      .single();
-    if (!course) {
-      setErrorMessage("Kursdaten konnten nicht geladen werden.");
-      setIsLoading(false);
-      return;
+      .order("sort_order", { ascending: true });
+
+    let dates: string[];
+    if (periodsData && periodsData.length > 0) {
+      dates = getPeriodDates(periodsData);
+    } else {
+      // Legacy fallback for courses without period rows
+      const { data: course } = await supabase
+        .from("course")
+        .select("start_date, end_date")
+        .eq("course_id", cid)
+        .single();
+      dates = course
+        ? getSinglePeriodDates(course.start_date, course.end_date)
+        : [];
     }
-    const dates = generateDateRange(course.start_date, course.end_date);
     setAllDates(dates);
 
     // Load all lookup tables in parallel for speed

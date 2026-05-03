@@ -3,6 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import {
+  formatPeriodLabel,
+  getPeriodDates,
+  getSinglePeriodDates,
+} from "@/lib/course-periods";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,12 +47,31 @@ type CourseDay = {
   status: DayStatus;
 };
 
+type CoursePeriodInfo = {
+  course_period_id: number;
+  start_date: string;
+  end_date: string;
+  sort_order: number;
+};
+
 // Basic course info shown in the page header
 type CourseSummary = {
   courseName: string;
-  startDate: string;
-  endDate: string;
+  periods: CoursePeriodInfo[];
 };
+
+function getLocalIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateOnlyToEpochDay(dateOnly: string): number {
+  const normalized = dateOnly.slice(0, 10);
+  const [year, month, day] = normalized.split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
 
 // ─── Pure helper functions ────────────────────────────────────────────────────
 
@@ -57,27 +81,15 @@ function getDayStatus(
   entryCount: number,
   isSubmitted: boolean,
 ): DayStatus {
-  // Compare date strings — ISO format sorts correctly as strings
-  const todayDate = new Date().toISOString().split("T")[0];
-
-  if (date > todayDate) return "nicht_verfuegbar";
   if (isSubmitted) return "abgeschlossen";
   if (entryCount > 0) return "in_bearbeitung";
-  return "nicht_begonnen";
-}
 
-// Generates an array of all ISO date strings between startDate and endDate (inclusive)
-function generateDateRange(startDate: string, endDate: string): string[] {
-  const dates: string[] = [];
-  const currentDate = new Date(startDate);
-  const lastDate = new Date(endDate);
-
-  while (currentDate <= lastDate) {
-    dates.push(currentDate.toISOString().split("T")[0]);
-    currentDate.setDate(currentDate.getDate() + 1);
+  const todayDate = getLocalIsoDate(new Date());
+  if (dateOnlyToEpochDay(date) > dateOnlyToEpochDay(todayDate)) {
+    return "nicht_verfuegbar";
   }
 
-  return dates;
+  return "nicht_begonnen";
 }
 
 // Formats an ISO date string into a German long-form date
@@ -234,17 +246,21 @@ function DayCarouselCard({
 function DayCarousel({
   days,
   onDayClick,
+  label,
 }: {
   days: CourseDay[];
   onDayClick: (date: string) => void;
+  label?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   return (
     <div>
-      {/* Header row with day count */}
+      {/* Header row: period date range + day count */}
       <div className="mb-3 flex items-center">
-        <p className="text-sm font-medium text-slate-600">{days.length} Tage</p>
+        <p className="text-sm font-medium text-slate-600">
+          {label ?? `${days.length} Tage`}
+        </p>
       </div>
 
       {/* Mobile: all days visible in a responsive grid */}
@@ -337,10 +353,33 @@ export default function ErfassteZeitPage() {
     null,
   );
   const [courseDays, setCourseDays] = useState<CourseDay[]>([]);
+  const [periods, setPeriods] = useState<CoursePeriodInfo[]>([]);
 
   // Load all overview data when the component mounts
+  // and whenever the tab/page becomes visible again (e.g. after returning from Zeiterfassung)
   useEffect(() => {
     loadOverviewData();
+
+    const handleFocus = () => {
+      void loadOverviewData();
+    };
+
+    const handlePageShow = () => {
+      void loadOverviewData();
+    };
+
+    const handleVisibility = () => {
+      if (!document.hidden) void loadOverviewData();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   // Orchestrates all data fetching steps:
@@ -374,7 +413,7 @@ export default function ErfassteZeitPage() {
     }
     const courseId = userCourseData.course_id;
 
-    // Step 3: load the course details (name, date range)
+    // Step 3a: load course name
     const { data: courseData, error: courseError } = await supabase
       .from("course")
       .select("name, start_date, end_date")
@@ -387,10 +426,37 @@ export default function ErfassteZeitPage() {
       return;
     }
 
+    // Step 3b: load periods for this course
+    const { data: periodsData } = await supabase
+      .from("course_period")
+      .select("course_period_id, start_date, end_date, sort_order")
+      .eq("course_id", courseId)
+      .order("sort_order", { ascending: true });
+
+    const loadedPeriods: CoursePeriodInfo[] = (periodsData ?? []).map((p) => ({
+      course_period_id: p.course_period_id,
+      start_date: p.start_date,
+      end_date: p.end_date,
+      sort_order: p.sort_order,
+    }));
+
+    // Fallback for courses without periods (pre-migration data)
+    const effectivePeriods =
+      loadedPeriods.length > 0
+        ? loadedPeriods
+        : [
+            {
+              course_period_id: 0,
+              start_date: courseData.start_date,
+              end_date: courseData.end_date,
+              sort_order: 0,
+            },
+          ];
+
+    setPeriods(effectivePeriods);
     setCourseSummary({
       courseName: courseData.name,
-      startDate: courseData.start_date,
-      endDate: courseData.end_date,
+      periods: effectivePeriods,
     });
 
     // Step 4: load all existing day records for this user and course
@@ -442,11 +508,8 @@ export default function ErfassteZeitPage() {
       dayRecordByDate[dayRecord.date] = dayRecord;
     }
 
-    // Step 7: generate the full date range from the course and merge with DB data
-    const allDates = generateDateRange(
-      courseData.start_date,
-      courseData.end_date,
-    );
+    // Step 7: generate all dates from all periods and merge with DB data
+    const allDates = getPeriodDates(effectivePeriods);
 
     const mergedCourseDays: CourseDay[] = allDates.map((date) => {
       const dayRecord = dayRecordByDate[date] ?? null;
@@ -492,27 +555,35 @@ export default function ErfassteZeitPage() {
     );
   }
 
+  // Groups the flat courseDays list into one entry per period
+  const groupedPeriods = periods.map((period) => {
+    const periodDates = new Set(
+      getSinglePeriodDates(period.start_date, period.end_date),
+    );
+    return {
+      period,
+      days: courseDays.filter((d) => periodDates.has(d.date)),
+    };
+  });
+
   return (
     <div className="space-y-4">
-      {/* Page header with course name and date range */}
-      <div>
-        {courseSummary && (
-          <div className="mt-1 text-sm text-slate-500">
-            <p>{courseSummary.courseName}</p>
-            <p className="mt-1">
-              {formatDateGerman(courseSummary.startDate)}
-              {" – "}
-              {formatDateGerman(courseSummary.endDate)}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Compact status summary above the week overview */}
+      {/* Compact status summary across all periods */}
       <SummaryBar days={courseDays} />
 
-      {/* Horizontal carousel of all days in the course */}
-      <DayCarousel days={courseDays} onDayClick={handleDayClick} />
+      {/* One carousel section per period */}
+      {groupedPeriods.map(({ period, days: periodDays }) => (
+        <section
+          key={period.course_period_id}
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+        >
+          <DayCarousel
+            days={periodDays}
+            onDayClick={handleDayClick}
+            label={formatPeriodLabel(period.start_date, period.end_date)}
+          />
+        </section>
+      ))}
     </div>
   );
 }

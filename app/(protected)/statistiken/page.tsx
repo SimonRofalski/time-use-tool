@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
 import ZeitverteilungTab from "./ZeitverteilungTab";
 import KursvergleichTab from "./KursvergleichTab";
 import type {
@@ -33,11 +34,12 @@ type Tab = "zeitverteilung" | "kursvergleich";
 
 // Raw time entry row as returned by Supabase for aggregation purposes
 type RawEntry = {
+  entry_id: number;
   day_id: number;
   start_time: string;
   end_time: string;
-  primary_activity_id: number;
-  digital_media_type_id: number | null;
+  primary_activity_id: number | null;
+  digital_media_type_ids: number[];
 };
 
 // Lookup row shapes
@@ -70,16 +72,21 @@ function calculateMinutes(startTime: string, endTime: string): number {
   return endMinTotal - startMinTotal;
 }
 
-// Generates an array of all ISO date strings between startDate and endDate (inclusive)
-function generateDateRange(startDate: string, endDate: string): string[] {
-  const dates: string[] = [];
-  const current = new Date(startDate);
-  const last = new Date(endDate);
-  while (current <= last) {
-    dates.push(current.toISOString().split("T")[0]);
-    current.setDate(current.getDate() + 1);
-  }
-  return dates;
+function getLocalIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateOnlyToEpochDay(dateOnly: string): number {
+  const normalized = dateOnly.slice(0, 10);
+  const [year, month, day] = normalized.split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+function normalizeDateOnly(value: string): string {
+  return value.slice(0, 10);
 }
 
 // ─── Data aggregation helpers ─────────────────────────────────────────────────
@@ -90,7 +97,7 @@ function buildZeitverteilungData(
   entries: RawEntry[],
   dayIdToDate: Record<number, string>,
   allCourseDates: string[],
-  submittedDayIds: Set<number>,
+  trackedDayIds: Set<number>,
   activities: ActivityLookup[],
   subcategories: SubcategoryLookup[],
   categories: CategoryLookup[],
@@ -113,24 +120,46 @@ function buildZeitverteilungData(
   // Accumulate minutes per day per category for the bar chart
   // Structure: { date: { categoryId: minutes } }
   const dailyMinutes: Record<string, Record<number, number>> = {};
+  const uncategorizedByDate: Record<string, number> = {};
+  let uncategorizedTotal = 0;
+  const trackedDates = new Set(
+    Object.values(dayIdToDate).map((d) => normalizeDateOnly(d)),
+  );
 
   for (const entry of entries) {
-    // Only include entries from submitted days
-    if (!submittedDayIds.has(entry.day_id)) continue;
+    // Only include entries from tracked days
+    if (!trackedDayIds.has(entry.day_id)) continue;
 
-    const date = dayIdToDate[entry.day_id];
-    if (!date) continue;
+    const dateRaw = dayIdToDate[entry.day_id];
+    if (!dateRaw) continue;
+    const date = normalizeDateOnly(dateRaw);
 
-    const activity = activityMap.get(entry.primary_activity_id);
-    if (!activity) continue;
-
-    const subcategory = subcategoryMap.get(activity.subcategory_id);
-    if (!subcategory) continue;
-
-    const category = categoryMap.get(subcategory.category_id);
-    if (!category) continue;
+    const activity =
+      entry.primary_activity_id != null
+        ? activityMap.get(entry.primary_activity_id)
+        : undefined;
 
     const minutes = calculateMinutes(entry.start_time, entry.end_time);
+
+    if (!activity) {
+      uncategorizedByDate[date] = (uncategorizedByDate[date] ?? 0) + minutes;
+      uncategorizedTotal += minutes;
+      continue;
+    }
+
+    const subcategory = subcategoryMap.get(activity.subcategory_id);
+    if (!subcategory) {
+      uncategorizedByDate[date] = (uncategorizedByDate[date] ?? 0) + minutes;
+      uncategorizedTotal += minutes;
+      continue;
+    }
+
+    const category = categoryMap.get(subcategory.category_id);
+    if (!category) {
+      uncategorizedByDate[date] = (uncategorizedByDate[date] ?? 0) + minutes;
+      uncategorizedTotal += minutes;
+      continue;
+    }
     const catId = category.category_id;
     const subId = subcategory.subcategory_id;
     const actId = activity.activity_id;
@@ -147,7 +176,7 @@ function buildZeitverteilungData(
   }
 
   // Total minutes across everything (for percentage calculation)
-  const grandTotal = Object.values(minuteTree).reduce(
+  const categorizedTotal = Object.values(minuteTree).reduce(
     (catSum, subs) =>
       catSum +
       Object.values(subs).reduce(
@@ -157,6 +186,7 @@ function buildZeitverteilungData(
       ),
     0,
   );
+  const grandTotal = categorizedTotal + uncategorizedTotal;
 
   // Build the CategoryRow array, sorted by total minutes descending
   const categoryRows: CategoryRow[] = categories
@@ -211,29 +241,54 @@ function buildZeitverteilungData(
     })
     .sort((a, b) => b.totalMinutes - a.totalMinutes);
 
+  if (uncategorizedTotal > 0) {
+    categoryRows.push({
+      categoryId: 0,
+      name: "Ohne Zuordnung",
+      totalMinutes: uncategorizedTotal,
+      percentOfTotal:
+        grandTotal > 0 ? (uncategorizedTotal / grandTotal) * 100 : 0,
+      isExpanded: false,
+      subcategories: [],
+    });
+    categoryRows.sort((a, b) => b.totalMinutes - a.totalMinutes);
+  }
+
   // Build the sorted category name list (same order as categoryRows)
   const categoryNames = categoryRows.map((r) => r.name);
 
   // Build one DayBarData entry per course date
-  const today = new Date().toISOString().split("T")[0];
-  const barData: DayBarData[] = allCourseDates.map((date) => {
-    const isSubmittedDay = [...submittedDayIds].some(
-      (id) => dayIdToDate[id] === date,
-    );
+  const normalizedCourseDates = Array.from(
+    new Set(allCourseDates.map((d) => normalizeDateOnly(d))),
+  );
+  const todayEpochDay = dateOnlyToEpochDay(getLocalIsoDate(new Date()));
+  const barData: DayBarData[] = normalizedCourseDates.map((date) => {
+    const isTrackedDay = trackedDates.has(date);
 
-    // Future or not-yet-submitted days: use a placeholder bar of 1440 minutes
-    if (!isSubmittedDay) {
+    // Not tracked day: show a small placeholder for past/today,
+    // and no placeholder for future days.
+    if (!isTrackedDay) {
+      const dateEpochDay = dateOnlyToEpochDay(date);
+      if (dateEpochDay > todayEpochDay) {
+        return {
+          date,
+          isSubmitted: false,
+        };
+      }
       return {
         date,
         isSubmitted: false,
-        unsubmitted: date <= today ? 60 : 1440, // small indicator for past unsubmitted, full grey for future
+        unsubmitted: 60,
       };
     }
 
     // Submitted day: populate per-category minutes
     const dayEntry: DayBarData = { date, isSubmitted: true };
     for (const cat of categoryRows) {
-      dayEntry[cat.name] = dailyMinutes[date]?.[cat.categoryId] ?? 0;
+      dayEntry[cat.name] =
+        cat.categoryId === 0
+          ? (uncategorizedByDate[date] ?? 0)
+          : (dailyMinutes[date]?.[cat.categoryId] ?? 0);
     }
     return dayEntry;
   });
@@ -254,6 +309,7 @@ function calcAverageHoursPerDay(
 
   for (const entry of entries) {
     if (!submittedDayIds.has(entry.day_id)) continue;
+    if (entry.primary_activity_id == null) continue;
     if (!activityIdFilter.has(entry.primary_activity_id)) continue;
 
     const mins = calculateMinutes(entry.start_time, entry.end_time);
@@ -280,7 +336,9 @@ function calcSmartphoneHoursPerDay(
   let totalMinutes = 0;
   for (const entry of entries) {
     if (!submittedDayIds.has(entry.day_id)) continue;
-    if (entry.digital_media_type_id !== SMARTPHONE_MEDIA_TYPE_ID) continue;
+    if (!entry.digital_media_type_ids.includes(SMARTPHONE_MEDIA_TYPE_ID)) {
+      continue;
+    }
     totalMinutes += calculateMinutes(entry.start_time, entry.end_time);
   }
 
@@ -310,6 +368,27 @@ export default function StatistikenPage() {
 
   useEffect(() => {
     loadAllData();
+
+    const handleFocus = () => {
+      void loadAllData();
+    };
+
+    const handlePageShow = () => {
+      void loadAllData();
+    };
+
+    const handleVisibility = () => {
+      if (!document.hidden) void loadAllData();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   // ── Data loading ────────────────────────────────────────────────────────────
@@ -339,21 +418,32 @@ export default function StatistikenPage() {
     }
     const courseId = userCourse.course_id;
 
-    // Step 3: load course date range
-    const { data: courseData } = await supabase
-      .from("course")
-      .select("start_date, end_date")
+    // Step 3: load course date range via periods; fallback to legacy columns
+    const { data: periodsData } = await supabase
+      .from("course_period")
+      .select("start_date, end_date, sort_order")
       .eq("course_id", courseId)
-      .single();
-    if (!courseData) {
-      setErrorMessage("Kursdaten konnten nicht geladen werden.");
-      setIsLoading(false);
-      return;
+      .order("sort_order", { ascending: true });
+
+    let allCourseDates: string[];
+    if (periodsData && periodsData.length > 0) {
+      allCourseDates = getPeriodDates(periodsData);
+    } else {
+      const { data: courseData } = await supabase
+        .from("course")
+        .select("start_date, end_date")
+        .eq("course_id", courseId)
+        .single();
+      if (!courseData) {
+        setErrorMessage("Kursdaten konnten nicht geladen werden.");
+        setIsLoading(false);
+        return;
+      }
+      allCourseDates = getSinglePeriodDates(
+        courseData.start_date,
+        courseData.end_date,
+      );
     }
-    const allCourseDates = generateDateRange(
-      courseData.start_date,
-      courseData.end_date,
-    );
 
     // Step 4: load lookup tables in parallel
     const [cats, subs, acts] = await Promise.all([
@@ -371,42 +461,72 @@ export default function StatistikenPage() {
         .order("activity_id"),
     ]);
 
+    if (cats.error || subs.error || acts.error) {
+      setErrorMessage("Stammdaten konnten nicht geladen werden.");
+      setIsLoading(false);
+      return;
+    }
+
     const categories: CategoryLookup[] = cats.data ?? [];
     const subcategories: SubcategoryLookup[] = subs.data ?? [];
     const activities: ActivityLookup[] = acts.data ?? [];
 
-    // Step 5: load all submitted day records for this user in this course
+    // Step 5: load day records for this user in this course
+    // Track submitted OR complete days to stay compatible with legacy rows.
     const { data: myDays } = await supabase
       .from("day")
-      .select("day_id, date")
+      .select("day_id, date, is_submitted, is_complete")
       .eq("profiles_id", userId)
-      .eq("course_id", courseId)
-      .eq("is_submitted", true);
+      .eq("course_id", courseId);
 
-    const mySubmittedDayIds = new Set((myDays ?? []).map((d) => d.day_id));
-    const myDayIdToDate: Record<number, string> = {};
-    for (const d of myDays ?? []) myDayIdToDate[d.day_id] = d.date;
+    const allMyDays = myDays ?? [];
+    const submittedDayIds = new Set(
+      allMyDays.filter((d) => d.is_submitted).map((d) => d.day_id),
+    );
 
-    // Step 6: load all time entries for the user's submitted days
-    const myDayIds = [...mySubmittedDayIds];
-    let myEntries: RawEntry[] = [];
+    // Step 6: load all time entries for this user's day records.
+    // Some legacy rows have entries but missing is_submitted/is_complete flags.
+    const allMyDayIds = allMyDays.map((d) => d.day_id);
+    let allMyEntries: RawEntry[] = [];
 
-    if (myDayIds.length > 0) {
+    if (allMyDayIds.length > 0) {
       const { data: entryData } = await supabase
         .from("time_entry")
         .select(
-          "day_id, start_time, end_time, primary_activity_id, digital_media_type_id",
+          "entry_id, day_id, start_time, end_time, primary_activity_id, time_entry_digital_media_type(digital_media_type_id)",
         )
-        .in("day_id", myDayIds);
-      myEntries = entryData ?? [];
+        .in("day_id", allMyDayIds);
+      allMyEntries = (entryData ?? []).map((row: any) => ({
+        entry_id: row.entry_id,
+        day_id: row.day_id,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        primary_activity_id: row.primary_activity_id,
+        digital_media_type_ids: (row.time_entry_digital_media_type ?? [])
+          .map((m: any) => m.digital_media_type_id)
+          .filter((id: unknown) => typeof id === "number"),
+      }));
     }
+
+    const dayIdsWithEntries = new Set(allMyEntries.map((e) => e.day_id));
+    const trackedDays = allMyDays.filter(
+      (d) => d.is_submitted || d.is_complete || dayIdsWithEntries.has(d.day_id),
+    );
+    const trackedDayIds = new Set(trackedDays.map((d) => d.day_id));
+
+    const myDayIdToDate: Record<number, string> = {};
+    for (const d of trackedDays) {
+      myDayIdToDate[d.day_id] = normalizeDateOnly(d.date);
+    }
+
+    const myEntries = allMyEntries.filter((e) => trackedDayIds.has(e.day_id));
 
     // Step 7: build Zeitverteilung data from the user's own entries
     const zeitverteilungResult = buildZeitverteilungData(
       myEntries,
       myDayIdToDate,
       allCourseDates,
-      mySubmittedDayIds,
+      trackedDayIds,
       activities,
       subcategories,
       categories,
@@ -464,11 +584,20 @@ export default function StatistikenPage() {
       const { data: allEntries } = await supabase
         .from("time_entry")
         .select(
-          "day_id, start_time, end_time, primary_activity_id, digital_media_type_id",
+          "entry_id, day_id, start_time, end_time, primary_activity_id, time_entry_digital_media_type(digital_media_type_id)",
         )
         .in("day_id", allQualifyingDayIds);
 
-      const rawAllEntries: RawEntry[] = allEntries ?? [];
+      const rawAllEntries: RawEntry[] = (allEntries ?? []).map((row: any) => ({
+        entry_id: row.entry_id,
+        day_id: row.day_id,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        primary_activity_id: row.primary_activity_id,
+        digital_media_type_ids: (row.time_entry_digital_media_type ?? [])
+          .map((m: any) => m.digital_media_type_id)
+          .filter((id: unknown) => typeof id === "number"),
+      }));
 
       // Calculate per-topic average hours/day for each qualifying user
       const sleepValues: number[] = [];
@@ -495,17 +624,17 @@ export default function StatistikenPage() {
       // Get the current user's own values (use myEntries + mySubmittedDayIds)
       const mySleeepValue = calcAverageHoursPerDay(
         myEntries,
-        mySubmittedDayIds,
+        submittedDayIds,
         SLEEP_ACTIVITY_IDS,
       );
       const mySportValue = calcAverageHoursPerDay(
         myEntries,
-        mySubmittedDayIds,
+        submittedDayIds,
         SPORT_ACTIVITY_IDS,
       );
       const mySmartphoneValue = calcSmartphoneHoursPerDay(
         myEntries,
-        mySubmittedDayIds,
+        submittedDayIds,
       );
 
       setComparisonTopics([

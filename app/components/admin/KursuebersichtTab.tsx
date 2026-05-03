@@ -1,11 +1,25 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Plus, X } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import ConfirmModal from "./ConfirmModal";
+import {
+  type CoursePeriod,
+  totalPeriodDays,
+  periodsDurationLabel,
+  formatPeriodLabel,
+  validatePeriodsNoOverlap,
+} from "@/lib/course-periods";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type PeriodInput = { start: string; end: string };
+
+type CoursePeriodRow = Pick<
+  CoursePeriod,
+  "course_period_id" | "start_date" | "end_date" | "sort_order"
+>;
 
 type CourseRow = {
   course_id: number;
@@ -16,6 +30,7 @@ type CourseRow = {
   accessCode: string | null;
   anonymized_at: string | null;
   userCount: number;
+  periods: CoursePeriodRow[];
 };
 
 type EnrolledUser = {
@@ -116,8 +131,9 @@ export default function KursuebersichtTab() {
 
   // ── "Neuer Kurs" form ───────────────────────────────────────────────────────
   const [newName, setNewName] = useState("");
-  const [newStartDate, setNewStartDate] = useState("");
-  const [newEndDate, setNewEndDate] = useState("");
+  const [newPeriods, setNewPeriods] = useState<PeriodInput[]>([
+    { start: "", end: "" },
+  ]);
   const [newAccessCode, setNewAccessCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -186,10 +202,23 @@ export default function KursuebersichtTab() {
       countByCourse[row.course_id] = (countByCourse[row.course_id] ?? 0) + 1;
     }
 
+    // Load all periods for all courses in one query and group by course_id
+    const { data: periodsData } = await supabase
+      .from("course_period")
+      .select("course_period_id, course_id, start_date, end_date, sort_order")
+      .order("sort_order", { ascending: true });
+
+    const periodsByCourse: Record<number, CoursePeriodRow[]> = {};
+    for (const p of periodsData ?? []) {
+      if (!periodsByCourse[p.course_id]) periodsByCourse[p.course_id] = [];
+      periodsByCourse[p.course_id].push(p);
+    }
+
     setCourses(
       courseData.map((c) => ({
         ...c,
         userCount: countByCourse[c.course_id] ?? 0,
+        periods: periodsByCourse[c.course_id] ?? [],
       })),
     );
     setIsLoadingCourses(false);
@@ -525,40 +554,90 @@ export default function KursuebersichtTab() {
     setCreateError("");
     setCreateSuccess(false);
 
-    if (
-      !newName.trim() ||
-      !newStartDate ||
-      !newEndDate ||
-      !newAccessCode.trim()
-    ) {
+    if (!newName.trim() || !newAccessCode.trim()) {
       setCreateError("Bitte alle Felder ausfüllen.");
       setIsCreating(false);
       return;
     }
 
-    if (newEndDate < newStartDate) {
-      setCreateError("Das Enddatum muss nach dem Startdatum liegen.");
+    // Validate every period
+    for (const p of newPeriods) {
+      if (!p.start || !p.end) {
+        setCreateError("Bitte für jeden Zeitraum Start- und Enddatum angeben.");
+        setIsCreating(false);
+        return;
+      }
+      if (p.end < p.start) {
+        setCreateError("Das Enddatum muss nach dem Startdatum liegen.");
+        setIsCreating(false);
+        return;
+      }
+    }
+
+    // Validate no overlaps between periods
+    const overlapError = validatePeriodsNoOverlap(
+      newPeriods.map((p) => ({ start_date: p.start, end_date: p.end })),
+    );
+    if (overlapError) {
+      setCreateError(overlapError);
       setIsCreating(false);
       return;
     }
 
-    const { error } = await supabase.from("course").insert({
-      name: newName.trim(),
-      start_date: newStartDate,
-      end_date: newEndDate,
-      accessCode: newAccessCode.trim(),
-      is_locked: false,
-    });
+    // Compute overall span for the legacy start_date / end_date columns
+    const sortedByStart = [...newPeriods].sort((a, b) =>
+      a.start.localeCompare(b.start),
+    );
+    const spanStart = sortedByStart[0].start;
+    const spanEnd = sortedByStart.reduce(
+      (max, p) => (p.end > max ? p.end : max),
+      sortedByStart[0].end,
+    );
 
-    if (error) {
-      setCreateError("Kurs konnte nicht erstellt werden: " + error.message);
-    } else {
-      setCreateSuccess(true);
-      setNewName("");
-      setNewStartDate("");
-      setNewEndDate("");
-      setNewAccessCode("");
+    // Insert the course
+    const { data: courseInsert, error: courseError } = await supabase
+      .from("course")
+      .insert({
+        name: newName.trim(),
+        start_date: spanStart,
+        end_date: spanEnd,
+        accessCode: newAccessCode.trim(),
+        is_locked: false,
+      })
+      .select("course_id")
+      .single();
+
+    if (courseError || !courseInsert) {
+      setCreateError(
+        "Kurs konnte nicht erstellt werden: " + (courseError?.message ?? ""),
+      );
+      setIsCreating(false);
+      return;
     }
+
+    // Insert periods
+    const periodInserts = newPeriods.map((p, i) => ({
+      course_id: courseInsert.course_id,
+      start_date: p.start,
+      end_date: p.end,
+      sort_order: i,
+    }));
+    const { error: periodError } = await supabase
+      .from("course_period")
+      .insert(periodInserts);
+
+    if (periodError) {
+      setCreateError(
+        "Zeiträume konnten nicht gespeichert werden: " + periodError.message,
+      );
+      setIsCreating(false);
+      return;
+    }
+
+    setCreateSuccess(true);
+    setNewName("");
+    setNewPeriods([{ start: "", end: "" }]);
+    setNewAccessCode("");
     setIsCreating(false);
   }
 
@@ -633,36 +712,83 @@ export default function KursuebersichtTab() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Startdatum
+        {/* Period list */}
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="block text-sm font-medium text-slate-700">
+              Zeiträume
             </label>
-            <input
-              type="date"
-              value={newStartDate}
-              onChange={(e) => {
-                setNewStartDate(e.target.value);
+            <button
+              type="button"
+              onClick={() => {
+                setNewPeriods((prev) => [...prev, { start: "", end: "" }]);
                 setCreateError("");
                 setCreateSuccess(false);
               }}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+              className="flex items-center gap-1 text-xs font-medium text-blue-600 transition-colors hover:text-blue-700"
+            >
+              <Plus size={13} />
+              Zeitraum hinzufügen
+            </button>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
-              Enddatum
-            </label>
-            <input
-              type="date"
-              value={newEndDate}
-              onChange={(e) => {
-                setNewEndDate(e.target.value);
-                setCreateError("");
-                setCreateSuccess(false);
-              }}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+
+          <div className="space-y-2">
+            {newPeriods.map((p, i) => (
+              <div key={i} className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-500 mb-1">
+                    {newPeriods.length > 1
+                      ? `Zeitraum ${i + 1} – Start`
+                      : "Startdatum"}
+                  </label>
+                  <input
+                    type="date"
+                    value={p.start}
+                    onChange={(e) => {
+                      const updated = newPeriods.map((x, j) =>
+                        j === i ? { ...x, start: e.target.value } : x,
+                      );
+                      setNewPeriods(updated);
+                      setCreateError("");
+                      setCreateSuccess(false);
+                    }}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-500 mb-1">
+                    {newPeriods.length > 1 ? `Ende` : "Enddatum"}
+                  </label>
+                  <input
+                    type="date"
+                    value={p.end}
+                    onChange={(e) => {
+                      const updated = newPeriods.map((x, j) =>
+                        j === i ? { ...x, end: e.target.value } : x,
+                      );
+                      setNewPeriods(updated);
+                      setCreateError("");
+                      setCreateSuccess(false);
+                    }}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                {newPeriods.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewPeriods((prev) => prev.filter((_, j) => j !== i));
+                      setCreateError("");
+                      setCreateSuccess(false);
+                    }}
+                    className="mb-0.5 rounded p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                    title="Zeitraum entfernen"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -729,10 +855,13 @@ export default function KursuebersichtTab() {
                   type="button"
                   className="min-w-0 flex-1 text-left"
                   onClick={() => {
-                    const totalDays = courseDurationDays(
-                      course.start_date,
-                      course.end_date,
-                    );
+                    const totalDays =
+                      course.periods.length > 0
+                        ? totalPeriodDays(course.periods)
+                        : courseDurationDays(
+                            course.start_date,
+                            course.end_date,
+                          );
                     setView({
                       type: "course",
                       courseId: course.course_id,
@@ -747,14 +876,24 @@ export default function KursuebersichtTab() {
                     {course.name}
                   </p>
                   <div className="mt-1 space-y-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400 sm:text-sm">
-                    <p className="break-words">
-                      {formatDate(course.start_date)} –{" "}
-                      {formatDate(course.end_date)}
-                    </p>
-                    <p className="break-words">
-                      {courseDurationLabel(course.start_date, course.end_date)}{" "}
-                      · {course.userCount} Teilnehmer
-                    </p>
+                    {course.periods.length > 0 ? (
+                      course.periods.map((p) => (
+                        <p key={p.course_period_id} className="break-words">
+                          {formatPeriodLabel(p.start_date, p.end_date)}
+                        </p>
+                      ))
+                    ) : (
+                      <p className="break-words">
+                        {formatDate(course.start_date)} –{" "}
+                        {formatDate(course.end_date)}
+                        {" · "}
+                        {courseDurationLabel(
+                          course.start_date,
+                          course.end_date,
+                        )}
+                      </p>
+                    )}
+                    <p className="break-words">{course.userCount} Teilnehmer</p>
                   </div>
                 </button>
 
