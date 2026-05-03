@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { totalPeriodDays } from "@/lib/course-periods";
 import ConfirmModal from "./ConfirmModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -84,11 +85,11 @@ export default function NutzeruebersichtTab() {
       return;
     }
 
-    // Fetch enrollments with course name + dates for total-days calculation
+    // Fetch enrollments with course name + dates + periods for total-days calculation
     const { data: userCourses } = await supabase
       .from("user_course")
       .select(
-        "user_course_id, profiles_id, is_excluded, course:course_id(name, start_date, end_date)",
+        "user_course_id, profiles_id, is_excluded, course:course_id(name, start_date, end_date, course_period(start_date, end_date))",
       );
 
     const courseInfoByUser: Record<
@@ -105,22 +106,38 @@ export default function NutzeruebersichtTab() {
       let courseName: string | null = null;
       let totalDays = 0;
 
+      const extractCourse = (c: {
+        name: string;
+        start_date: string;
+        end_date: string;
+        course_period?: { start_date: string; end_date: string }[] | null;
+      }) => {
+        courseName = c.name;
+        const coursePeriods = c.course_period ?? [];
+        totalDays =
+          coursePeriods.length > 0
+            ? totalPeriodDays(coursePeriods)
+            : courseDurationDays(c.start_date, c.end_date);
+      };
+
       if (courseRaw && typeof courseRaw === "object" && "name" in courseRaw) {
-        const c = courseRaw as {
-          name: string;
-          start_date: string;
-          end_date: string;
-        };
-        courseName = c.name;
-        totalDays = courseDurationDays(c.start_date, c.end_date);
+        extractCourse(
+          courseRaw as {
+            name: string;
+            start_date: string;
+            end_date: string;
+            course_period?: { start_date: string; end_date: string }[];
+          },
+        );
       } else if (Array.isArray(courseRaw) && courseRaw.length > 0) {
-        const c = courseRaw[0] as {
-          name: string;
-          start_date: string;
-          end_date: string;
-        };
-        courseName = c.name;
-        totalDays = courseDurationDays(c.start_date, c.end_date);
+        extractCourse(
+          courseRaw[0] as {
+            name: string;
+            start_date: string;
+            end_date: string;
+            course_period?: { start_date: string; end_date: string }[];
+          },
+        );
       }
 
       if (uc.profiles_id && courseName) {
@@ -385,8 +402,8 @@ export default function NutzeruebersichtTab() {
                   </div>
                 </div>
 
-                {u.userCourseId && (
-                  <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <div className="mt-4 space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  {u.userCourseId && (
                     <button
                       type="button"
                       onClick={() => openExcludeModal(u)}
@@ -398,8 +415,8 @@ export default function NutzeruebersichtTab() {
                     >
                       {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -487,19 +504,21 @@ export default function NutzeruebersichtTab() {
 
                     {/* Actions */}
                     <td className="px-4 py-3">
-                      {u.userCourseId && (
-                        <button
-                          type="button"
-                          onClick={() => openExcludeModal(u)}
-                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                            u.isExcluded
-                              ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400"
-                              : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
-                          }`}
-                        >
-                          {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
-                        </button>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {u.userCourseId && (
+                          <button
+                            type="button"
+                            onClick={() => openExcludeModal(u)}
+                            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                              u.isExcluded
+                                ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400"
+                                : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                            }`}
+                          >
+                            {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

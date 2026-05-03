@@ -11,24 +11,13 @@ import {
   type QuestionnaireStep,
   type LookupData,
 } from "./types";
+import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TOTAL_SLOTS_PER_DAY = 144;
 
 // ─── Pure helper functions ────────────────────────────────────────────────────
-
-// Generates every date string between startDate and endDate (inclusive)
-function generateDateRange(startDate: string, endDate: string): string[] {
-  const dates: string[] = [];
-  const current = new Date(startDate);
-  const last = new Date(endDate);
-  while (current <= last) {
-    dates.push(current.toISOString().split("T")[0]);
-    current.setDate(current.getDate() + 1);
-  }
-  return dates;
-}
 
 // Formats a date string to German long format: "Freitag, 28. März 2026"
 function formatDateGerman(dateString: string): string {
@@ -102,7 +91,7 @@ function createEmptyPendingEntry(slots: string[]): PendingEntry {
     primary_activity_id: null,
     secondary_activity_id: null,
     digital_media_used: false,
-    digital_media_type_id: null,
+    digital_media_type_ids: [],
     location_transport_id: null,
     social_context_ids: [],
     satisfaction_id: null,
@@ -138,7 +127,8 @@ function getPreloadedEntry(
       e.satisfaction_id === first.satisfaction_id &&
       e.location_transport_id === first.location_transport_id &&
       e.digital_media_used === first.digital_media_used &&
-      e.digital_media_type_id === first.digital_media_type_id,
+      JSON.stringify([...e.digital_media_type_ids].sort()) ===
+        JSON.stringify([...first.digital_media_type_ids].sort()),
   );
 
   if (!allIdentical) return null;
@@ -148,7 +138,7 @@ function getPreloadedEntry(
     primary_activity_id: first.primary_activity_id,
     secondary_activity_id: first.secondary_activity_id,
     digital_media_used: first.digital_media_used,
-    digital_media_type_id: first.digital_media_type_id,
+    digital_media_type_ids: first.digital_media_type_ids,
     location_transport_id: first.location_transport_id,
     social_context_ids: first.social_context_ids,
     satisfaction_id: first.satisfaction_id,
@@ -167,7 +157,10 @@ function mapRawEntryToRecord(raw: any): TimeEntryRecord {
     satisfaction_id: raw.satisfaction_id ?? null,
     location_transport_id: raw.location_transport_id ?? null,
     digital_media_used: raw.digital_media_used,
-    digital_media_type_id: raw.digital_media_type_id ?? null,
+    digital_media_type_ids:
+      raw.time_entry_digital_media_type?.map(
+        (r: any) => r.digital_media_type_id,
+      ) ?? [],
     social_context_ids:
       raw.time_entry_social_context?.map((sc: any) => sc.social_context_id) ??
       [],
@@ -309,18 +302,27 @@ export default function ZeiterfassungPage() {
     const cid = userCourse.course_id;
     setCourseId(cid);
 
-    // Load course date range
-    const { data: course } = await supabase
-      .from("course")
-      .select("start_date, end_date")
+    // Load course date range (via periods; fallback to legacy columns)
+    const { data: periodsData } = await supabase
+      .from("course_period")
+      .select("start_date, end_date, sort_order")
       .eq("course_id", cid)
-      .single();
-    if (!course) {
-      setErrorMessage("Kursdaten konnten nicht geladen werden.");
-      setIsLoading(false);
-      return;
+      .order("sort_order", { ascending: true });
+
+    let dates: string[];
+    if (periodsData && periodsData.length > 0) {
+      dates = getPeriodDates(periodsData);
+    } else {
+      // Legacy fallback for courses without period rows
+      const { data: course } = await supabase
+        .from("course")
+        .select("start_date, end_date")
+        .eq("course_id", cid)
+        .single();
+      dates = course
+        ? getSinglePeriodDates(course.start_date, course.end_date)
+        : [];
     }
-    const dates = generateDateRange(course.start_date, course.end_date);
     setAllDates(dates);
 
     // Load all lookup tables in parallel for speed
@@ -407,7 +409,8 @@ export default function ZeiterfassungPage() {
         entry_id, day_id, start_time, end_time,
         primary_activity_id, secondary_activity_id,
         satisfaction_id, location_transport_id,
-        digital_media_used, digital_media_type_id,
+        digital_media_used,
+        time_entry_digital_media_type ( digital_media_type_id ),
         time_entry_social_context ( social_context_id )
       `,
       )
@@ -455,10 +458,13 @@ export default function ZeiterfassungPage() {
     const { _save, _advance, ...cleanData } = stepData as any;
     const updatedEntry: PendingEntry = { ...pendingEntry, ...cleanData };
 
-    // social_context toggles fire onStepComplete for state updates without advancing
-    // only proceed when _advance is set
+    // social_context and digital_media_type toggles fire onStepComplete for state
+    // updates without advancing — only proceed when _advance is set
     const isIntermediateUpdate =
-      currentStep === "social_context" && !isAdvance && !shouldSave;
+      (currentStep === "social_context" ||
+        currentStep === "digital_media_type") &&
+      !isAdvance &&
+      !shouldSave;
 
     if (isIntermediateUpdate) {
       setPendingEntry(updatedEntry);
@@ -518,9 +524,6 @@ export default function ZeiterfassungPage() {
       satisfaction_id: finalEntry.satisfaction_id || null,
       location_transport_id: finalEntry.location_transport_id || null,
       digital_media_used: finalEntry.digital_media_used,
-      digital_media_type_id: finalEntry.digital_media_used
-        ? finalEntry.digital_media_type_id
-        : null,
     }));
 
     const { data: newEntries, error: insertError } = await supabase
@@ -533,6 +536,20 @@ export default function ZeiterfassungPage() {
         `Eintrag konnte nicht gespeichert werden: ${insertError?.message ?? "unbekannter Fehler"}`,
       );
       return;
+    }
+
+    // Insert digital media type junction rows
+    if (
+      finalEntry.digital_media_used &&
+      finalEntry.digital_media_type_ids.length > 0
+    ) {
+      const mediaRows = newEntries.flatMap((entry) =>
+        finalEntry.digital_media_type_ids.map((id) => ({
+          entry_id: entry.entry_id,
+          digital_media_type_id: id,
+        })),
+      );
+      await supabase.from("time_entry_digital_media_type").insert(mediaRows);
     }
 
     // Insert social context records for every newly created entry
@@ -584,6 +601,10 @@ export default function ZeiterfassungPage() {
     if (toDelete.length === 0) return;
 
     const ids = toDelete.map((e) => e.entry_id);
+    await supabase
+      .from("time_entry_digital_media_type")
+      .delete()
+      .in("entry_id", ids);
     await supabase
       .from("time_entry_social_context")
       .delete()
@@ -654,7 +675,7 @@ export default function ZeiterfassungPage() {
       {/* Responsive layout: stacked on mobile, side-by-side on md+ */}
       <div className="flex flex-col gap-4 md:flex-row md:items-start">
         {/* Left: 24×6 time grid — collapsible on mobile when questionnaire is active */}
-        <div className="w-full md:w-1/3 min-w-0">
+        <div className="w-full md:w-1/3 min-w-0 md:self-start">
           {/* Mobile collapse toggle — only shown when questionnaire is open */}
           {isQuestionnaireActive && (
             <button
@@ -707,9 +728,9 @@ export default function ZeiterfassungPage() {
                 Zeitslot auswählen
               </p>
               <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-                Tippe auf einen Slot im Raster –
-                <br className="hidden sm:block" /> oder wische über mehrere auf
-                einmal.
+                Markiere zuerst einen oder mehrere Slots im Raster.
+                <br className="hidden sm:block" /> Danach wählst du die passende
+                Kategorie als Kachel und direkt die Aktivität.
               </p>
             </div>
           )}

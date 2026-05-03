@@ -19,7 +19,7 @@ export const CATEGORY_COLORS: string[] = [
 // Falls back to slate-400 if the category is not found
 export function getCategoryColor(
   categoryId: number,
-  categories: Category[]
+  categories: Category[],
 ): string {
   const index = categories.findIndex((c) => c.category_id === categoryId);
   return index >= 0
@@ -98,17 +98,17 @@ export type TimeEntryRecord = {
   satisfaction_id: number | null;
   location_transport_id: number | null;
   digital_media_used: boolean;
-  digital_media_type_id: number | null;
+  digital_media_type_ids: number[];
   social_context_ids: number[];
 };
 
 // Entry being built step-by-step in the questionnaire before it is saved
 export type PendingEntry = {
-  slots: string[];                  // sorted "HH:MM" slot strings
+  slots: string[]; // sorted "HH:MM" slot strings
   primary_activity_id: number | null;
   secondary_activity_id: number | null;
   digital_media_used: boolean;
-  digital_media_type_id: number | null;
+  digital_media_type_ids: number[];
   location_transport_id: number | null;
   social_context_ids: number[];
   satisfaction_id: number | null;

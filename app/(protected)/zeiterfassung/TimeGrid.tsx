@@ -130,8 +130,10 @@ function getSlotsInRange(anchorSlot: string, currentSlot: string): Set<string> {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-// Labels shown in the sticky header row (minute offsets per column)
-const MINUTE_LABELS = [":00", ":10", ":20", ":30", ":40", ":50"];
+// Labels shown in the sticky header row (left-edge markers, 7 items for 6 columns + end)
+const MINUTE_LABELS = [":00", ":10", ":20", ":30", ":40", ":50", ":60"];
+// Indices for the 6 data cells per row (separate from header labels)
+const MINUTE_INDICES = [0, 1, 2, 3, 4, 5];
 // Labels shown on the left side (one per row = one per hour)
 const HOUR_LABELS = Array.from({ length: 24 }, (_, i) =>
   i.toString().padStart(2, "0"),
@@ -266,15 +268,15 @@ export default function TimeGrid({
   return (
     <div
       ref={containerRef}
-      className="overflow-hidden overflow-x-hidden rounded-xl border border-slate-200 bg-white shadow-sm select-none md:overflow-y-auto md:scrollbar-thin md:max-h-[calc(100vh-230px)]"
+      className="overflow-hidden overflow-x-hidden rounded-xl border border-slate-200 bg-white shadow-sm select-none md:overflow-y-auto md:scrollbar-thin md:max-h-[calc(100vh-150px)]"
     >
-      {/* Sticky header row: minute-offset labels */}
-      <div className="grid grid-cols-[1.5rem_repeat(6,minmax(0,1fr))] border-b-2 border-slate-100 bg-white md:sticky md:top-0 md:z-10 md:grid-cols-[2rem_repeat(6,minmax(0,1fr))]">
+      {/* Sticky header row: minute-offset labels at left edge of each column */}
+      <div className="grid grid-cols-[1.5rem_repeat(6,minmax(0,1fr))_auto] border-b-2 border-slate-100 bg-white md:sticky md:top-0 md:z-10 md:grid-cols-[2rem_repeat(6,minmax(0,1fr))_auto]">
         <div className="h-6 md:h-8" /> {/* empty corner above hour labels */}
         {MINUTE_LABELS.map((label) => (
           <div
             key={label}
-            className="flex h-6 items-center justify-center text-[10px] font-semibold text-slate-400 md:h-8 md:text-xs"
+            className="flex h-6 items-center justify-start text-[10px] font-semibold text-slate-400 md:h-8 md:text-xs"
           >
             {label}
           </div>
@@ -294,7 +296,7 @@ export default function TimeGrid({
             </div>
 
             {/* 6 slot cells for this hour */}
-            {MINUTE_LABELS.map((_, minIndex) => {
+            {MINUTE_INDICES.map((minIndex) => {
               const slot = ALL_SLOTS[hourIndex * 6 + minIndex];
               const isHighlighted = isCellHighlighted(slot);
               const entry = slotToEntry.get(slot);
@@ -318,7 +320,7 @@ export default function TimeGrid({
                     }
                   `}
                   style={{
-                    height: "18px",
+                    height: "24px",
                     ...(isFilled ? getCellStyle(entry, lookupData) : {}),
                   }}
                 />

@@ -2,105 +2,63 @@
 
 import { useEffect, useState } from "react";
 import {
+  Baby,
+  Bike,
+  BookOpen,
+  Briefcase,
+  Building2,
+  Bus,
+  Calendar,
+  Car,
+  Check,
+  Clock3,
+  CookingPot,
+  Dumbbell,
+  Film,
+  Footprints,
+  Gamepad2,
+  GraduationCap,
+  HandHeart,
+  Heart,
+  UserCheck,
+  UserX,
+  Headphones,
+  HeartPulse,
+  Home,
+  Hotel,
+  Laptop,
+  MapPin,
+  MessageCircle,
+  HelpCircle,
+  MoonStar,
+  Music,
+  Newspaper,
+  Palette,
+  Pencil,
+  Scissors,
+  Search,
+  Smartphone,
+  Tablet,
+  ShoppingBag,
+  Sparkles,
+  Timer,
+  TrainFront,
+  Tv,
+  TreePine,
+  type LucideIcon,
+  UtensilsCrossed,
+  Users,
+  UserRound,
+  Watch,
+  Gauge,
+  Wrench,
+} from "lucide-react";
+import {
   type PendingEntry,
   type QuestionnaireStep,
   type LookupData,
-  type Category,
-  getCategoryColor,
   CATEGORY_COLORS,
 } from "./types";
-
-const RECENT_PRIMARY_ACTIVITIES_KEY = "time-use-tool:recent-primary-activities";
-const RECENT_SECONDARY_ACTIVITIES_KEY =
-  "time-use-tool:recent-secondary-activities";
-const MAX_RECENT_ACTIVITIES = 20;
-
-type ActiveActivityNode = {
-  activity_id: number;
-  count: number;
-};
-
-function getTopCategories(
-  lookupData: LookupData,
-  recentActivityIds: number[],
-  excludeActivityId?: number | null,
-): Array<{
-  category_id: number;
-  name: string;
-  color: string;
-  topActivities: ActivityNode[];
-}> {
-  const activityIdCount = new Map<number, number>();
-  for (const id of recentActivityIds) {
-    if (id === excludeActivityId) {
-      continue;
-    }
-    activityIdCount.set(id, (activityIdCount.get(id) ?? 0) + 1);
-  }
-
-  const subcategoryToCategory = new Map<number, number>();
-  for (const subcategory of lookupData.subcategories) {
-    subcategoryToCategory.set(
-      subcategory.subcategory_id,
-      subcategory.category_id,
-    );
-  }
-
-  const activityToCategory = new Map<number, number>();
-  const categoryUsageCount = new Map<number, number>();
-  const categoryTopActivities = new Map<number, ActiveActivityNode[]>();
-
-  for (const activity of lookupData.activities) {
-    const categoryId = subcategoryToCategory.get(activity.subcategory_id);
-    if (categoryId) {
-      activityToCategory.set(activity.activity_id, categoryId);
-    }
-  }
-
-  for (const [activityId, count] of activityIdCount) {
-    const categoryId = activityToCategory.get(activityId);
-    if (!categoryId) continue;
-    categoryUsageCount.set(
-      categoryId,
-      (categoryUsageCount.get(categoryId) ?? 0) + count,
-    );
-    const activities = categoryTopActivities.get(categoryId) ?? [];
-    activities.push({ activity_id: activityId, count });
-    categoryTopActivities.set(categoryId, activities);
-  }
-
-  const topCategoryIds = [...categoryUsageCount.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([id]) => id);
-  const result = [];
-
-  for (const categoryId of topCategoryIds) {
-    const catData = lookupData.categories.find(
-      (c) => c.category_id === categoryId,
-    );
-    if (!catData) continue;
-    const catIndex = lookupData.categories.indexOf(catData);
-    const color = CATEGORY_COLORS[catIndex % CATEGORY_COLORS.length];
-    const activities = (categoryTopActivities.get(categoryId) ?? [])
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 2)
-      .map((a) => {
-        const act = lookupData.activities.find(
-          (x) => x.activity_id === a.activity_id,
-        );
-        return { activity_id: a.activity_id, name: act?.name ?? "" };
-      });
-    result.push({
-      category_id: categoryId,
-      name: catData.name,
-      color,
-      topActivities: activities,
-    });
-  }
-
-  return result;
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,6 +79,12 @@ type CategoryNode = {
   name: string;
   color: string;
   subcategories: SubcategoryNode[];
+};
+
+type CategoryVisual = {
+  primaryIcon: LucideIcon;
+  secondaryIcon: LucideIcon;
+  tertiaryIcon: LucideIcon;
 };
 
 type ActivitySelectorProps = {
@@ -187,13 +151,13 @@ function getStepQuestion(step: QuestionnaireStep): string {
     case "secondary_activity":
       return "Hast du gleichzeitig eine Nebentätigkeit ausgeführt?";
     case "digital_media":
-      return "Hast du während dieser Zeit ein elektronisches Gerät benutzt?";
+      return "Hast du für die Aktivität ein IT-Gerät (z.B. Smartphone, Tablet oder ähnlich) genutzt?";
     case "digital_media_type":
-      return "Welches Gerät hast du hauptsächlich benutzt?";
+      return "Welche Geräte hast du genutzt?";
     case "location_transport":
       return "Wo warst du während dieser Zeit?";
     case "social_context":
-      return "Mit wem warst du während dieser Zeit?";
+      return "War jemand anders mit dabei?";
     case "satisfaction":
       return "Wie hast du dich während dieser Zeit gefühlt?";
   }
@@ -227,98 +191,358 @@ function formatSlotsRange(slots: Set<string>): string {
   return `${firstSlot} – ${endStr} · ${slots.size} Felder`;
 }
 
+function normalizeLabel(value: string): string {
+  return value
+    .toLowerCase()
+    .replaceAll("ä", "ae")
+    .replaceAll("ö", "oe")
+    .replaceAll("ü", "ue")
+    .replaceAll("ß", "ss");
+}
+
+function getCategoryVisual(
+  categoryName: string,
+  index: number,
+): CategoryVisual {
+  const normalized = normalizeLabel(categoryName);
+
+  if (normalized.includes("persoenliche pflege")) {
+    return {
+      primaryIcon: MoonStar,
+      secondaryIcon: UtensilsCrossed,
+      tertiaryIcon: HeartPulse,
+    };
+  }
+  if (normalized.includes("erwerbstaetigkeit")) {
+    return {
+      primaryIcon: Briefcase,
+      secondaryIcon: Laptop,
+      tertiaryIcon: Clock3,
+    };
+  }
+  if (normalized.includes("studium") || normalized.includes("ausbildung")) {
+    return {
+      primaryIcon: GraduationCap,
+      secondaryIcon: BookOpen,
+      tertiaryIcon: Pencil,
+    };
+  }
+  if (
+    normalized.includes("haushalt") ||
+    normalized.includes("familienarbeit")
+  ) {
+    return { primaryIcon: Home, secondaryIcon: CookingPot, tertiaryIcon: Baby };
+  }
+  if (
+    normalized.includes("freiwilligenarbeit") ||
+    normalized.includes("treffen")
+  ) {
+    return {
+      primaryIcon: HandHeart,
+      secondaryIcon: Users,
+      tertiaryIcon: Calendar,
+    };
+  }
+  if (normalized.includes("soziales") || normalized.includes("unterhaltung")) {
+    return {
+      primaryIcon: MessageCircle,
+      secondaryIcon: Music,
+      tertiaryIcon: Film,
+    };
+  }
+  if (normalized.includes("sport") || normalized.includes("im freien")) {
+    return {
+      primaryIcon: Dumbbell,
+      secondaryIcon: TreePine,
+      tertiaryIcon: Bike,
+    };
+  }
+  if (normalized.includes("hobbys")) {
+    return {
+      primaryIcon: Palette,
+      secondaryIcon: Gamepad2,
+      tertiaryIcon: Scissors,
+    };
+  }
+  if (normalized.includes("massenmedien")) {
+    return {
+      primaryIcon: Tv,
+      secondaryIcon: Newspaper,
+      tertiaryIcon: Headphones,
+    };
+  }
+  if (
+    normalized.includes("wegezeiten") ||
+    normalized.includes("nicht spezifizierte")
+  ) {
+    return { primaryIcon: Bus, secondaryIcon: MapPin, tertiaryIcon: Timer };
+  }
+
+  const defaultVisuals: CategoryVisual[] = [
+    { primaryIcon: BookOpen, secondaryIcon: Laptop, tertiaryIcon: Pencil },
+    { primaryIcon: Briefcase, secondaryIcon: Wrench, tertiaryIcon: Clock3 },
+    { primaryIcon: Home, secondaryIcon: ShoppingBag, tertiaryIcon: CookingPot },
+    { primaryIcon: Users, secondaryIcon: HeartPulse, tertiaryIcon: Music },
+    { primaryIcon: TreePine, secondaryIcon: Sparkles, tertiaryIcon: Bike },
+  ];
+
+  return defaultVisuals[index % defaultVisuals.length];
+}
+
+function countActivities(subcategories: SubcategoryNode[]): number {
+  return subcategories.reduce((sum, subcategory) => {
+    return sum + subcategory.activities.length;
+  }, 0);
+}
+
+function findSelectedActivityName(
+  hierarchy: CategoryNode[],
+  selectedActivityId: number | null,
+): string | null {
+  if (selectedActivityId === null) {
+    return null;
+  }
+
+  for (const category of hierarchy) {
+    for (const subcategory of category.subcategories) {
+      const activity = subcategory.activities.find(
+        (item) => item.activity_id === selectedActivityId,
+      );
+      if (activity) {
+        return activity.name;
+      }
+    }
+  }
+
+  return null;
+}
+
 // ─── Step renderers ───────────────────────────────────────────────────────────
 
 // Shared activity list used for both primary and secondary activity steps
 // Renders category/subcategory headers with clickable activity buttons
 function ActivityList({
   hierarchy,
-  topCategories,
-  topCategoriesTitle,
   selectedActivityId,
   searchQuery,
   onSearchChange,
   onActivitySelect,
+  activeCategoryId,
+  onActiveCategoryChange,
+  searchPlaceholder,
   topSlot,
 }: {
   hierarchy: CategoryNode[];
-  topCategories: Array<{
-    category_id: number;
-    name: string;
-    color: string;
-    topActivities: ActivityNode[];
-  }>;
-  topCategoriesTitle: string;
   selectedActivityId: number | null;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onActivitySelect: (activityId: number) => void;
+  activeCategoryId: number | null;
+  onActiveCategoryChange: (categoryId: number | null) => void;
+  searchPlaceholder: string;
   topSlot?: React.ReactNode; // optional slot for the "Keine" button in step 2
 }) {
+  const trimmedQuery = searchQuery.trim();
+  const isSearching = trimmedQuery.length > 0;
+  const activeCategory = hierarchy.find(
+    (category) => category.category_id === activeCategoryId,
+  );
+  const selectedActivityName = findSelectedActivityName(
+    hierarchy,
+    selectedActivityId,
+  );
+
   return (
     <div className="flex flex-col gap-3">
-      {/* Optional top content (e.g. "Keine Nebentätigkeit" button) */}
       {topSlot}
 
-      {/* Scrollable activity list grouped by category and subcategory */}
-      <div
-        className="overflow-y-auto overflow-x-hidden scrollbar-thin"
-        style={{ maxHeight: "380px" }}
-      >
-        <div className="-mx-1 mb-2 rounded-b-lg border-b border-slate-200 bg-white/95 px-1 pb-2 backdrop-blur">
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+        <div className="flex items-center gap-2">
+          {!isSearching && activeCategory && (
+            <button
+              type="button"
+              onClick={() => onActiveCategoryChange(null)}
+              className="flex shrink-0 flex-col items-center gap-0.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-400 hover:text-slate-800"
+            >
+              <span>←</span>
+              <span className="text-[10px] font-normal text-slate-400 leading-none">
+                Kategorien
+              </span>
+            </button>
+          )}
+          <label className="relative block flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Tätigkeit suchen..."
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              placeholder={
+                activeCategory ? activeCategory.name : searchPlaceholder
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
+          </label>
+        </div>
+      </div>
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
-              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                {topCategoriesTitle}
-              </p>
-              {searchQuery.trim().length > 0 ? (
-                <p className="text-[11px] text-slate-400">
-                  Während der Suche ausgeblendet.
-                </p>
-              ) : topCategories.length === 0 ? (
-                <p className="text-[11px] text-slate-400">
-                  Noch keine Einträge vorhanden.
-                </p>
-              ) : (
-                <div className="space-y-1.5">
-                  {topCategories.map((cat) => (
+      <div
+        className="overflow-y-auto overflow-x-hidden scrollbar-thin"
+        style={{ maxHeight: "min(620px, calc(100vh - 220px))" }}
+      >
+        {hierarchy.length === 0 && (
+          <p className="py-8 text-center text-sm text-slate-400">
+            Keine Tätigkeiten gefunden.
+          </p>
+        )}
+
+        {!isSearching && !activeCategory && hierarchy.length > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            {hierarchy.map((category, index) => {
+              const visual = getCategoryVisual(category.name, index);
+              const PrimaryIcon = visual.primaryIcon;
+              const SecondaryIcon = visual.secondaryIcon;
+              const TertiaryIcon = visual.tertiaryIcon;
+              const isSelectedCategory = category.subcategories.some((sub) =>
+                sub.activities.some(
+                  (activity) => activity.activity_id === selectedActivityId,
+                ),
+              );
+
+              return (
+                <button
+                  key={category.category_id}
+                  type="button"
+                  onClick={() => onActiveCategoryChange(category.category_id)}
+                  className={`group overflow-hidden rounded-2xl bg-white text-left shadow-sm transition-all hover:shadow-md ${
+                    isSelectedCategory
+                      ? "border-2"
+                      : "border border-slate-200 hover:border-slate-300"
+                  }`}
+                  style={
+                    isSelectedCategory
+                      ? { borderColor: category.color }
+                      : undefined
+                  }
+                >
+                  <div
+                    className="h-1.5 w-full shrink-0"
+                    style={{ backgroundColor: category.color }}
+                  />
+                  <div
+                    className="flex flex-col gap-3 p-3"
+                    style={{
+                      background: `linear-gradient(160deg, ${category.color}14 0%, rgba(255,255,255,1) 60%)`,
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <h4 className="text-sm font-semibold leading-snug text-slate-900">
+                        {category.name}
+                      </h4>
+                      {isSelectedCategory && (
+                        <span
+                          className="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold text-white"
+                          style={{ backgroundColor: category.color }}
+                        >
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 text-slate-500 ring-1 ring-slate-200">
+                        <PrimaryIcon className="h-4 w-4" />
+                      </div>
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 text-slate-500 ring-1 ring-slate-200">
+                        <SecondaryIcon className="h-4 w-4" />
+                      </div>
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 text-slate-500 ring-1 ring-slate-200">
+                        <TertiaryIcon className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {((!isSearching && activeCategory) || isSearching) && (
+          <div className="space-y-4">
+            {
+              !isSearching &&
+                activeCategory &&
+                null /* back button now in search bar */
+            }
+
+            {(isSearching
+              ? hierarchy
+              : activeCategory
+                ? [activeCategory]
+                : []
+            ).map((category) => (
+              <div
+                key={category.category_id}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                {isSearching && (
+                  <div
+                    className="mb-4 flex items-center gap-3 rounded-xl px-3 py-2"
+                    style={{ backgroundColor: `${category.color}10` }}
+                  >
+                    <span
+                      className="h-3 w-3 rounded-full"
+                      style={{ backgroundColor: category.color }}
+                    />
+                    <span className="text-sm font-semibold text-slate-800">
+                      {category.name}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {countActivities(category.subcategories)} Treffer
+                    </span>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {category.subcategories.map((subcategory) => (
                     <div
-                      key={cat.category_id}
-                      className="rounded-md border px-2 py-1"
+                      key={subcategory.subcategory_id}
+                      className="rounded-xl border p-3"
                       style={{
-                        borderLeft: `3px solid ${cat.color}`,
-                        backgroundColor: `${cat.color}0A`,
+                        borderColor: `${category.color}30`,
+                        backgroundColor: `${category.color}07`,
                       }}
                     >
                       <p
-                        className="mb-1 text-[10px] font-medium"
-                        style={{ color: cat.color }}
+                        className="mb-2 text-xs font-semibold uppercase tracking-wide"
+                        style={{ color: `${category.color}99` }}
                       >
-                        {cat.name}
+                        {subcategory.name}
                       </p>
-                      <div className="flex flex-wrap gap-1">
-                        {cat.topActivities.map((act) => {
+                      <div className="flex flex-wrap gap-2">
+                        {subcategory.activities.map((activity) => {
                           const isSelected =
-                            selectedActivityId === act.activity_id;
+                            selectedActivityId === activity.activity_id;
                           return (
                             <button
-                              key={act.activity_id}
+                              key={activity.activity_id}
                               type="button"
-                              onClick={() => onActivitySelect(act.activity_id)}
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-all ${isSelected ? "text-white shadow-sm" : "bg-white text-slate-600 hover:bg-slate-100"}`}
+                              onClick={() =>
+                                onActivitySelect(activity.activity_id)
+                              }
+                              className={`rounded-2xl border px-4 py-3 text-sm font-medium leading-snug transition-all ${
+                                isSelected
+                                  ? "border-transparent text-white shadow-sm"
+                                  : "border-white text-slate-700 hover:opacity-80"
+                              }`}
                               style={
-                                isSelected ? { backgroundColor: cat.color } : {}
+                                isSelected
+                                  ? { backgroundColor: category.color }
+                                  : {
+                                      backgroundColor: `${category.color}15`,
+                                      color: category.color,
+                                    }
                               }
                             >
-                              {act.name}
+                              {activity.name}
                             </button>
                           );
                         })}
@@ -326,71 +550,10 @@ function ActivityList({
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {hierarchy.length === 0 && (
-            <p className="text-center text-sm text-slate-400 py-6">
-              Keine Tätigkeiten gefunden.
-            </p>
-          )}
-
-          {hierarchy.map((cat) => (
-            <div key={cat.category_id}>
-              {/* Category header with colored left border */}
-              <div
-                className="flex items-center gap-2 mb-1.5 px-1"
-                style={{
-                  borderLeft: `3px solid ${cat.color}`,
-                  paddingLeft: "8px",
-                }}
-              >
-                <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  {cat.name}
-                </span>
               </div>
-
-              {cat.subcategories.map((sub) => (
-                <div key={sub.subcategory_id} className="mb-2 pl-3">
-                  {/* Subcategory label */}
-                  <p className="text-xs font-medium text-slate-400 mb-1">
-                    {sub.name}
-                  </p>
-
-                  {/* Activity buttons */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {sub.activities.map((act) => {
-                      const isSelected = selectedActivityId === act.activity_id;
-                      return (
-                        <button
-                          key={act.activity_id}
-                          type="button"
-                          onClick={() => onActivitySelect(act.activity_id)}
-                          className={`
-                          rounded-full px-3 py-1 text-xs font-medium transition-all
-                          ${
-                            isSelected
-                              ? "text-white shadow-sm scale-105"
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          }
-                        `}
-                          style={
-                            isSelected ? { backgroundColor: cat.color } : {}
-                          }
-                        >
-                          {act.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -408,105 +571,37 @@ export default function ActivitySelector({
   onCancel,
 }: ActivitySelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
-
-  const [recentPrimaryActivityIds, setRecentPrimaryActivityIds] = useState<
-    number[]
-  >([]);
-  const [recentSecondaryActivityIds, setRecentSecondaryActivityIds] = useState<
-    number[]
-  >([]);
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
+    setSearchQuery("");
+    setActiveCategoryId(null);
+  }, [step]);
+
+  useEffect(() => {
+    if (searchQuery.trim().length > 0) {
+      setActiveCategoryId(null);
     }
+  }, [searchQuery]);
 
-    try {
-      const loadRecentIds = (storageKey: string) => {
-        const raw = window.localStorage.getItem(storageKey);
-        if (!raw) {
-          return [] as number[];
-        }
-
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) {
-          return [] as number[];
-        }
-
-        return parsed
-          .map((value) => Number(value))
-          .filter((value) => Number.isInteger(value) && value > 0)
-          .slice(0, MAX_RECENT_ACTIVITIES);
-      };
-
-      setRecentPrimaryActivityIds(loadRecentIds(RECENT_PRIMARY_ACTIVITIES_KEY));
-      setRecentSecondaryActivityIds(
-        loadRecentIds(RECENT_SECONDARY_ACTIVITIES_KEY),
-      );
-    } catch {
-      setRecentPrimaryActivityIds([]);
-      setRecentSecondaryActivityIds([]);
-    }
-  }, []);
-
-  function updateRecentPrimaryActivities(activityId: number) {
-    setRecentPrimaryActivityIds((previous) => {
-      const next = [
-        activityId,
-        ...previous.filter((id) => id !== activityId),
-      ].slice(0, MAX_RECENT_ACTIVITIES);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          RECENT_PRIMARY_ACTIVITIES_KEY,
-          JSON.stringify(next),
-        );
-      }
-      return next;
-    });
-  }
-
-  function updateRecentSecondaryActivities(activityId: number) {
-    setRecentSecondaryActivityIds((previous) => {
-      const next = [
-        activityId,
-        ...previous.filter((id) => id !== activityId),
-      ].slice(0, MAX_RECENT_ACTIVITIES);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          RECENT_SECONDARY_ACTIVITIES_KEY,
-          JSON.stringify(next),
-        );
-      }
-      return next;
-    });
-  }
-
-  // When step changes, reset the search field
-  // (handled by the parent changing the step prop)
   const hierarchy = buildActivityHierarchy(lookupData, searchQuery);
 
   // ── Step content renderers ──────────────────────────────────────────────────
 
   // Step 1: select the main (required) activity
   function renderPrimaryActivityStep() {
-    const topCategories = getTopCategories(
-      lookupData,
-      recentPrimaryActivityIds,
-    );
-
     return (
       <ActivityList
         hierarchy={hierarchy}
-        topCategories={topCategories}
-        topCategoriesTitle="Zuletzt verwendete Hauptkategorien"
         selectedActivityId={pendingEntry.primary_activity_id}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onActivitySelect={(activityId) => {
-          updateRecentPrimaryActivities(activityId);
-          setSearchQuery("");
-          onStepComplete({ primary_activity_id: activityId });
-        }}
+        onActivitySelect={(activityId) =>
+          onStepComplete({ primary_activity_id: activityId })
+        }
+        activeCategoryId={activeCategoryId}
+        onActiveCategoryChange={setActiveCategoryId}
+        searchPlaceholder="Haupttätigkeit oder Stichwort suchen..."
       />
     );
   }
@@ -520,32 +615,26 @@ export default function ActivitySelector({
       searchQuery,
       pendingEntry.primary_activity_id,
     );
-    const topCategories = getTopCategories(
-      lookupData,
-      recentSecondaryActivityIds,
-      pendingEntry.primary_activity_id,
-    );
 
     return (
       <ActivityList
         hierarchy={hierarchyWithoutPrimary}
-        topCategories={topCategories}
-        topCategoriesTitle="Zuletzt verwendete Nebenkategorien"
         selectedActivityId={pendingEntry.secondary_activity_id}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onActivitySelect={(activityId) => {
-          updateRecentSecondaryActivities(activityId);
-          setSearchQuery("");
-          onStepComplete({ secondary_activity_id: activityId });
-        }}
+        onActivitySelect={(activityId) =>
+          onStepComplete({ secondary_activity_id: activityId })
+        }
+        activeCategoryId={activeCategoryId}
+        onActiveCategoryChange={setActiveCategoryId}
+        searchPlaceholder="Nebentätigkeit oder Stichwort suchen..."
         topSlot={
           <button
             type="button"
             onClick={() => onStepComplete({ secondary_activity_id: null })}
-            className="w-full rounded-lg border-2 border-slate-400 py-2 text-sm font-medium text-slate-600 hover:border-slate-600 hover:text-slate-800 transition-colors"
+            className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
           >
-            Keine Nebentätigkeit
+            Ohne Nebentätigkeit weiter
           </button>
         }
       />
@@ -586,69 +675,418 @@ export default function ActivitySelector({
   }
 
   // Step 4 (conditional): which type of device was used?
+  function getDigitalMediaTypeVisual(typeName: string): {
+    icon: LucideIcon;
+    chipClass: string;
+  } {
+    const normalized = normalizeLabel(typeName);
+
+    if (normalized.includes("smartphone")) {
+      return {
+        icon: Smartphone,
+        chipClass: "bg-cyan-50 text-cyan-700 ring-cyan-100",
+      };
+    }
+    if (normalized.includes("computer") || normalized.includes("laptop")) {
+      return {
+        icon: Laptop,
+        chipClass: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+      };
+    }
+    if (normalized.includes("tablet")) {
+      return {
+        icon: Tablet,
+        chipClass: "bg-violet-50 text-violet-700 ring-violet-100",
+      };
+    }
+    if (normalized.includes("tv") || normalized.includes("streaming")) {
+      return {
+        icon: Tv,
+        chipClass: "bg-orange-50 text-orange-700 ring-orange-100",
+      };
+    }
+    if (normalized.includes("spielkonsole") || normalized.includes("konsole")) {
+      return {
+        icon: Gamepad2,
+        chipClass: "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-100",
+      };
+    }
+    if (normalized.includes("smartwatch") || normalized.includes("wearable")) {
+      return {
+        icon: Watch,
+        chipClass: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+      };
+    }
+
+    return {
+      icon: HelpCircle,
+      chipClass: "bg-slate-100 text-slate-700 ring-slate-200",
+    };
+  }
+
   function renderDigitalMediaTypeStep() {
+    const filteredTypes = lookupData.digitalMediaTypes.filter((type) => {
+      const normalized = normalizeLabel(type.name);
+      // "Kein IT-Hilfsmittel" is redundant because previous step already asks this.
+      return !normalized.includes("kein it") && !normalized.includes("ohne it");
+    });
+
+    const selectedIds = new Set(pendingEntry.digital_media_type_ids);
+
+    function toggleDevice(id: number) {
+      const updated = new Set(selectedIds);
+      if (updated.has(id)) {
+        updated.delete(id);
+      } else {
+        updated.add(id);
+      }
+      onStepComplete({ digital_media_type_ids: [...updated] });
+    }
+
     return (
-      <div className="space-y-2">
-        {lookupData.digitalMediaTypes.map((type) => {
-          const isSelected =
-            pendingEntry.digital_media_type_id === type.digital_media_type_id;
-          return (
-            <button
-              key={type.digital_media_type_id}
-              type="button"
-              onClick={() =>
-                onStepComplete({
-                  digital_media_type_id: type.digital_media_type_id,
-                })
-              }
-              className={`
-                w-full rounded-lg border px-4 py-3 text-left text-sm font-medium transition-all
-                ${
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {filteredTypes.map((type) => {
+            const isSelected = selectedIds.has(type.digital_media_type_id);
+            const { icon: IconComponent, chipClass } =
+              getDigitalMediaTypeVisual(type.name);
+
+            return (
+              <button
+                key={type.digital_media_type_id}
+                type="button"
+                onClick={() => toggleDevice(type.digital_media_type_id)}
+                className={`flex flex-col items-start gap-2 rounded-xl border-2 p-3 text-left transition-all ${
                   isSelected
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                }
-              `}
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <div className="relative">
+                  <span
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg ring-1 ${isSelected ? "bg-blue-100 text-blue-600 ring-blue-200" : chipClass}`}
+                  >
+                    <IconComponent className="h-4 w-4" />
+                  </span>
+                  {isSelected && (
+                    <Check className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-blue-500 text-white p-px" />
+                  )}
+                </div>
+                <span
+                  className={`text-sm font-medium leading-snug ${
+                    isSelected ? "text-blue-700" : "text-slate-700"
+                  }`}
+                >
+                  {type.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            onStepComplete({
+              digital_media_type_ids: [...selectedIds],
+              _advance: true,
+            } as any)
+          }
+          className="w-full rounded-lg bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
+        >
+          Weiter
+        </button>
+      </div>
+    );
+  }
+
+  // Helper: map location name to appropriate icon and category
+  function getLocationMappings(locName: string): {
+    icon: LucideIcon;
+    secondaryIcon?: LucideIcon;
+    category: string;
+    chipClass: string;
+  } {
+    const normalized = locName.toLowerCase();
+
+    // LOCATIONS (Orte)
+    // Must check "zuhause anderer" BEFORE the generic "zuhause" check
+    if (
+      normalized.includes("anderer person") ||
+      normalized.includes("zuhause anderer")
+    )
+      return {
+        icon: Home,
+        secondaryIcon: UserRound,
+        category: "Orte",
+        chipClass: "bg-violet-50 text-violet-600 ring-violet-100",
+      };
+    if (normalized.includes("zuhause") || normalized.includes("zu hause"))
+      return {
+        icon: Home,
+        category: "Orte",
+        chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
+      };
+    if (
+      normalized.includes("wochenendhaus") ||
+      normalized.includes("ferienwohnung")
+    )
+      return {
+        icon: Hotel,
+        category: "Orte",
+        chipClass: "bg-cyan-50 text-cyan-600 ring-cyan-100",
+      };
+    if (normalized.includes("arbeitsplatz"))
+      return {
+        icon: Briefcase,
+        category: "Orte",
+        chipClass: "bg-amber-50 text-amber-600 ring-amber-100",
+      };
+    if (
+      normalized.includes("restaurant") ||
+      normalized.includes("café") ||
+      normalized.includes("cafe") ||
+      normalized.includes("bar")
+    )
+      return {
+        icon: UtensilsCrossed,
+        category: "Orte",
+        chipClass: "bg-rose-50 text-rose-600 ring-rose-100",
+      };
+    if (
+      normalized.includes("einkaufs") ||
+      normalized.includes("markt") ||
+      normalized.includes("geschäfte")
+    )
+      return {
+        icon: ShoppingBag,
+        category: "Orte",
+        chipClass: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+      };
+    if (normalized.includes("hotel") || normalized.includes("camping"))
+      return {
+        icon: Hotel,
+        category: "Orte",
+        chipClass: "bg-sky-50 text-sky-600 ring-sky-100",
+      };
+    if (
+      normalized.includes("schule") ||
+      normalized.includes("universität") ||
+      normalized.includes("universitaet")
+    )
+      return {
+        icon: GraduationCap,
+        category: "Orte",
+        chipClass: "bg-indigo-50 text-indigo-600 ring-indigo-100",
+      };
+    if (
+      normalized.includes("spezifizierter ort") &&
+      !normalized.includes("transport")
+    )
+      return {
+        icon: MapPin,
+        category: "Orte",
+        chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+      };
+
+    // PRIVATE TRANSPORT (Private Verkehrsmittel)
+    if (normalized.includes("zu fuß") || normalized.includes("zu fuss"))
+      return {
+        icon: Footprints,
+        category: "Private Verkehrsmittel",
+        chipClass: "bg-green-50 text-green-600 ring-green-100",
+      };
+    if (normalized.includes("fahrrad"))
+      return {
+        icon: Bike,
+        category: "Private Verkehrsmittel",
+        chipClass: "bg-lime-50 text-lime-600 ring-lime-100",
+      };
+    if (
+      normalized.includes("moped") ||
+      normalized.includes("motorrad") ||
+      normalized.includes("motorboot")
+    )
+      return {
+        icon: Gauge,
+        category: "Private Verkehrsmittel",
+        chipClass: "bg-orange-50 text-orange-600 ring-orange-100",
+      };
+    if (normalized.includes("pkw") || normalized.includes("auto"))
+      return {
+        icon: Car,
+        category: "Private Verkehrsmittel",
+        chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
+      };
+    if (
+      normalized.includes("spezifizierter transportmodus") &&
+      !normalized.includes("öffentlich")
+    )
+      return {
+        icon: MapPin,
+        category: "Private Verkehrsmittel",
+        chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+      };
+
+    // PUBLIC TRANSPORT (Öffentlicher Verkehr)
+    if (
+      normalized.includes("öffentlich") ||
+      normalized.includes("oeffentlich") ||
+      normalized.includes("zug") ||
+      normalized.includes("train") ||
+      normalized.includes("bahn") ||
+      normalized.includes("tram")
+    )
+      return {
+        icon: Bus,
+        category: "Öffentlicher Verkehr",
+        chipClass: "bg-teal-50 text-teal-600 ring-teal-100",
+      };
+
+    // DEFAULT (fallback, shouldn't really happen)
+    return {
+      icon: MapPin,
+      category: "Sonstiges",
+      chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+    };
+  }
+
+  // Helper: categorize locations/transport by ID range and assign icons
+  function getLocationIcon(locId: number, locName: string): LucideIcon {
+    return getLocationMappings(locName).icon;
+  }
+
+  function getLocationCategory(locId: number, locName: string): string {
+    return getLocationMappings(locName).category;
+  }
+
+  // Step 5: where was the user? (categorized with icons)
+  function renderLocationStep() {
+    // Group locations by category
+    const grouped = new Map<string, typeof lookupData.locationTransports>();
+    const categoryOrder = [
+      "Orte",
+      "Private Verkehrsmittel",
+      "Öffentlicher Verkehr",
+      "Sonstiges",
+    ];
+
+    for (const loc of lookupData.locationTransports) {
+      const normalizedName = normalizeLabel(loc.name);
+      // Hide this option on request
+      if (normalizedName.includes("anderer spezifizierter ort (keine reise)")) {
+        continue;
+      }
+      const cat = getLocationCategory(loc.location_transport_id, loc.name);
+      if (!grouped.has(cat)) grouped.set(cat, []);
+      grouped.get(cat)!.push(loc);
+    }
+
+    return (
+      <div className="space-y-3">
+        {categoryOrder.map((category) => {
+          const items = grouped.get(category);
+          if (!items || items.length === 0) return null;
+
+          return (
+            <div
+              key={category}
+              className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"
             >
-              {type.name}
-            </button>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {category}
+              </h4>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                {items.map((loc) => {
+                  const isSelected =
+                    pendingEntry.location_transport_id ===
+                    loc.location_transport_id;
+                  const {
+                    icon: IconComponent,
+                    secondaryIcon: SecondaryIcon,
+                    chipClass,
+                  } = getLocationMappings(loc.name);
+
+                  return (
+                    <button
+                      key={loc.location_transport_id}
+                      type="button"
+                      onClick={() =>
+                        onStepComplete({
+                          location_transport_id: loc.location_transport_id,
+                        })
+                      }
+                      className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-all ${
+                        isSelected
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-white bg-white hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div
+                        className={`relative shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-lg ring-1 ${chipClass}`}
+                      >
+                        <IconComponent className="h-[18px] w-[18px]" />
+                        {SecondaryIcon && (
+                          <SecondaryIcon className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white" />
+                        )}
+                      </div>
+                      <span className="text-xs font-medium leading-snug text-slate-700">
+                        {loc.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </div>
     );
   }
 
-  // Step 5: where was the user? (2-column grid so all options fit without scrolling)
-  function renderLocationStep() {
-    return (
-      <div className="grid grid-cols-2 gap-2">
-        {lookupData.locationTransports.map((loc) => {
-          const isSelected =
-            pendingEntry.location_transport_id === loc.location_transport_id;
-          return (
-            <button
-              key={loc.location_transport_id}
-              type="button"
-              onClick={() =>
-                onStepComplete({
-                  location_transport_id: loc.location_transport_id,
-                })
-              }
-              className={`
-                rounded-lg border px-3 py-2 text-left text-xs font-medium leading-tight transition-all
-                ${
-                  isSelected
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-                }
-              `}
-            >
-              {loc.name}
-            </button>
-          );
-        })}
-      </div>
-    );
+  // Helper: map social context name to icon + color
+  function getSocialContextVisual(name: string): {
+    icon: LucideIcon;
+    chipClass: string;
+  } {
+    const n = name.toLowerCase();
+    if (n.includes("alleine") || n.includes("allein"))
+      return {
+        icon: UserX,
+        chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+      };
+    if (n.includes("partner") || n.includes("ehepartner"))
+      return {
+        icon: Heart,
+        chipClass: "bg-rose-50 text-rose-500 ring-rose-100",
+      };
+    if (n.includes("eltern") || n.includes("mutter") || n.includes("vater"))
+      return {
+        icon: Users,
+        chipClass: "bg-amber-50 text-amber-600 ring-amber-100",
+      };
+    if (n.includes("bis 9") || n.includes("kind") || n.includes("baby"))
+      return {
+        icon: Baby,
+        chipClass: "bg-pink-50 text-pink-500 ring-pink-100",
+      };
+    if (n.includes("haushalt"))
+      return {
+        icon: Home,
+        chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
+      };
+    if (
+      n.includes("freunde") ||
+      n.includes("kollegen") ||
+      n.includes("bekannte")
+    )
+      return {
+        icon: UserCheck,
+        chipClass: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+      };
+    return {
+      icon: Users,
+      chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+    };
   }
 
   // Step 6: who was the user with? (multiple choice — needs explicit confirm)
@@ -669,28 +1107,34 @@ export default function ActivitySelector({
 
     return (
       <div className="space-y-3">
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-2">
           {lookupData.socialContexts.map((ctx) => {
             const isSelected = selectedIds.has(ctx.social_context_id);
+            const { icon: IconComponent, chipClass } = getSocialContextVisual(
+              ctx.name,
+            );
             return (
               <button
                 key={ctx.social_context_id}
                 type="button"
                 onClick={() => toggleSocialContext(ctx.social_context_id)}
-                className={`
-                  w-full rounded-lg border px-4 py-3 text-left text-sm font-medium
-                  flex items-center justify-between transition-all
-                  ${
-                    isSelected
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                  }
-                `}
+                className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-all ${
+                  isSelected
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                }`}
               >
-                <span>{ctx.name}</span>
-                {isSelected && (
-                  <span className="text-blue-500 font-bold">✓</span>
-                )}
+                <div
+                  className={`relative shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-lg ring-1 ${isSelected ? "bg-blue-100 text-blue-600 ring-blue-200" : chipClass}`}
+                >
+                  <IconComponent className="h-[18px] w-[18px]" />
+                  {isSelected && (
+                    <Check className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-blue-500 text-white p-px" />
+                  )}
+                </div>
+                <span className="text-xs font-medium leading-snug text-slate-700">
+                  {ctx.name}
+                </span>
               </button>
             );
           })}
@@ -714,13 +1158,30 @@ export default function ActivitySelector({
     );
   }
 
-  // Step 7 (final): how did the user feel? (single choice — selecting saves immediately)
+  // Helper: map satisfaction name to emoji
+  function getSmileyForSatisfaction(satisfactionName: string): string {
+    const normalized = satisfactionName.toLowerCase();
+    if (normalized.includes("sehr gut")) return "😄";
+    if (normalized.includes("gut")) return "🙂";
+    if (
+      normalized.includes("mittelmäßig") ||
+      normalized.includes("mittelmaessig")
+    )
+      return "😐";
+    if (normalized.includes("schlecht") && !normalized.includes("sehr"))
+      return "😟";
+    if (normalized.includes("sehr schlecht")) return "😢";
+    return "😐";
+  }
+
+  // Step 7 (final): how did the user feel? (emoji grid with labels below)
   function renderSatisfactionStep() {
     return (
-      <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
         {lookupData.satisfactions.map((sat) => {
           const isSelected =
             pendingEntry.satisfaction_id === sat.satisfaction_id;
+          const emoji = getSmileyForSatisfaction(sat.name);
           return (
             <button
               key={sat.satisfaction_id}
@@ -729,15 +1190,18 @@ export default function ActivitySelector({
                 onStepComplete({ satisfaction_id: sat.satisfaction_id })
               }
               className={`
-                w-full rounded-lg border px-4 py-3 text-left text-sm font-medium transition-all
+                flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-3 transition-all
                 ${
                   isSelected
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                 }
               `}
             >
-              {sat.name}
+              <div className="text-4xl">{emoji}</div>
+              <div className="text-center text-xs font-semibold text-slate-700">
+                {sat.name}
+              </div>
             </button>
           );
         })}
@@ -772,11 +1236,25 @@ export default function ActivitySelector({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      {/* Header: selected time range + cancel button */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <span className="text-xs font-medium text-slate-400">
-          {formatSlotsRange(selectedSlots)}
-        </span>
+      {/* Header: selected time range + back/cancel actions */}
+      <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-blue-700 ring-1 ring-blue-100">
+            <Clock3 className="h-4 w-4 shrink-0" />
+            <span className="text-sm font-semibold">
+              {formatSlotsRange(selectedSlots)}
+            </span>
+          </div>
+          {!isFirstStep && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50"
+            >
+              ← Zurück
+            </button>
+          )}
+        </div>
         <button
           type="button"
           onClick={onCancel}
@@ -798,27 +1276,14 @@ export default function ActivitySelector({
       </div>
 
       {/* Question */}
-      <div className="px-4 pb-3">
-        <h3 className="text-sm font-semibold text-slate-800">
+      <div className="px-4 pb-4 pt-1">
+        <h3 className="text-lg font-bold text-slate-900 leading-snug">
           {getStepQuestion(step)}
         </h3>
       </div>
 
       {/* Step content (scrollable if needed) */}
       <div className="px-4 pb-4">{renderStepContent()}</div>
-
-      {/* Footer: back button (hidden only on the first step) */}
-      {!isFirstStep && (
-        <div className="px-4 pb-4">
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            ← Zurück
-          </button>
-        </div>
-      )}
     </div>
   );
 }

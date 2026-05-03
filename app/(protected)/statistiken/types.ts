@@ -4,9 +4,9 @@
 export type CategoryRow = {
   categoryId: number;
   name: string;
-  totalMinutes: number;        // sum of all time entries in this category
-  percentOfTotal: number;      // share of all tracked time (0–100)
-  isExpanded: boolean;         // controls accordion open/close
+  totalMinutes: number; // sum of all time entries in this category
+  percentOfTotal: number; // share of all tracked time (0–100)
+  isExpanded: boolean; // controls accordion open/close
   subcategories: SubcategoryRow[];
 };
 
@@ -15,7 +15,7 @@ export type SubcategoryRow = {
   subcategoryId: number;
   name: string;
   totalMinutes: number;
-  percentOfTotal: number;      // share of all tracked time (not just the parent category)
+  percentOfTotal: number; // share of all tracked time (not just the parent category)
   isExpanded: boolean;
   activities: ActivityRow[];
 };
@@ -26,14 +26,39 @@ export type ActivityRow = {
   name: string;
   totalMinutes: number;
   percentOfTotal: number;
+  meta?: ActivityMetaStats;
+};
+
+export type ActivityMetaStats = {
+  withDevicesMinutes: number;
+  withoutDevicesMinutes: number;
+  withPeopleMinutes: number;
+  aloneMinutes: number;
+  atHomeMinutes: number;
+  elsewhereMinutes: number;
+  satisfactionWeightedSum: number;
+  satisfactionWeight: number;
+  avgSatisfactionLabel: string;
+};
+
+export type MetaAggregateItem = {
+  name: string;
+  minutes: number;
+};
+
+export type MetaAggregates = {
+  devices: MetaAggregateItem[];
+  social: MetaAggregateItem[];
+  locations: MetaAggregateItem[];
+  avgSatisfactionLabel: string;
 };
 
 // ─── Bar chart types ──────────────────────────────────────────────────────────
 
 // One bar in the daily stacked bar chart — one entry per course date
 export type DayBarData = {
-  date: string;                // ISO date "YYYY-MM-DD"
-  isSubmitted: boolean;        // false → render as a grey placeholder bar
+  date: string; // ISO date "YYYY-MM-DD"
+  isSubmitted: boolean; // false → render as a grey placeholder bar
   // Dynamic keys: one per category name (e.g. "Schlaf": 420)
   // Values are minutes spent in that category on this day
   [categoryName: string]: number | string | boolean;
@@ -47,10 +72,34 @@ export type ComparisonTopicKey = "schlaf" | "sport" | "smartphone";
 // Aggregated comparison data for one topic
 export type ComparisonTopic = {
   key: ComparisonTopicKey;
-  label: string;               // German display name
-  unit: string;                // e.g. "h/Tag"
+  label: string; // German display name
+  unit: string; // e.g. "h/Tag"
   // All participants' average hours/day (anonymous, used for distribution)
   allValues: number[];
   // The current user's average hours/day for this topic
   userValue: number;
+};
+
+export type ComparisonPairPercent = {
+  leftPercent: number;
+  rightPercent: number;
+};
+
+export type ComparisonMetaStats = {
+  itDevice: {
+    user: ComparisonPairPercent | null;
+    course: ComparisonPairPercent | null;
+  };
+  social: {
+    user: ComparisonPairPercent | null;
+    course: ComparisonPairPercent | null;
+  };
+  location: {
+    user: ComparisonPairPercent | null;
+    course: ComparisonPairPercent | null;
+  };
+  wellbeing: {
+    userLabel: string;
+    courseLabel: string;
+  };
 };
