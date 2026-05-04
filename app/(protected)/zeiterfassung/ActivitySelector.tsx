@@ -1174,11 +1174,26 @@ export default function ActivitySelector({
     return "😐";
   }
 
+  // Returns a sort rank for satisfaction names: sehr schlecht=0 … sehr gut=4
+  function getSatisfactionSortRank(name: string): number {
+    const n = name.toLowerCase();
+    if (n.includes("sehr schlecht")) return 0;
+    if (n.includes("schlecht")) return 1;
+    if (n.includes("mittelmäßig") || n.includes("mittelmaessig")) return 2;
+    if (n.includes("sehr gut")) return 4;
+    if (n.includes("gut")) return 3;
+    return 2;
+  }
+
   // Step 7 (final): how did the user feel? (emoji grid with labels below)
   function renderSatisfactionStep() {
+    const sortedSatisfactions = [...lookupData.satisfactions].sort(
+      (a, b) =>
+        getSatisfactionSortRank(a.name) - getSatisfactionSortRank(b.name),
+    );
     return (
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
-        {lookupData.satisfactions.map((sat) => {
+        {sortedSatisfactions.map((sat) => {
           const isSelected =
             pendingEntry.satisfaction_id === sat.satisfaction_id;
           const emoji = getSmileyForSatisfaction(sat.name);
