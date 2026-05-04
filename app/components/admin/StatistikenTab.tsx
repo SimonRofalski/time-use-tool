@@ -204,8 +204,7 @@ function buildTopActivities(
           ? `${count} (${Math.round((count / total) * 100)}%)`
           : `${count}`,
       categoryId: activityToCategory[Number(id)] ?? 0,
-    }))
-    .reverse(); // smallest at top so the largest bar reads last (natural reading order)
+    }));
 }
 
 function buildCategoryDistribution(
