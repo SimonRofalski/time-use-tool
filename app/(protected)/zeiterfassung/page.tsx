@@ -1,10 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
-import TimeGrid from "./TimeGrid";
-import ActivitySelector from "./ActivitySelector";
 import {
   type TimeEntryRecord,
   type PendingEntry,
@@ -12,6 +11,22 @@ import {
   type LookupData,
 } from "./types";
 import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
+
+const TimeGrid = dynamic(() => import("./TimeGrid"), {
+  loading: () => (
+    <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+      Raster wird geladen...
+    </div>
+  ),
+});
+
+const ActivitySelector = dynamic(() => import("./ActivitySelector"), {
+  loading: () => (
+    <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+      Fragebogen wird geladen...
+    </div>
+  ),
+});
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -267,6 +282,41 @@ export default function ZeiterfassungPage() {
   useEffect(() => {
     loadPageData();
   }, []);
+
+  // Optional local/preview diagnostics: /zeiterfassung?perf=1
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (searchParams.get("perf") !== "1") return;
+    if (!("PerformanceObserver" in window)) return;
+
+    let lastValue = 0;
+    const observer = new PerformanceObserver((entryList) => {
+      for (const entry of entryList.getEntries()) {
+        if (entry.startTime <= lastValue) continue;
+        lastValue = entry.startTime;
+
+        const lcpEntry = entry as PerformanceEntry & {
+          element?: Element;
+          size?: number;
+        };
+        const element = lcpEntry.element;
+        const className =
+          element instanceof HTMLElement ? element.className : "(none)";
+
+        console.info("[perf] LCP update", {
+          valueMs: Math.round(entry.startTime),
+          size: lcpEntry.size,
+          tag: element?.tagName,
+          className,
+          path: window.location.pathname,
+        });
+      }
+    });
+
+    observer.observe({ type: "largest-contentful-paint", buffered: true });
+
+    return () => observer.disconnect();
+  }, [searchParams]);
 
   // Reload day entries whenever the date or user/course changes
   useEffect(() => {
@@ -645,8 +695,33 @@ export default function ZeiterfassungPage() {
 
   if (isLoading || !lookupData || !currentDate) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <p className="text-slate-500">Wird geladen...</p>
+      <div className="space-y-4">
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="h-4 w-44 animate-pulse rounded bg-slate-200" />
+          <div className="mt-3 h-2 w-full animate-pulse rounded-full bg-slate-100" />
+        </div>
+
+        <div className="flex flex-col gap-4 md:flex-row md:items-start">
+          <div className="w-full md:w-1/3 min-w-0 md:self-start">
+            <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+              Raster wird geladen...
+            </div>
+          </div>
+
+          <div className="w-full md:w-2/3 min-w-0">
+            <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-10 text-center">
+              <p className="text-3xl mb-4">⏱️</p>
+              <p className="text-base font-semibold text-slate-700">
+                Zeitslot auswählen
+              </p>
+              <p className="mt-2 text-sm text-slate-400 leading-relaxed">
+                Markiere zuerst einen oder mehrere Slots im Raster.
+                <br className="hidden sm:block" /> Danach wählst du die passende
+                Kategorie als Kachel und direkt die Aktivität.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

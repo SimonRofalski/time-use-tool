@@ -437,7 +437,15 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     needsProfileDetails === null ||
     (!needsSecurityQuestions && !needsProfileDetails && isEnrolled === null)
   ) {
-    return null;
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
+        <div className="mx-auto max-w-7xl px-4 py-16 text-center">
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            Sitzung wird vorbereitet...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const fullName = [profileFirstName, profileLastName]

@@ -413,12 +413,28 @@ export default function ErfassteZeitPage() {
     }
     const courseId = userCourseData.course_id;
 
-    // Step 3a: load course name
-    const { data: courseData, error: courseError } = await supabase
-      .from("course")
-      .select("name, start_date, end_date")
-      .eq("course_id", courseId)
-      .single();
+    // Steps 3a, 3b, 4: load course name, periods, and day records in parallel
+    const [
+      { data: courseData, error: courseError },
+      { data: periodsData },
+      { data: dayRecords, error: dayError },
+    ] = await Promise.all([
+      supabase
+        .from("course")
+        .select("name, start_date, end_date")
+        .eq("course_id", courseId)
+        .single(),
+      supabase
+        .from("course_period")
+        .select("course_period_id, start_date, end_date, sort_order")
+        .eq("course_id", courseId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("day")
+        .select("day_id, date, is_submitted, is_complete")
+        .eq("profiles_id", userId)
+        .eq("course_id", courseId),
+    ]);
 
     if (courseError || !courseData) {
       setErrorMessage("Kursinformationen konnten nicht geladen werden.");
@@ -426,12 +442,11 @@ export default function ErfassteZeitPage() {
       return;
     }
 
-    // Step 3b: load periods for this course
-    const { data: periodsData } = await supabase
-      .from("course_period")
-      .select("course_period_id, start_date, end_date, sort_order")
-      .eq("course_id", courseId)
-      .order("sort_order", { ascending: true });
+    if (dayError) {
+      setErrorMessage("Tage konnten nicht geladen werden.");
+      setIsLoading(false);
+      return;
+    }
 
     const loadedPeriods: CoursePeriodInfo[] = (periodsData ?? []).map((p) => ({
       course_period_id: p.course_period_id,
@@ -458,19 +473,6 @@ export default function ErfassteZeitPage() {
       courseName: courseData.name,
       periods: effectivePeriods,
     });
-
-    // Step 4: load all existing day records for this user and course
-    const { data: dayRecords, error: dayError } = await supabase
-      .from("day")
-      .select("day_id, date, is_submitted, is_complete")
-      .eq("profiles_id", userId)
-      .eq("course_id", courseId);
-
-    if (dayError) {
-      setErrorMessage("Tage konnten nicht geladen werden.");
-      setIsLoading(false);
-      return;
-    }
 
     // Step 5: load entry counts for all days that have a day record
     // We only fetch the day_id column and count client-side to keep it simple
@@ -541,8 +543,61 @@ export default function ErfassteZeitPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <p className="text-slate-500">Wird geladen...</p>
+      <div className="space-y-4" aria-busy="true" aria-label="Wird geladen">
+        {/* Skeleton SummaryBar */}
+        <div className="flex flex-wrap items-stretch gap-2">
+          <div className="w-full rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-center sm:w-[220px]">
+            <div className="mx-auto h-7 w-8 animate-pulse rounded bg-green-200" />
+            <p className="mt-0.5 text-xs font-medium text-green-700">
+              Abgeschlossen
+            </p>
+          </div>
+          <div className="w-full rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-center sm:w-[220px]">
+            <div className="mx-auto h-7 w-8 animate-pulse rounded bg-orange-200" />
+            <p className="mt-0.5 text-xs font-medium text-orange-700">
+              In Bearbeitung
+            </p>
+          </div>
+          <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-center sm:w-[220px]">
+            <div className="mx-auto h-7 w-8 animate-pulse rounded bg-slate-200" />
+            <p className="mt-0.5 text-xs font-medium text-slate-600">
+              Nicht begonnen
+            </p>
+          </div>
+        </div>
+
+        {/* Skeleton carousel section */}
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center">
+            <p className="text-sm font-medium text-slate-600">Wird geladen…</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:hidden">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 rounded-lg border border-slate-200 bg-white p-3 animate-pulse"
+              >
+                <div className="h-3 w-8 rounded bg-slate-200" />
+                <div className="mt-1 h-4 w-14 rounded bg-slate-200" />
+                <div className="mt-2 h-4 w-20 rounded-full bg-slate-100" />
+                <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100" />
+              </div>
+            ))}
+          </div>
+          <div className="hidden gap-3 md:flex">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 w-28 rounded-lg border border-slate-200 bg-white p-3 animate-pulse"
+              >
+                <div className="h-3 w-8 rounded bg-slate-200" />
+                <div className="mt-1 h-4 w-14 rounded bg-slate-200" />
+                <div className="mt-2 h-4 w-20 rounded-full bg-slate-100" />
+                <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100" />
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     );
   }
