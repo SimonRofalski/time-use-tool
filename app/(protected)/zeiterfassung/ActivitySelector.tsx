@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Baby,
   Bike,
@@ -10,6 +10,8 @@ import {
   Bus,
   Calendar,
   Car,
+  ChevronDown,
+  ChevronUp,
   Check,
   Clock3,
   CookingPot,
@@ -35,6 +37,7 @@ import {
   Newspaper,
   Palette,
   Pencil,
+  Plus,
   Scissors,
   Search,
   Smartphone,
@@ -42,6 +45,7 @@ import {
   ShoppingBag,
   Sparkles,
   Timer,
+  Trash2,
   TrainFront,
   Tv,
   TreePine,
@@ -57,6 +61,7 @@ import {
   type PendingEntry,
   type QuestionnaireStep,
   type LookupData,
+  type TimeEntryRecord,
   CATEGORY_COLORS,
 } from "./types";
 
@@ -91,10 +96,15 @@ type ActivitySelectorProps = {
   step: QuestionnaireStep;
   pendingEntry: PendingEntry;
   selectedSlots: Set<string>;
+  existingEntries: TimeEntryRecord[];
   lookupData: LookupData;
   onStepComplete: (data: Partial<PendingEntry>) => void;
   onBack: () => void;
-  onCancel: () => void;
+  onDeleteSelection: () => void | Promise<void>;
+  onDeleteSlots: (slots: string[]) => Promise<void>;
+  onReselectSlots: (slots: string[]) => void;
+  showDeleteSelection: boolean;
+  isDeletingSelection?: boolean;
 };
 
 // ─── Pure helper functions ────────────────────────────────────────────────────
@@ -147,11 +157,11 @@ function buildActivityHierarchy(
 function getStepQuestion(step: QuestionnaireStep): string {
   switch (step) {
     case "primary_activity":
-      return "Welche Haupttätigkeit hast du in dieser Zeit ausgeführt?";
+      return "Welche Haupttätigkeit hast du ausgeführt?";
     case "secondary_activity":
       return "Hast du gleichzeitig eine Nebentätigkeit ausgeführt?";
     case "digital_media":
-      return "Hast du für die Aktivität ein IT-Gerät (z.B. Smartphone, Tablet oder ähnlich) genutzt?";
+      return "Hast du ein Gerät genutzt? (Smartphone, Tablet, PC…)";
     case "digital_media_type":
       return "Welche Geräte hast du genutzt?";
     case "location_transport":
@@ -159,22 +169,39 @@ function getStepQuestion(step: QuestionnaireStep): string {
     case "social_context":
       return "War jemand anders mit dabei?";
     case "satisfaction":
-      return "Wie hast du dich während dieser Zeit gefühlt?";
+      return "Wie hast du dich gefühlt?";
   }
 }
 
-// Returns a 0–100 progress value used to fill the progress bar
-function getStepProgress(step: QuestionnaireStep): number {
-  const progressMap: Record<QuestionnaireStep, number> = {
-    primary_activity: 5,
-    secondary_activity: 20,
-    digital_media: 38,
-    digital_media_type: 52,
-    location_transport: 65,
-    social_context: 80,
-    satisfaction: 100,
+// Returns label and step index (1-based) out of total for the step indicator
+function getStepMeta(step: QuestionnaireStep): {
+  index: number;
+  total: number;
+  label: string;
+} {
+  const steps: QuestionnaireStep[] = [
+    "primary_activity",
+    "secondary_activity",
+    "digital_media",
+    "digital_media_type",
+    "location_transport",
+    "social_context",
+    "satisfaction",
+  ];
+  const labels: Record<QuestionnaireStep, string> = {
+    primary_activity: "Haupttätigkeit",
+    secondary_activity: "Nebentätigkeit",
+    digital_media: "Gerät?",
+    digital_media_type: "Geräteart",
+    location_transport: "Ort",
+    social_context: "Sozial",
+    satisfaction: "Stimmung",
   };
-  return progressMap[step] ?? 0;
+  return {
+    index: steps.indexOf(step) + 1,
+    total: steps.length,
+    label: labels[step],
+  };
 }
 
 // Formats the selected slot range as a readable string: "08:00 – 09:30 (9 Felder)"
@@ -189,6 +216,162 @@ function formatSlotsRange(slots: Set<string>): string {
     .toString()
     .padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}`;
   return `${firstSlot} – ${endStr} · ${slots.size} Felder`;
+}
+
+function slotToMinutes(slot: string): number {
+  const [hour, minute] = slot.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+function minutesToSlot(minutes: number): string {
+  const normalized = ((minutes % 1440) + 1440) % 1440;
+  return `${Math.floor(normalized / 60)
+    .toString()
+    .padStart(2, "0")}:${(normalized % 60).toString().padStart(2, "0")}`;
+}
+
+// Groups contiguous 10-minute slots into compact ranges: ["08:00 - 09:30", "12:00 - 12:20"]
+function formatMergedSlotRanges(slots: Set<string>): string[] {
+  if (slots.size === 0) return [];
+
+  const sortedMinutes = [...slots].map(slotToMinutes).sort((a, b) => a - b);
+
+  const ranges: Array<{ start: number; endExclusive: number }> = [];
+  let start = sortedMinutes[0];
+  let previous = sortedMinutes[0];
+
+  for (let i = 1; i < sortedMinutes.length; i++) {
+    const current = sortedMinutes[i];
+    if (current === previous + 10) {
+      previous = current;
+      continue;
+    }
+
+    ranges.push({ start, endExclusive: previous + 10 });
+    start = current;
+    previous = current;
+  }
+
+  ranges.push({ start, endExclusive: previous + 10 });
+
+  return ranges.map((range) => {
+    const startText = minutesToSlot(range.start);
+    const endText = minutesToSlot(range.endExclusive);
+    return `${startText} - ${endText}`;
+  });
+}
+
+function findActivityById(
+  lookupData: LookupData,
+  activityId: number | null,
+): LookupData["activities"][number] | null {
+  if (activityId === null) return null;
+  return (
+    lookupData.activities.find((a) => a.activity_id === activityId) ?? null
+  );
+}
+
+function findCategoryForActivity(
+  lookupData: LookupData,
+  activityId: number | null,
+): LookupData["categories"][number] | null {
+  const activity = findActivityById(lookupData, activityId);
+  if (!activity) return null;
+
+  const subcategory = lookupData.subcategories.find(
+    (s) => s.subcategory_id === activity.subcategory_id,
+  );
+  if (!subcategory) return null;
+
+  return (
+    lookupData.categories.find(
+      (c) => c.category_id === subcategory.category_id,
+    ) ?? null
+  );
+}
+
+function findNameById<T extends Record<string, unknown>>(
+  rows: T[],
+  idKey: keyof T,
+  idValue: number | null,
+): string | null {
+  if (idValue === null) return null;
+  const row = rows.find((item) => item[idKey] === idValue);
+  if (!row) return null;
+  return typeof row.name === "string" ? row.name : null;
+}
+
+type SelectedSlotGroup = {
+  start: number;
+  endExclusive: number;
+  entry: TimeEntryRecord | null;
+};
+
+function buildSelectedSlotGroups(
+  selectedSlots: Set<string>,
+  existingEntries: TimeEntryRecord[],
+): SelectedSlotGroup[] {
+  if (selectedSlots.size === 0) return [];
+
+  const entryByStartTime = new Map(
+    existingEntries.map((entry) => [entry.start_time, entry]),
+  );
+
+  const orderedMinutes = [...selectedSlots]
+    .map(slotToMinutes)
+    .sort((a, b) => a - b);
+
+  const groups: SelectedSlotGroup[] = [];
+
+  function getSignature(entry: TimeEntryRecord | null): string {
+    if (!entry) return "__empty__";
+    return JSON.stringify({
+      p: entry.primary_activity_id,
+      s: entry.secondary_activity_id,
+      dm: entry.digital_media_used,
+      dmt: [...entry.digital_media_type_ids].sort((a, b) => a - b),
+      l: entry.location_transport_id,
+      sc: [...entry.social_context_ids].sort((a, b) => a - b),
+      sat: entry.satisfaction_id,
+    });
+  }
+
+  let currentStart = orderedMinutes[0];
+  let previousMinute = orderedMinutes[0];
+  let currentEntry = entryByStartTime.get(minutesToSlot(currentStart)) ?? null;
+  let currentSignature = getSignature(currentEntry);
+
+  for (let i = 1; i < orderedMinutes.length; i++) {
+    const minute = orderedMinutes[i];
+    const entry = entryByStartTime.get(minutesToSlot(minute)) ?? null;
+    const signature = getSignature(entry);
+    const isContiguous = minute === previousMinute + 10;
+    const isSameContent = signature === currentSignature;
+
+    if (isContiguous && isSameContent) {
+      previousMinute = minute;
+      continue;
+    }
+
+    groups.push({
+      start: currentStart,
+      endExclusive: previousMinute + 10,
+      entry: currentEntry,
+    });
+
+    currentStart = minute;
+    previousMinute = minute;
+    currentEntry = entry;
+    currentSignature = signature;
+  }
+
+  groups.push({
+    start: currentStart,
+    endExclusive: previousMinute + 10,
+    entry: currentEntry,
+  });
+
+  return groups;
 }
 
 function normalizeLabel(value: string): string {
@@ -565,13 +748,38 @@ export default function ActivitySelector({
   step,
   pendingEntry,
   selectedSlots,
+  existingEntries,
   lookupData,
   onStepComplete,
   onBack,
-  onCancel,
+  onDeleteSelection,
+  onDeleteSlots,
+  onReselectSlots,
+  showDeleteSelection,
+  isDeletingSelection = false,
 }: ActivitySelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
+  // Open editor by default when the selection has no existing entries (fresh slots)
+  const hasAnyExistingEntryInSelection =
+    selectedSlots.size > 0 &&
+    [...selectedSlots].some((slot) =>
+      existingEntries.some((e) => e.start_time === slot),
+    );
+  const [isEditorVisible, setIsEditorVisible] = useState(
+    !hasAnyExistingEntryInSelection,
+  );
+
+  // Reset editor visibility whenever the slot selection changes
+  useEffect(() => {
+    if (forceEditorOpenRef.current) {
+      forceEditorOpenRef.current = false;
+      setIsEditorVisible(true);
+      return;
+    }
+    setIsEditorVisible(!hasAnyExistingEntryInSelection);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSlots]);
 
   useEffect(() => {
     setSearchQuery("");
@@ -585,6 +793,70 @@ export default function ActivitySelector({
   }, [searchQuery]);
 
   const hierarchy = buildActivityHierarchy(lookupData, searchQuery);
+  const activeBrowsingCategory = hierarchy.find(
+    (category) => category.category_id === activeCategoryId,
+  );
+  const mergedSlotRanges = formatMergedSlotRanges(selectedSlots);
+  const selectedSlotGroups = buildSelectedSlotGroups(
+    selectedSlots,
+    existingEntries,
+  );
+  const uniqueSelectedSignatures = new Set(
+    selectedSlotGroups.map((group) =>
+      group.entry
+        ? JSON.stringify({
+            p: group.entry.primary_activity_id,
+            s: group.entry.secondary_activity_id,
+            dm: group.entry.digital_media_used,
+            dmt: [...group.entry.digital_media_type_ids].sort((a, b) => a - b),
+            l: group.entry.location_transport_id,
+            sc: [...group.entry.social_context_ids].sort((a, b) => a - b),
+            sat: group.entry.satisfaction_id,
+          })
+        : "__empty__",
+    ),
+  );
+  const hasMixedSelectionContent = uniqueSelectedSignatures.size > 1;
+
+  const primaryActivity = findActivityById(
+    lookupData,
+    pendingEntry.primary_activity_id,
+  );
+  const secondaryActivity = findActivityById(
+    lookupData,
+    pendingEntry.secondary_activity_id,
+  );
+  const primaryCategory = findCategoryForActivity(
+    lookupData,
+    pendingEntry.primary_activity_id,
+  );
+  const secondaryCategory = findCategoryForActivity(
+    lookupData,
+    pendingEntry.secondary_activity_id,
+  );
+
+  const locationName = findNameById(
+    lookupData.locationTransports,
+    "location_transport_id",
+    pendingEntry.location_transport_id,
+  );
+  const satisfactionName = findNameById(
+    lookupData.satisfactions,
+    "satisfaction_id",
+    pendingEntry.satisfaction_id,
+  );
+
+  const socialContextNames = lookupData.socialContexts
+    .filter((item) =>
+      pendingEntry.social_context_ids.includes(item.social_context_id),
+    )
+    .map((item) => item.name);
+
+  const digitalMediaTypeNames = lookupData.digitalMediaTypes
+    .filter((item) =>
+      pendingEntry.digital_media_type_ids.includes(item.digital_media_type_id),
+    )
+    .map((item) => item.name);
 
   // ── Step content renderers ──────────────────────────────────────────────────
 
@@ -632,9 +904,9 @@ export default function ActivitySelector({
           <button
             type="button"
             onClick={() => onStepComplete({ secondary_activity_id: null })}
-            className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
           >
-            Ohne Nebentätigkeit weiter
+            Keine Nebentätigkeit → Weiter
           </button>
         }
       />
@@ -1048,20 +1320,24 @@ export default function ActivitySelector({
     icon: LucideIcon;
     chipClass: string;
   } {
-    const n = name.toLowerCase();
+    const n = normalizeLabel(name);
     if (n.includes("alleine") || n.includes("allein"))
       return {
         icon: UserX,
         chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
       };
-    if (n.includes("partner") || n.includes("ehepartner"))
+    if (
+      n.includes("partner") ||
+      n.includes("ehepartner") ||
+      n.includes("haushalt") ||
+      n.includes("haushaltsmitglied") ||
+      n.includes("familie") ||
+      n.includes("eltern") ||
+      n.includes("mutter") ||
+      n.includes("vater")
+    )
       return {
-        icon: Heart,
-        chipClass: "bg-rose-50 text-rose-500 ring-rose-100",
-      };
-    if (n.includes("eltern") || n.includes("mutter") || n.includes("vater"))
-      return {
-        icon: Users,
+        icon: n.includes("partner") || n.includes("ehepartner") ? Heart : Home,
         chipClass: "bg-amber-50 text-amber-600 ring-amber-100",
       };
     if (n.includes("bis 9") || n.includes("kind") || n.includes("baby"))
@@ -1069,15 +1345,11 @@ export default function ActivitySelector({
         icon: Baby,
         chipClass: "bg-pink-50 text-pink-500 ring-pink-100",
       };
-    if (n.includes("haushalt"))
-      return {
-        icon: Home,
-        chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
-      };
     if (
       n.includes("freunde") ||
       n.includes("kollegen") ||
-      n.includes("bekannte")
+      n.includes("bekannte") ||
+      n.includes("andere bekannte")
     )
       return {
         icon: UserCheck,
@@ -1244,61 +1516,523 @@ export default function ActivitySelector({
     }
   }
 
-  const progressPercent = getStepProgress(step);
+  const stepMeta = getStepMeta(step);
   const isFirstStep = step === "primary_activity";
+  const isSecondaryStep = step === "secondary_activity";
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const forceEditorOpenRef = useRef(false);
+
+  function openEditor(groupSlots?: string[]) {
+    if (groupSlots) {
+      forceEditorOpenRef.current = true;
+      onReselectSlots(groupSlots);
+    }
+    setIsEditorVisible(true);
+    setTimeout(() => {
+      containerRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+  }
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      {/* Header: selected time range + back/cancel actions */}
-      <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-blue-700 ring-1 ring-blue-100">
-            <Clock3 className="h-4 w-4 shrink-0" />
-            <span className="text-sm font-semibold">
-              {formatSlotsRange(selectedSlots)}
+    <div
+      ref={containerRef}
+      className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+    >
+      {/* Header: time range badge */}
+      <div className="flex items-center gap-3 px-4 pt-3 pb-3 border-b border-slate-100">
+        <div className="flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-1.5 text-blue-700 ring-1 ring-blue-100">
+          <Clock3 className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-semibold">
+            {formatSlotsRange(selectedSlots)}
+          </span>
+        </div>
+      </div>
+
+      {/* Full-width step progress — only when editor is open */}
+      {isEditorVisible && (
+        <div className="px-4 pt-3 pb-1">
+          {/* Label positioned above the active segment */}
+          <div className="relative mb-1.5 h-4">
+            <span
+              className="absolute text-[11px] font-bold uppercase tracking-widest text-slate-500 transition-all duration-300 whitespace-nowrap -translate-x-1/2"
+              style={{
+                left: `${((stepMeta.index - 1) / stepMeta.total + 1 / (2 * stepMeta.total)) * 100}%`,
+              }}
+            >
+              {step === "primary_activity"
+                ? "Haupttätigkeit"
+                : isSecondaryStep
+                  ? "Nebentätigkeit"
+                  : stepMeta.label}
             </span>
           </div>
+          <div className="flex gap-1">
+            {Array.from({ length: stepMeta.total }, (_, i) => {
+              const done = i < stepMeta.index - 1;
+              const active = i === stepMeta.index - 1;
+              return (
+                <div
+                  key={i}
+                  className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                    active
+                      ? "bg-blue-500"
+                      : done
+                        ? "bg-blue-300"
+                        : "bg-slate-200"
+                  }`}
+                />
+              );
+            })}
+          </div>
           {!isFirstStep && (
-            <button
-              type="button"
-              onClick={onBack}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50"
-            >
-              ← Zurück
-            </button>
+            <div className="mt-2 flex">
+              <button
+                type="button"
+                onClick={onBack}
+                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500 shadow-sm transition-colors hover:bg-slate-50"
+                title="Zurück"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-3 w-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+                Zurück
+              </button>
+            </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-slate-400 hover:text-slate-600 transition-colors text-lg leading-none"
-          title="Auswahl aufheben"
-        >
-          ✕
-        </button>
-      </div>
+      )}
 
-      {/* Progress bar */}
-      <div className="px-4 pb-3">
-        <div className="h-1 w-full rounded-full bg-slate-100">
-          <div
-            className="h-1 rounded-full bg-blue-500 transition-all duration-300"
-            style={{ width: `${progressPercent}%` }}
-          />
+      {/* Selection overview: time-led list only */}
+      {hasAnyExistingEntryInSelection && !isEditorVisible && (
+        <div className="mx-4 mb-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <div className="hidden">
+            <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Zeit
+              </p>
+              <div className="mt-1.5 flex max-h-36 flex-wrap gap-1.5 overflow-auto pr-1">
+                {mergedSlotRanges.length > 0 ? (
+                  mergedSlotRanges.map((range) => (
+                    <span
+                      key={range}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100"
+                    >
+                      <Clock3 className="h-3.5 w-3.5" />
+                      {range}
+                    </span>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-400">Keine Zeitslots</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Kategorie
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {primaryCategory && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Hauptkategorie: {primaryCategory.name}
+                  </span>
+                )}
+                {activeBrowsingCategory && !primaryCategory && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-100">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Gewählte Kategorie: {activeBrowsingCategory.name}
+                  </span>
+                )}
+                {primaryActivity && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
+                    <Briefcase className="h-3.5 w-3.5" />
+                    Haupttätigkeit: {primaryActivity.name}
+                  </span>
+                )}
+                {secondaryCategory && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700 ring-1 ring-teal-100">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Nebenkategorie: {secondaryCategory.name}
+                  </span>
+                )}
+                {secondaryActivity && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700 ring-1 ring-teal-100">
+                    <Briefcase className="h-3.5 w-3.5" />
+                    Nebentätigkeit: {secondaryActivity.name}
+                  </span>
+                )}
+                {!primaryCategory &&
+                  !primaryActivity &&
+                  !secondaryCategory &&
+                  !secondaryActivity && (
+                    <p className="text-xs text-slate-400">
+                      Noch nichts ausgewählt
+                    </p>
+                  )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Kontext
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {locationName && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-100">
+                    <MapPin className="h-3.5 w-3.5" />
+                    Ort/Transport: {locationName}
+                  </span>
+                )}
+                {socialContextNames.map((name) => (
+                  <span
+                    key={name}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-100"
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    Sozial: {name}
+                  </span>
+                ))}
+                {!locationName && socialContextNames.length === 0 && (
+                  <p className="text-xs text-slate-400">
+                    Noch nichts ausgewählt
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Medien
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {digitalMediaTypeNames.map((name) => (
+                  <span
+                    key={name}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-violet-100"
+                  >
+                    <Smartphone className="h-3.5 w-3.5" />
+                    {name}
+                  </span>
+                ))}
+                {digitalMediaTypeNames.length === 0 && (
+                  <p className="text-xs text-slate-400">
+                    Noch nichts ausgewählt
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Stimmung
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {satisfactionName ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-100">
+                    <Heart className="h-3.5 w-3.5" />
+                    {satisfactionName}
+                  </span>
+                ) : (
+                  <p className="text-xs text-slate-400">
+                    Noch nichts ausgewählt
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {selectedSlotGroups.length > 0 && (
+            <div className="mt-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+              <p className="hidden text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Zeitgeführte Auflistung
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {selectedSlotGroups.map((group, index) => {
+                  const timeRange = `${minutesToSlot(group.start)} - ${minutesToSlot(group.endExclusive)}`;
+
+                  if (!group.entry) {
+                    return (
+                      <div
+                        key={`${group.start}-${group.endExclusive}-${index}`}
+                        className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"
+                      >
+                        <span className="shrink-0 text-xs font-semibold text-slate-700">
+                          {timeRange}
+                        </span>
+                        <span className="flex-1 text-xs text-slate-400">
+                          Kein Eintrag
+                        </span>
+                        <button
+                          type="button"
+                          title="Eintrag hinzufügen"
+                          onClick={() => {
+                            const groupSlots: string[] = [];
+                            for (
+                              let m = group.start;
+                              m < group.endExclusive;
+                              m += 10
+                            ) {
+                              groupSlots.push(minutesToSlot(m));
+                            }
+                            openEditor(groupSlots);
+                          }}
+                          className="shrink-0 rounded-md border border-blue-200 bg-blue-50 p-1 text-blue-600 transition-colors hover:bg-blue-100"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  const rowPrimaryCategory = findCategoryForActivity(
+                    lookupData,
+                    group.entry.primary_activity_id,
+                  );
+                  const rowPrimaryActivity = findActivityById(
+                    lookupData,
+                    group.entry.primary_activity_id,
+                  );
+                  const rowSecondaryActivity = findActivityById(
+                    lookupData,
+                    group.entry.secondary_activity_id,
+                  );
+                  const rowSecondaryCategory = findCategoryForActivity(
+                    lookupData,
+                    group.entry.secondary_activity_id,
+                  );
+                  const rowLocationName = findNameById(
+                    lookupData.locationTransports,
+                    "location_transport_id",
+                    group.entry.location_transport_id,
+                  );
+                  const rowSatisfaction = findNameById(
+                    lookupData.satisfactions,
+                    "satisfaction_id",
+                    group.entry.satisfaction_id,
+                  );
+                  const rowMediaItems = lookupData.digitalMediaTypes
+                    .filter((item) =>
+                      group.entry?.digital_media_type_ids.includes(
+                        item.digital_media_type_id,
+                      ),
+                    )
+                    .map((item) => ({
+                      name: item.name,
+                      ...getDigitalMediaTypeVisual(item.name),
+                    }));
+                  const rowSocialItems = lookupData.socialContexts
+                    .filter((sc) =>
+                      group.entry?.social_context_ids.includes(
+                        sc.social_context_id,
+                      ),
+                    )
+                    .map((sc) => ({
+                      name: sc.name,
+                      ...getSocialContextVisual(sc.name),
+                    }));
+
+                  // Primary category: index → color + visual icons
+                  const rowPriCatIdx = rowPrimaryCategory
+                    ? lookupData.categories.findIndex(
+                        (c) => c.category_id === rowPrimaryCategory.category_id,
+                      )
+                    : -1;
+                  const rowPriVisual = rowPrimaryCategory
+                    ? getCategoryVisual(rowPrimaryCategory.name, rowPriCatIdx)
+                    : null;
+                  const rowPriColor =
+                    rowPriCatIdx >= 0
+                      ? CATEGORY_COLORS[rowPriCatIdx % CATEGORY_COLORS.length]
+                      : "#94A3B8";
+                  const RowPriCatIcon = rowPriVisual?.primaryIcon ?? null;
+                  const RowPriActIcon = rowPriVisual?.secondaryIcon ?? null;
+
+                  // Secondary activity category
+                  const rowSecCatIdx = rowSecondaryCategory
+                    ? lookupData.categories.findIndex(
+                        (c) =>
+                          c.category_id === rowSecondaryCategory.category_id,
+                      )
+                    : -1;
+                  const rowSecVisual = rowSecondaryCategory
+                    ? getCategoryVisual(rowSecondaryCategory.name, rowSecCatIdx)
+                    : null;
+                  const rowSecColor =
+                    rowSecCatIdx >= 0
+                      ? CATEGORY_COLORS[rowSecCatIdx % CATEGORY_COLORS.length]
+                      : "#94A3B8";
+                  const RowSecActIcon = rowSecVisual?.primaryIcon ?? null;
+
+                  // Location
+                  const rowLocVisual = rowLocationName
+                    ? getLocationMappings(rowLocationName)
+                    : null;
+                  const RowLocIcon = rowLocVisual?.icon ?? null;
+
+                  // Satisfaction emoji
+                  const rowSatisfactionEmoji = rowSatisfaction
+                    ? getSmileyForSatisfaction(rowSatisfaction)
+                    : null;
+
+                  return (
+                    <div
+                      key={`${group.start}-${group.endExclusive}-${index}`}
+                      className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"
+                    >
+                      <span className="shrink-0 text-xs font-semibold text-slate-700">
+                        {timeRange}
+                      </span>
+                      <div className="flex flex-1 flex-wrap gap-1.5">
+                        {rowPrimaryActivity && RowPriActIcon && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold"
+                            style={{
+                              backgroundColor: `${rowPriColor}1a`,
+                              color: rowPriColor,
+                              border: `1px solid ${rowPriColor}40`,
+                            }}
+                          >
+                            <RowPriActIcon className="h-3.5 w-3.5" />
+                            {rowPrimaryActivity.name}
+                          </span>
+                        )}
+                        {rowSecondaryActivity && RowSecActIcon && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+                            style={{
+                              backgroundColor: `${rowSecColor}1a`,
+                              color: rowSecColor,
+                              border: `1px solid ${rowSecColor}40`,
+                            }}
+                          >
+                            <RowSecActIcon className="h-3.5 w-3.5" />
+                            {rowSecondaryActivity.name}
+                          </span>
+                        )}
+                        {rowLocationName && RowLocIcon && (
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ${rowLocVisual!.chipClass}`}
+                          >
+                            <RowLocIcon className="h-3.5 w-3.5" />
+                            {rowLocationName}
+                          </span>
+                        )}
+                        {rowSocialItems.map(({ name, icon: SocIcon }) => (
+                          <span
+                            key={name}
+                            className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-600 ring-1 ring-amber-100"
+                          >
+                            <SocIcon className="h-3.5 w-3.5" />
+                            {name}
+                          </span>
+                        ))}
+                        {rowMediaItems.map(({ name, icon: MediaIcon }) => (
+                          <span
+                            key={name}
+                            className="inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-violet-100"
+                          >
+                            <MediaIcon className="h-3.5 w-3.5" />
+                            {name}
+                          </span>
+                        ))}
+                        {rowSatisfaction && rowSatisfactionEmoji && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-rose-100">
+                            <span className="text-sm leading-none">
+                              {rowSatisfactionEmoji}
+                            </span>
+                            {rowSatisfaction}
+                          </span>
+                        )}
+                      </div>
+                      {/* Row actions: edit + delete */}
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          title="Bearbeiten"
+                          onClick={() => {
+                            const groupSlots: string[] = [];
+                            for (
+                              let m = group.start;
+                              m < group.endExclusive;
+                              m += 10
+                            ) {
+                              groupSlots.push(minutesToSlot(m));
+                            }
+                            openEditor(groupSlots);
+                          }}
+                          className="rounded-md border border-slate-200 bg-white p-1 text-slate-500 transition-colors hover:bg-slate-100"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Löschen"
+                          onClick={() => {
+                            const groupSlots: string[] = [];
+                            for (
+                              let m = group.start;
+                              m < group.endExclusive;
+                              m += 10
+                            ) {
+                              groupSlots.push(minutesToSlot(m));
+                            }
+                            void onDeleteSlots(groupSlots);
+                          }}
+                          disabled={isDeletingSelection}
+                          className="rounded-md border border-red-200 bg-red-50 p-1 text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {/* Question */}
-      <div className="px-4 pb-4 pt-1">
-        <h3 className="text-lg font-bold text-slate-900 leading-snug">
-          {getStepQuestion(step)}
-        </h3>
-      </div>
+      {/* Back button for fresh (no existing entries) selection */}
+      {!hasAnyExistingEntryInSelection && !isFirstStep && !isEditorVisible && (
+        <div className="mx-4 mb-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50"
+          >
+            ← Zurück
+          </button>
+        </div>
+      )}
 
-      {/* Step content (scrollable if needed) */}
-      <div className="px-4 pb-4">{renderStepContent()}</div>
+      {/* Question + editor only shown on explicit edit action */}
+      <div className={isEditorVisible ? "block" : "hidden"}>
+        <div className="px-4 pb-2 pt-3">
+          <h3 className="text-base font-bold leading-snug text-slate-900">
+            {getStepQuestion(step)}
+          </h3>
+        </div>
+
+        {/* Step content (scrollable if needed) */}
+        <div className="px-4 pb-4">{renderStepContent()}</div>
+      </div>
     </div>
   );
 }

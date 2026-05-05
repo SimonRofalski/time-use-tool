@@ -306,6 +306,12 @@ export default function SecurityQuestionsForm({
                     <option
                       key={option.security_question_id}
                       value={option.security_question_id}
+                      disabled={rows.some(
+                        (entry, entryIndex) =>
+                          entryIndex !== index &&
+                          entry.questionId ===
+                            String(option.security_question_id),
+                      )}
                     >
                       {option.question_text}
                     </option>
