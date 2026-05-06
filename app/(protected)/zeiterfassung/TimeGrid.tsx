@@ -310,7 +310,8 @@ export default function TimeGrid({
                   onMouseDown={(e) => handleCellMouseDown(slot, e)}
                   onMouseEnter={() => handleCellMouseEnter(slot)}
                   className={`
-                    cursor-pointer rounded-sm transition-all duration-75
+                    rounded-sm transition-all duration-75
+                    cursor-pointer
                     ${
                       isHighlighted
                         ? "ring-1 ring-blue-500 ring-inset brightness-75 md:ring-2"

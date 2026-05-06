@@ -690,13 +690,13 @@ function ActivityList({
                       key={subcategory.subcategory_id}
                       className="rounded-xl border p-3"
                       style={{
-                        borderColor: `${category.color}30`,
-                        backgroundColor: `${category.color}07`,
+                        borderColor: `${category.color}50`,
+                        backgroundColor: `${category.color}0d`,
                       }}
                     >
                       <p
-                        className="mb-2 text-xs font-semibold uppercase tracking-wide"
-                        style={{ color: `${category.color}99` }}
+                        className="mb-2 text-xs font-bold uppercase tracking-wide"
+                        style={{ color: category.color }}
                       >
                         {subcategory.name}
                       </p>
@@ -711,17 +711,19 @@ function ActivityList({
                               onClick={() =>
                                 onActivitySelect(activity.activity_id)
                               }
-                              className={`rounded-2xl border px-4 py-3 text-sm font-medium leading-snug transition-all ${
+                              className={`rounded-2xl border px-4 py-3 text-sm font-semibold leading-snug transition-all ${
                                 isSelected
                                   ? "border-transparent text-white shadow-sm"
-                                  : "border-white text-slate-700 hover:opacity-80"
+                                  : "hover:opacity-90 active:scale-95"
                               }`}
                               style={
                                 isSelected
                                   ? { backgroundColor: category.color }
                                   : {
-                                      backgroundColor: `${category.color}15`,
+                                      backgroundColor: `${category.color}22`,
                                       color: category.color,
+                                      borderColor: `${category.color}60`,
+                                      filter: "brightness(0.92)",
                                     }
                               }
                             >
@@ -760,6 +762,9 @@ export default function ActivitySelector({
 }: ActivitySelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
+  const [stepValidationError, setStepValidationError] = useState<string | null>(
+    null,
+  );
   // Open editor by default when the selection has no existing entries (fresh slots)
   const hasAnyExistingEntryInSelection =
     selectedSlots.size > 0 &&
@@ -784,6 +789,7 @@ export default function ActivitySelector({
   useEffect(() => {
     setSearchQuery("");
     setActiveCategoryId(null);
+    setStepValidationError(null);
   }, [step]);
 
   useEffect(() => {
@@ -1004,6 +1010,7 @@ export default function ActivitySelector({
     });
 
     const selectedIds = new Set(pendingEntry.digital_media_type_ids);
+    const isContinueDisabled = selectedIds.size === 0;
 
     function toggleDevice(id: number) {
       const updated = new Set(selectedIds);
@@ -1012,7 +1019,19 @@ export default function ActivitySelector({
       } else {
         updated.add(id);
       }
+      setStepValidationError(null);
       onStepComplete({ digital_media_type_ids: [...updated] });
+    }
+
+    function handleContinue() {
+      if (selectedIds.size === 0) {
+        setStepValidationError("Bitte wähle mindestens eine Geräteart aus.");
+        return;
+      }
+      onStepComplete({
+        digital_media_type_ids: [...selectedIds],
+        _advance: true,
+      } as any);
     }
 
     return (
@@ -1055,15 +1074,20 @@ export default function ActivitySelector({
             );
           })}
         </div>
+        {stepValidationError && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+            {stepValidationError}
+          </p>
+        )}
         <button
           type="button"
-          onClick={() =>
-            onStepComplete({
-              digital_media_type_ids: [...selectedIds],
-              _advance: true,
-            } as any)
-          }
-          className="w-full rounded-lg bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
+          onClick={handleContinue}
+          disabled={isContinueDisabled}
+          className={`w-full rounded-lg py-2.5 text-sm font-medium transition-colors ${
+            isContinueDisabled
+              ? "cursor-not-allowed bg-slate-300 text-slate-500"
+              : "bg-slate-800 text-white hover:bg-slate-700"
+          }`}
         >
           Weiter
         </button>
@@ -1364,6 +1388,7 @@ export default function ActivitySelector({
   // Step 6: who was the user with? (multiple choice — needs explicit confirm)
   function renderSocialContextStep() {
     const selectedIds = new Set(pendingEntry.social_context_ids);
+    const isContinueDisabled = selectedIds.size === 0;
 
     // Toggle a social context id in the pending selection
     function toggleSocialContext(id: number) {
@@ -1373,8 +1398,22 @@ export default function ActivitySelector({
       } else {
         updated.add(id);
       }
+      setStepValidationError(null);
       // Update pendingEntry directly without advancing step
       onStepComplete({ social_context_ids: [...updated] });
+    }
+
+    function handleContinue() {
+      if (selectedIds.size === 0) {
+        setStepValidationError(
+          "Bitte wähle mindestens einen Sozialkontext aus.",
+        );
+        return;
+      }
+      onStepComplete({
+        social_context_ids: [...selectedIds],
+        _advance: true,
+      } as any);
     }
 
     return (
@@ -1412,17 +1451,23 @@ export default function ActivitySelector({
           })}
         </div>
 
+        {stepValidationError && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+            {stepValidationError}
+          </p>
+        )}
+
         {/* Confirm multi-selection and advance to next step */}
         {/* _advance flag tells the parent this is a step transition, not a toggle update */}
         <button
           type="button"
-          onClick={() =>
-            onStepComplete({
-              social_context_ids: [...selectedIds],
-              _advance: true,
-            } as any)
-          }
-          className="w-full rounded-lg bg-slate-800 py-2.5 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
+          onClick={handleContinue}
+          disabled={isContinueDisabled}
+          className={`w-full rounded-lg py-2.5 text-sm font-medium transition-colors ${
+            isContinueDisabled
+              ? "cursor-not-allowed bg-slate-300 text-slate-500"
+              : "bg-slate-800 text-white hover:bg-slate-700"
+          }`}
         >
           Weiter
         </button>
@@ -1544,76 +1589,69 @@ export default function ActivitySelector({
       ref={containerRef}
       className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden"
     >
-      {/* Header: time range badge */}
+      {/* Header: time range badge + step progress inline */}
       <div className="flex items-center gap-3 px-4 pt-3 pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-1.5 text-blue-700 ring-1 ring-blue-100">
+        <div className="flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-1.5 text-blue-700 ring-1 ring-blue-100 shrink-0">
           <Clock3 className="h-4 w-4 shrink-0" />
           <span className="text-sm font-semibold">
             {formatSlotsRange(selectedSlots)}
           </span>
         </div>
-      </div>
 
-      {/* Full-width step progress — only when editor is open */}
-      {isEditorVisible && (
-        <div className="px-4 pt-3 pb-1">
-          {/* Label positioned above the active segment */}
-          <div className="relative mb-1.5 h-4">
-            <span
-              className="absolute text-[11px] font-bold uppercase tracking-widest text-slate-500 transition-all duration-300 whitespace-nowrap -translate-x-1/2"
-              style={{
-                left: `${((stepMeta.index - 1) / stepMeta.total + 1 / (2 * stepMeta.total)) * 100}%`,
-              }}
-            >
+        {isEditorVisible && (
+          <div className="flex flex-1 flex-col gap-1 min-w-0">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
               {step === "primary_activity"
                 ? "Haupttätigkeit"
                 : isSecondaryStep
                   ? "Nebentätigkeit"
                   : stepMeta.label}
             </span>
-          </div>
-          <div className="flex gap-1">
-            {Array.from({ length: stepMeta.total }, (_, i) => {
-              const done = i < stepMeta.index - 1;
-              const active = i === stepMeta.index - 1;
-              return (
-                <div
-                  key={i}
-                  className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                    active
-                      ? "bg-blue-500"
-                      : done
-                        ? "bg-blue-300"
-                        : "bg-slate-200"
-                  }`}
-                />
-              );
-            })}
-          </div>
-          {!isFirstStep && (
-            <div className="mt-2 flex">
-              <button
-                type="button"
-                onClick={onBack}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500 shadow-sm transition-colors hover:bg-slate-50"
-                title="Zurück"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-3 w-3"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-                Zurück
-              </button>
+            <div className="flex gap-1">
+              {Array.from({ length: stepMeta.total }, (_, i) => {
+                const done = i < stepMeta.index - 1;
+                const active = i === stepMeta.index - 1;
+                return (
+                  <div
+                    key={i}
+                    className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                      active
+                        ? "bg-blue-500"
+                        : done
+                          ? "bg-blue-300"
+                          : "bg-slate-200"
+                    }`}
+                  />
+                );
+              })}
             </div>
-          )}
+          </div>
+        )}
+      </div>
+
+      {/* Back button — only shown when editor is open and not on first step */}
+      {isEditorVisible && !isFirstStep && (
+        <div className="px-4 pt-2 pb-1 flex">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500 shadow-sm transition-colors hover:bg-slate-50"
+            title="Zurück"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-3 w-3"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            Zurück
+          </button>
         </div>
       )}
 
@@ -1792,9 +1830,9 @@ export default function ActivitySelector({
                             }
                             openEditor(groupSlots);
                           }}
-                          className="shrink-0 rounded-md border border-blue-200 bg-blue-50 p-1 text-blue-600 transition-colors hover:bg-blue-100"
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-blue-300 bg-blue-50 text-blue-700 shadow-sm transition-colors hover:bg-blue-100"
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <Plus className="h-4 w-4" />
                         </button>
                       </div>
                     );
@@ -1961,7 +1999,7 @@ export default function ActivitySelector({
                         )}
                       </div>
                       {/* Row actions: edit + delete */}
-                      <div className="flex shrink-0 items-center gap-1">
+                      <div className="flex shrink-0 items-center gap-1.5">
                         <button
                           type="button"
                           title="Bearbeiten"
@@ -1976,9 +2014,9 @@ export default function ActivitySelector({
                             }
                             openEditor(groupSlots);
                           }}
-                          className="rounded-md border border-slate-200 bg-white p-1 text-slate-500 transition-colors hover:bg-slate-100"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-100"
                         >
-                          <Pencil className="h-3.5 w-3.5" />
+                          <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           type="button"
@@ -1995,9 +2033,9 @@ export default function ActivitySelector({
                             void onDeleteSlots(groupSlots);
                           }}
                           disabled={isDeletingSelection}
-                          className="rounded-md border border-red-200 bg-red-50 p-1 text-red-500 transition-colors hover:bg-red-100 disabled:opacity-50"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 bg-red-50 text-red-600 shadow-sm transition-colors hover:bg-red-100 disabled:opacity-50"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>

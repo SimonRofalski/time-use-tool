@@ -229,59 +229,64 @@ function CompletionBar({
         : "text-orange-600";
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      {/* Date row with stronger previous/current/next emphasis */}
-      <div className="mb-3 grid grid-cols-1 items-stretch gap-2 sm:grid-cols-[auto_1fr_auto]">
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+      {/* Date row: prev | current (with inline progress) | next */}
+      <div className="grid grid-cols-1 items-stretch gap-2 sm:grid-cols-[140px_1fr_140px]">
         <button
           type="button"
           onClick={() => canGoPrev && onDateChange(allDates[currentIndex - 1])}
           disabled={!canGoPrev}
-          className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+          className="relative overflow-hidden rounded-md border border-slate-200 bg-white px-4 py-1.5 text-right transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
         >
-          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-            Vorher
+          <span className="pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 text-5xl font-light text-slate-400 select-none leading-none">
+            ‹
+          </span>
+          <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400">
+            Letzter
           </p>
-          <p className="text-xs font-medium text-slate-600">
+          <p className="relative text-xs font-medium text-slate-600">
             {previousDate
               ? formatDateCompactGerman(previousDate)
               : "Kein früherer Tag"}
           </p>
         </button>
 
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-          <p className="text-sm font-bold text-blue-950 sm:text-[15px]">
+        {/* Current date + progress inline */}
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <p className="text-sm font-bold text-blue-950 sm:text-[15px] leading-tight">
             {formatDateGerman(currentDate)}
           </p>
+          <div className="mt-1 flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full bg-blue-100">
+              <div
+                className={`h-1.5 rounded-full ${progressFillClass} transition-all duration-500`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span
+              className={`text-[10px] font-semibold whitespace-nowrap ${progressTextClass}`}
+            >
+              {coveredSlots}/{TOTAL_SLOTS_PER_DAY} · {progressPercent}%
+            </span>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={() => canGoNext && onDateChange(allDates[currentIndex + 1])}
           disabled={!canGoNext}
-          className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-right transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+          className="relative overflow-hidden rounded-md border border-slate-200 bg-white px-4 py-1.5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
         >
-          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+          <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-5xl font-light text-slate-400 select-none leading-none">
+            ›
+          </span>
+          <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400">
             Nächster
           </p>
-          <p className="text-xs font-medium text-slate-600">
+          <p className="relative text-xs font-medium text-slate-600">
             {nextDate ? formatDateCompactGerman(nextDate) : "Kein späterer Tag"}
           </p>
         </button>
-      </div>
-
-      {/* Progress bar + slot count */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-2 rounded-full bg-slate-100">
-          <div
-            className={`h-2 rounded-full ${progressFillClass} transition-all duration-500`}
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-        <span
-          className={`text-xs font-medium whitespace-nowrap ${progressTextClass}`}
-        >
-          {coveredSlots} / {TOTAL_SLOTS_PER_DAY} · {progressPercent}%
-        </span>
       </div>
     </div>
   );
