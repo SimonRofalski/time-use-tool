@@ -412,12 +412,19 @@ function SubcategoryAccordion({
     <>
       {/* Subcategory row */}
       <tr
-        className="cursor-pointer hover:bg-slate-50 transition-colors"
+        className="cursor-pointer transition-colors"
+        style={{ backgroundColor: `${color}18` }}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.backgroundColor = `${color}28`)
+        }
+        onMouseLeave={(e) =>
+          (e.currentTarget.style.backgroundColor = `${color}18`)
+        }
         onClick={onToggle}
       >
         {/* Indent + expand icon */}
         <td className="py-2 pl-8 pr-2">
-          <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+          <div className="flex items-center gap-1.5 text-slate-700 text-sm">
             {sub.activities.length > 0 ? (
               sub.isExpanded ? (
                 <ChevronDown
@@ -489,7 +496,7 @@ function SubcategoryAccordion({
       {/* Activity rows — visible only when subcategory is expanded */}
       {sub.isExpanded &&
         sub.activities.map((act) => (
-          <tr key={act.activityId} className="bg-slate-50/50">
+          <tr key={act.activityId} style={{ backgroundColor: `${color}0c` }}>
             <td className="py-1.5 pl-14 pr-2 text-xs text-slate-500">
               {act.name}
             </td>
@@ -753,15 +760,15 @@ export default function ZeitverteilungTab({
                 <XAxis
                   dataKey="date"
                   tickFormatter={formatDateShort}
-                  tick={{ fontSize: 10, fill: "#94a3b8" }}
+                  tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
                   interval={0}
-                  height={22}
+                  height={24}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   tickFormatter={(v) => `${Math.round(v / 60)}h`}
-                  tick={{ fontSize: 10, fill: "#94a3b8" }}
+                  tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
                   axisLine={false}
                   tickLine={false}
                   domain={[0, MINUTES_PER_DAY]}
@@ -919,112 +926,116 @@ export default function ZeitverteilungTab({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {categoryRows.map((cat) => (
-                <Fragment key={cat.categoryId}>
-                  {/* Category row */}
-                  <tr
-                    className="cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => onToggleCategory(cat.categoryId)}
-                  >
-                    <td className="py-3 pl-4 pr-2">
-                      <div className="flex items-center gap-2">
-                        {/* Color dot */}
-                        <span
-                          className="inline-block w-3 h-3 rounded-full flex-shrink-0"
-                          style={{
-                            backgroundColor: getCategoryColorById(
-                              cat.categoryId,
-                            ),
-                          }}
-                        />
-                        {/* Expand / collapse chevron */}
-                        {cat.subcategories.length > 0 ? (
-                          cat.isExpanded ? (
-                            <ChevronDown
-                              size={15}
-                              className="flex-shrink-0 text-slate-400"
-                            />
+              {categoryRows.map((cat) => {
+                const catColor = getCategoryColorById(cat.categoryId);
+                return (
+                  <Fragment key={cat.categoryId}>
+                    {/* Category row */}
+                    <tr
+                      className="cursor-pointer transition-colors"
+                      style={{ backgroundColor: `${catColor}12` }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.backgroundColor = `${catColor}22`)
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.backgroundColor = `${catColor}12`)
+                      }
+                      onClick={() => onToggleCategory(cat.categoryId)}
+                    >
+                      <td className="py-3 pl-4 pr-2">
+                        <div className="flex items-center gap-2">
+                          {/* Expand / collapse chevron */}
+                          {cat.subcategories.length > 0 ? (
+                            cat.isExpanded ? (
+                              <ChevronDown
+                                size={15}
+                                className="flex-shrink-0 text-slate-400"
+                              />
+                            ) : (
+                              <ChevronRight
+                                size={15}
+                                className="flex-shrink-0 text-slate-400"
+                              />
+                            )
                           ) : (
-                            <ChevronRight
-                              size={15}
-                              className="flex-shrink-0 text-slate-400"
-                            />
-                          )
-                        ) : (
-                          <span className="w-4" />
-                        )}
-                        <span className="text-sm font-medium text-slate-800">
-                          {cat.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-sm font-semibold text-slate-800 text-right whitespace-nowrap">
-                      {formatMinutes(cat.totalMinutes)}
-                    </td>
-                    <td className="py-3 px-3 text-sm text-slate-600 text-right whitespace-nowrap">
-                      {cat.percentOfTotal.toFixed(1)}%
-                    </td>
-                    {/* Mini progress bar — hidden when meta cols shown */}
-                    {!showActivityMeta && (
-                      <td className="py-3 pl-3 pr-4 w-32">
-                        <div className="h-2 w-full rounded-full bg-slate-100">
-                          <div
-                            className="h-2 rounded-full transition-all"
-                            style={{
-                              width: `${Math.min(cat.percentOfTotal, 100)}%`,
-                              backgroundColor: getCategoryColorById(
-                                cat.categoryId,
-                              ),
-                            }}
-                          />
+                            <span className="w-4" />
+                          )}
+                          <span className="text-sm font-semibold text-slate-800">
+                            {cat.name}
+                          </span>
                         </div>
                       </td>
-                    )}
-                    {showActivityMeta &&
-                      (() => {
-                        const allActs = cat.subcategories.flatMap(
-                          (s) => s.activities,
-                        );
-                        const agg = aggregateActivitiesMeta(allActs);
-                        return (
-                          <>
-                            <PairCell
-                              pair={agg.devices}
-                              leftLabel="mit IT"
-                              rightLabel="ohne IT"
+                      <td className="py-3 px-3 text-sm font-semibold text-slate-800 text-right whitespace-nowrap">
+                        {formatMinutes(cat.totalMinutes)}
+                      </td>
+                      <td className="py-3 px-3 text-sm text-slate-600 text-right whitespace-nowrap">
+                        {cat.percentOfTotal.toFixed(1)}%
+                      </td>
+                      {/* Mini progress bar — hidden when meta cols shown */}
+                      {!showActivityMeta && (
+                        <td className="py-3 pl-3 pr-4 w-32">
+                          <div className="h-2 w-full rounded-full bg-slate-100">
+                            <div
+                              className="h-2 rounded-full transition-all"
+                              style={{
+                                width: `${Math.min(cat.percentOfTotal, 100)}%`,
+                                backgroundColor: getCategoryColorById(
+                                  cat.categoryId,
+                                ),
+                              }}
                             />
-                            <PairCell
-                              pair={agg.social}
-                              leftLabel="mit anderen"
-                              rightLabel="allein"
-                            />
-                            <PairCell
-                              pair={agg.location}
-                              leftLabel="zuhause"
-                              rightLabel="anderswo"
-                            />
-                            <SatisfactionCell label={agg.avgSatisfaction} />
-                          </>
-                        );
-                      })()}
-                  </tr>
+                          </div>
+                        </td>
+                      )}
+                      {showActivityMeta &&
+                        (() => {
+                          const allActs = cat.subcategories.flatMap(
+                            (s) => s.activities,
+                          );
+                          const agg = aggregateActivitiesMeta(allActs);
+                          return (
+                            <>
+                              <PairCell
+                                pair={agg.devices}
+                                leftLabel="mit IT"
+                                rightLabel="ohne IT"
+                              />
+                              <PairCell
+                                pair={agg.social}
+                                leftLabel="mit anderen"
+                                rightLabel="allein"
+                              />
+                              <PairCell
+                                pair={agg.location}
+                                leftLabel="zuhause"
+                                rightLabel="anderswo"
+                              />
+                              <SatisfactionCell label={agg.avgSatisfaction} />
+                            </>
+                          );
+                        })()}
+                    </tr>
 
-                  {/* Subcategory + activity rows — visible when category is expanded */}
-                  {cat.isExpanded &&
-                    cat.subcategories.map((sub) => (
-                      <SubcategoryAccordion
-                        key={sub.subcategoryId}
-                        sub={sub}
-                        totalMinutes={grandTotalMinutes}
-                        color={getCategoryColorById(cat.categoryId)}
-                        showActivityMeta={showActivityMeta}
-                        onToggle={() =>
-                          onToggleSubcategory(cat.categoryId, sub.subcategoryId)
-                        }
-                      />
-                    ))}
-                </Fragment>
-              ))}
+                    {/* Subcategory + activity rows — visible when category is expanded */}
+                    {cat.isExpanded &&
+                      cat.subcategories.map((sub) => (
+                        <SubcategoryAccordion
+                          key={sub.subcategoryId}
+                          sub={sub}
+                          totalMinutes={grandTotalMinutes}
+                          color={getCategoryColorById(cat.categoryId)}
+                          showActivityMeta={showActivityMeta}
+                          onToggle={() =>
+                            onToggleSubcategory(
+                              cat.categoryId,
+                              sub.subcategoryId,
+                            )
+                          }
+                        />
+                      ))}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         )}

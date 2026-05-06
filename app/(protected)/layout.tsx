@@ -453,328 +453,428 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     .filter(Boolean)
     .join(" ");
 
+  const showSecurityQuestionsGate = needsSecurityQuestions === true;
+  const showProfileDetailsGate =
+    needsSecurityQuestions === false && needsProfileDetails === true;
+  const showEnrollmentGate =
+    needsSecurityQuestions === false &&
+    needsProfileDetails === false &&
+    isEnrolled === false;
+  const showOnboardingGate =
+    showSecurityQuestionsGate || showProfileDetailsGate || showEnrollmentGate;
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
-      <header
-        className={`sticky top-0 z-20 border-b backdrop-blur transition-colors ${
-          adminMode
-            ? "border-amber-200 bg-amber-50/95 dark:border-amber-800/60 dark:bg-amber-950/90"
-            : "border-slate-200 bg-white/95 dark:border-slate-800 dark:bg-slate-950/95"
-        }`}
-      >
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0" />
-            <h1 className="shrink-0 whitespace-nowrap text-base font-semibold text-slate-800 dark:text-slate-100 sm:text-lg">
-              Time Use Tool
-            </h1>
-            {activeCourseName && !adminMode && (
-              <>
-                <span className="shrink-0 text-slate-300 dark:text-slate-600">
-                  ·
-                </span>
-                <span className="min-w-0 truncate text-xs font-medium text-slate-500 dark:text-slate-400 sm:text-sm">
-                  {activeCourseName}
-                </span>
-              </>
-            )}
-          </div>
+      {!showOnboardingGate && (
+        <>
+          <header
+            className={`sticky top-0 z-20 border-b backdrop-blur transition-colors ${
+              adminMode
+                ? "border-amber-200 bg-amber-50/95 dark:border-amber-800/60 dark:bg-amber-950/90"
+                : "border-slate-200 bg-white/95 dark:border-slate-800 dark:bg-slate-950/95"
+            }`}
+          >
+            <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0" />
+                <h1 className="shrink-0 whitespace-nowrap text-base font-semibold text-slate-800 dark:text-slate-100 sm:text-lg">
+                  Time Use Tool
+                </h1>
+                {activeCourseName && !adminMode && (
+                  <>
+                    <span className="shrink-0 text-slate-300 dark:text-slate-600">
+                      ·
+                    </span>
+                    <span className="min-w-0 truncate text-xs font-medium text-slate-500 dark:text-slate-400 sm:text-sm">
+                      {activeCourseName}
+                    </span>
+                  </>
+                )}
+              </div>
 
-          {/* Admin mode badge — centered */}
-          {adminMode && (
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-100 px-3 py-1 dark:border-amber-600/50 dark:bg-amber-900/40">
-              <ShieldCheck
-                size={13}
-                className="shrink-0 text-amber-700 dark:text-amber-400"
+              {/* Admin mode badge — centered */}
+              {adminMode && (
+                <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-100 px-3 py-1 dark:border-amber-600/50 dark:bg-amber-900/40">
+                  <ShieldCheck
+                    size={13}
+                    className="shrink-0 text-amber-700 dark:text-amber-400"
+                  />
+                  <span className="text-xs font-semibold tracking-wide text-amber-800 dark:text-amber-300">
+                    Admin-Modus
+                  </span>
+                </div>
+              )}
+
+              <div className="ml-3 flex shrink-0 items-center gap-2">
+                {isAdmin &&
+                  (adminMode ? (
+                    <button
+                      type="button"
+                      aria-label="Zurück zum Zeittagebuch"
+                      className="inline-flex min-w-[5.9rem] items-center justify-center gap-1.5 rounded-2xl border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs font-semibold tracking-tight text-sky-700 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-500/60 dark:hover:bg-sky-500/15 sm:min-w-[7.75rem] sm:gap-2 sm:px-3.5 sm:text-sm"
+                      onClick={() => {
+                        setAdminMode(false);
+                        setSettingsOpen(false);
+                      }}
+                    >
+                      <ArrowLeft size={16} className="shrink-0" />
+                      <span className="text-center leading-[1.05] sm:leading-none">
+                        <span className="block sm:inline">Zuruck zur</span>
+                        <span className="block sm:inline sm:ml-1">Eingabe</span>
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      aria-label="Admin-Center öffnen"
+                      className="inline-flex min-w-[5.9rem] items-center justify-center gap-1.5 rounded-2xl border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs font-semibold tracking-tight text-amber-800 shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100 hover:text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:border-amber-500/60 dark:hover:bg-amber-500/15 sm:min-w-[7.75rem] sm:gap-2 sm:px-3.5 sm:text-sm"
+                      onClick={() => {
+                        setAdminMode(true);
+                        setSettingsOpen(false);
+                      }}
+                    >
+                      <ShieldCheck size={16} className="shrink-0" />
+                      <span className="text-center leading-[1.05] sm:leading-none">
+                        <span className="block sm:inline">Admin-</span>
+                        <span className="block sm:inline">Modus</span>
+                      </span>
+                    </button>
+                  ))}
+
+                <div className="relative" ref={profileMenuRef}>
+                  <div className="group relative">
+                    <button
+                      type="button"
+                      aria-label="Profilmenü öffnen"
+                      className={`rounded-full border p-2.5 transition-colors ${
+                        profileMenuOpen || profileModalOpen
+                          ? "border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300"
+                          : "border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                      }`}
+                      onClick={() => setProfileMenuOpen((current) => !current)}
+                    >
+                      <User size={18} />
+                    </button>
+                    <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-slate-700">
+                      Profil
+                    </span>
+                  </div>
+
+                  {profileMenuOpen && (
+                    <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                      <div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800">
+                        <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                          {fullName || "Profilname fehlt"}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500">
+                          {user.email}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                        onClick={openProfileModal}
+                      >
+                        <User size={16} />
+                        Persönliche Angaben
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                        onClick={openSecurityQuestionsModal}
+                      >
+                        <ShieldCheck size={16} />
+                        Sicherheitsfragen
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50 dark:hover:bg-red-500/10"
+                        onClick={handleSignOut}
+                      >
+                        <LogOut size={16} />
+                        Ausloggen
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="group relative">
+                  <button
+                    type="button"
+                    aria-label="Einstellungen öffnen"
+                    className={`rounded-full border p-2.5 transition-colors ${
+                      settingsOpen
+                        ? "border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300"
+                        : "border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                    }`}
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      setSettingsOpen(true);
+                    }}
+                  >
+                    <Settings size={18} />
+                  </button>
+                  <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-slate-700">
+                    Einstellungen
+                  </span>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <nav className="sticky top-[73px] z-10 border-b border-slate-200 bg-white/95 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950/95">
+            <div className="mx-auto max-w-7xl px-4">
+              <div className="flex">
+                {adminMode
+                  ? adminTabs.map((tab) => {
+                      const isActive = activeAdminTab === tab.id;
+                      const Icon = tab.icon;
+
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
+                            isActive
+                              ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
+                              : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-100"
+                          }`}
+                          onClick={() => setActiveAdminTab(tab.id)}
+                        >
+                          <Icon size={16} className="shrink-0 sm:hidden" />
+                          <Icon
+                            size={18}
+                            className="shrink-0 hidden sm:block"
+                          />
+                          <span className="hidden sm:inline">{tab.label}</span>
+                          <span className="sm:hidden text-xs font-semibold">
+                            {tab.label.charAt(0) +
+                              tab.label.slice(1).toLowerCase()}
+                          </span>
+                        </button>
+                      );
+                    })
+                  : tabs.map((tab) => {
+                      const isActive = pathname === tab.path;
+                      const Icon = tab.icon;
+
+                      return (
+                        <Link
+                          key={tab.path}
+                          href={tab.path}
+                          className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
+                            isActive
+                              ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
+                              : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-100"
+                          }`}
+                        >
+                          <Icon size={16} className="shrink-0 sm:hidden" />
+                          <Icon
+                            size={18}
+                            className="shrink-0 hidden sm:block"
+                          />
+                          <span className="hidden sm:inline">{tab.label}</span>
+                          <span className="sm:hidden text-xs font-semibold">
+                            {tab.label.charAt(0) +
+                              tab.label.slice(1).toLowerCase()}
+                          </span>
+                        </Link>
+                      );
+                    })}
+              </div>
+            </div>
+          </nav>
+
+          {settingsOpen && (
+            <div className="fixed inset-0 z-50 flex justify-end">
+              <div
+                className="flex-1 bg-slate-950/45 backdrop-blur-sm"
+                onClick={() => setSettingsOpen(false)}
               />
-              <span className="text-xs font-semibold tracking-wide text-amber-800 dark:text-amber-300">
-                Admin-Modus
-              </span>
+              <aside className="flex h-full w-full max-w-sm flex-col border-l border-slate-200 bg-white p-5 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      Einstellungen
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      Darstellung und Kontoinformationen anpassen.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen(false)}
+                    className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  className="mt-8 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-left transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-800/80"
+                  onClick={() =>
+                    setTheme((current) =>
+                      current === "dark" ? "light" : "dark",
+                    )
+                  }
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      Darkmode
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      Schaltet zwischen heller und dunkler Darstellung um.
+                    </p>
+                  </div>
+                  <div
+                    className={`rounded-full p-3 ${
+                      theme === "dark"
+                        ? "bg-blue-500/15 text-blue-500 dark:text-blue-300"
+                        : "bg-amber-100 text-amber-600 dark:bg-slate-700 dark:text-slate-200"
+                    }`}
+                  >
+                    {theme === "dark" ? (
+                      <Moon size={18} />
+                    ) : (
+                      <SunMedium size={18} />
+                    )}
+                  </div>
+                </button>
+
+                <div className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-950">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Konto
+                  </p>
+                  <dl className="mt-4 space-y-3 text-sm">
+                    <div>
+                      <dt className="text-xs text-slate-500 dark:text-slate-400">
+                        User ID
+                      </dt>
+                      <dd className="mt-1 break-all font-mono text-xs text-slate-700 dark:text-slate-200">
+                        {user.id}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-500 dark:text-slate-400">
+                        Letztes Login
+                      </dt>
+                      <dd className="mt-1 text-slate-800 dark:text-slate-100">
+                        {formatDateTime(user.last_sign_in_at)}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              </aside>
             </div>
           )}
 
-          <div className="ml-3 flex shrink-0 items-center gap-2">
-            {isAdmin &&
-              (adminMode ? (
-                <button
-                  type="button"
-                  aria-label="Zurück zum Zeittagebuch"
-                  className="inline-flex min-w-[5.9rem] items-center justify-center gap-1.5 rounded-2xl border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs font-semibold tracking-tight text-sky-700 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-500/60 dark:hover:bg-sky-500/15 sm:min-w-[7.75rem] sm:gap-2 sm:px-3.5 sm:text-sm"
-                  onClick={() => {
-                    setAdminMode(false);
-                    setSettingsOpen(false);
-                  }}
-                >
-                  <ArrowLeft size={16} className="shrink-0" />
-                  <span className="text-center leading-[1.05] sm:leading-none">
-                    <span className="block sm:inline">Zuruck zur</span>
-                    <span className="block sm:inline sm:ml-1">Eingabe</span>
-                  </span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  aria-label="Admin-Center öffnen"
-                  className="inline-flex min-w-[5.9rem] items-center justify-center gap-1.5 rounded-2xl border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs font-semibold tracking-tight text-amber-800 shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100 hover:text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:border-amber-500/60 dark:hover:bg-amber-500/15 sm:min-w-[7.75rem] sm:gap-2 sm:px-3.5 sm:text-sm"
-                  onClick={() => {
-                    setAdminMode(true);
-                    setSettingsOpen(false);
-                  }}
-                >
-                  <ShieldCheck size={16} className="shrink-0" />
-                  <span className="text-center leading-[1.05] sm:leading-none">
-                    <span className="block sm:inline">Admin-</span>
-                    <span className="block sm:inline">Modus</span>
-                  </span>
-                </button>
-              ))}
-
-            <div className="relative" ref={profileMenuRef}>
-              <div className="group relative">
-                <button
-                  type="button"
-                  aria-label="Profilmenü öffnen"
-                  className={`rounded-full border p-2.5 transition-colors ${
-                    profileMenuOpen || profileModalOpen
-                      ? "border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300"
-                      : "border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
-                  }`}
-                  onClick={() => setProfileMenuOpen((current) => !current)}
-                >
-                  <User size={18} />
-                </button>
-                <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-slate-700">
-                  Profil
-                </span>
-              </div>
-
-              {profileMenuOpen && (
-                <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-                  <div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800">
-                    <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {fullName || "Profilname fehlt"}
-                    </p>
-                    <p className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500">
-                      {user.email}
-                    </p>
+          {profileModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+              <div
+                className="absolute inset-0"
+                onClick={() => {
+                  handleProfileModalClose();
+                }}
+              />
+              <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+                {!profileModalMandatory && (
+                  <div className="mb-4 flex justify-end">
+                    <button
+                      type="button"
+                      className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                      onClick={handleProfileModalClose}
+                    >
+                      <X size={20} />
+                    </button>
                   </div>
+                )}
+                <ProfileDetailsForm
+                  allowEditToggle={!profileModalMandatory}
+                  initialEditMode={profileModalMandatory ? true : false}
+                  showAccountInfoBar={false}
+                  showPopupHint={false}
+                  requireCompletion={profileModalMandatory}
+                  onEditStateChange={setProfileFormIsEditing}
+                  onSaved={handleProfileSaved}
+                />
+              </div>
+            </div>
+          )}
 
-                  <button
-                    type="button"
-                    className="mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                    onClick={openProfileModal}
-                  >
-                    <User size={16} />
-                    Persönliche Angaben
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                    onClick={openSecurityQuestionsModal}
-                  >
-                    <ShieldCheck size={16} />
-                    Sicherheitsfragen
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50 dark:hover:bg-red-500/10"
-                    onClick={handleSignOut}
-                  >
-                    <LogOut size={16} />
-                    Ausloggen
-                  </button>
+          {securityQuestionsModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+              {!securityQuestionsMandatory && (
+                <div
+                  className="absolute inset-0"
+                  onClick={handleSecurityQuestionsModalClose}
+                />
+              )}
+              <div className="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+                {!securityQuestionsMandatory && (
+                  <div className="mb-4 flex justify-end">
+                    <button
+                      type="button"
+                      className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                      onClick={handleSecurityQuestionsModalClose}
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                )}
+                <SecurityQuestionsForm
+                  allowEditToggle={!securityQuestionsMandatory}
+                  requireCompletion={securityQuestionsMandatory}
+                  onSaved={handleSecurityQuestionsSaved}
+                />
+              </div>
+            </div>
+          )}
+
+          {adminMode ? (
+            <main className="mx-auto max-w-7xl px-4 py-6">
+              {activeAdminTab === "kursuebersicht" && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+                  <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Kursübersicht
+                  </h3>
+                  <KursuebersichtTab />
                 </div>
               )}
-            </div>
-
-            <div className="group relative">
-              <button
-                type="button"
-                aria-label="Einstellungen öffnen"
-                className={`rounded-full border p-2.5 transition-colors ${
-                  settingsOpen
-                    ? "border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300"
-                    : "border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
-                }`}
-                onClick={() => {
-                  setProfileMenuOpen(false);
-                  setSettingsOpen(true);
-                }}
-              >
-                <Settings size={18} />
-              </button>
-              <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-slate-700">
-                Einstellungen
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <nav className="sticky top-[73px] z-10 border-b border-slate-200 bg-white/95 backdrop-blur transition-colors dark:border-slate-800 dark:bg-slate-950/95">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="flex">
-            {adminMode
-              ? adminTabs.map((tab) => {
-                  const isActive = activeAdminTab === tab.id;
-                  const Icon = tab.icon;
-
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
-                        isActive
-                          ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
-                          : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-100"
-                      }`}
-                      onClick={() => setActiveAdminTab(tab.id)}
-                    >
-                      <Icon size={16} className="shrink-0 sm:hidden" />
-                      <Icon size={18} className="shrink-0 hidden sm:block" />
-                      <span className="hidden sm:inline">{tab.label}</span>
-                      <span className="sm:hidden text-xs font-semibold">
-                        {tab.label.charAt(0) + tab.label.slice(1).toLowerCase()}
-                      </span>
-                    </button>
-                  );
-                })
-              : tabs.map((tab) => {
-                  const isActive = pathname === tab.path;
-                  const Icon = tab.icon;
-
-                  return (
-                    <Link
-                      key={tab.path}
-                      href={tab.path}
-                      className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
-                        isActive
-                          ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
-                          : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-100"
-                      }`}
-                    >
-                      <Icon size={16} className="shrink-0 sm:hidden" />
-                      <Icon size={18} className="shrink-0 hidden sm:block" />
-                      <span className="hidden sm:inline">{tab.label}</span>
-                      <span className="sm:hidden text-xs font-semibold">
-                        {tab.label.charAt(0) + tab.label.slice(1).toLowerCase()}
-                      </span>
-                    </Link>
-                  );
-                })}
-          </div>
-        </div>
-      </nav>
-
-      {settingsOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div
-            className="flex-1 bg-slate-950/45 backdrop-blur-sm"
-            onClick={() => setSettingsOpen(false)}
-          />
-          <aside className="flex h-full w-full max-w-sm flex-col border-l border-slate-200 bg-white p-5 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  Einstellungen
-                </h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Darstellung und Kontoinformationen anpassen.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(false)}
-                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <button
-              type="button"
-              className="mt-8 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-left transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-800/80"
-              onClick={() =>
-                setTheme((current) => (current === "dark" ? "light" : "dark"))
-              }
-            >
-              <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  Darkmode
-                </p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Schaltet zwischen heller und dunkler Darstellung um.
-                </p>
-              </div>
-              <div
-                className={`rounded-full p-3 ${
-                  theme === "dark"
-                    ? "bg-blue-500/15 text-blue-500 dark:text-blue-300"
-                    : "bg-amber-100 text-amber-600 dark:bg-slate-700 dark:text-slate-200"
-                }`}
-              >
-                {theme === "dark" ? (
-                  <Moon size={18} />
-                ) : (
-                  <SunMedium size={18} />
-                )}
-              </div>
-            </button>
-
-            <div className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-950">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                Konto
-              </p>
-              <dl className="mt-4 space-y-3 text-sm">
-                <div>
-                  <dt className="text-xs text-slate-500 dark:text-slate-400">
-                    User ID
-                  </dt>
-                  <dd className="mt-1 break-all font-mono text-xs text-slate-700 dark:text-slate-200">
-                    {user.id}
-                  </dd>
+              {activeAdminTab === "nutzeruebersicht" && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+                  <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Nutzerübersicht
+                  </h3>
+                  <NutzeruebersichtTab />
                 </div>
-                <div>
-                  <dt className="text-xs text-slate-500 dark:text-slate-400">
-                    Letztes Login
-                  </dt>
-                  <dd className="mt-1 text-slate-800 dark:text-slate-100">
-                    {formatDateTime(user.last_sign_in_at)}
-                  </dd>
+              )}
+              {activeAdminTab === "statistiken" && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+                  <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Statistiken
+                  </h3>
+                  <StatistikenTab />
                 </div>
-              </dl>
-            </div>
-          </aside>
-        </div>
+              )}
+            </main>
+          ) : (
+            <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+          )}
+        </>
       )}
 
-      {profileModalOpen && (
+      {showProfileDetailsGate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
-          <div
-            className="absolute inset-0"
-            onClick={() => {
-              handleProfileModalClose();
-            }}
-          />
           <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
-            {!profileModalMandatory && (
-              <div className="mb-4 flex justify-end">
-                <button
-                  type="button"
-                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                  onClick={handleProfileModalClose}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            )}
             <ProfileDetailsForm
-              allowEditToggle={!profileModalMandatory}
-              initialEditMode={profileModalMandatory ? true : false}
+              allowEditToggle={false}
+              initialEditMode={true}
               showAccountInfoBar={false}
               showPopupHint={false}
-              requireCompletion={profileModalMandatory}
+              requireCompletion={true}
               onEditStateChange={setProfileFormIsEditing}
               onSaved={handleProfileSaved}
             />
@@ -782,71 +882,21 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {securityQuestionsModalOpen && (
+      {showSecurityQuestionsGate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
-          {!securityQuestionsMandatory && (
-            <div
-              className="absolute inset-0"
-              onClick={handleSecurityQuestionsModalClose}
-            />
-          )}
           <div className="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
-            {!securityQuestionsMandatory && (
-              <div className="mb-4 flex justify-end">
-                <button
-                  type="button"
-                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                  onClick={handleSecurityQuestionsModalClose}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            )}
             <SecurityQuestionsForm
-              allowEditToggle={!securityQuestionsMandatory}
-              requireCompletion={securityQuestionsMandatory}
+              allowEditToggle={false}
+              requireCompletion={true}
               onSaved={handleSecurityQuestionsSaved}
             />
           </div>
         </div>
       )}
 
-      {adminMode ? (
-        <main className="mx-auto max-w-7xl px-4 py-6">
-          {activeAdminTab === "kursuebersicht" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Kursübersicht
-              </h3>
-              <KursuebersichtTab />
-            </div>
-          )}
-          {activeAdminTab === "nutzeruebersicht" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Nutzerübersicht
-              </h3>
-              <NutzeruebersichtTab />
-            </div>
-          )}
-          {activeAdminTab === "statistiken" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Statistiken
-              </h3>
-              <StatistikenTab />
-            </div>
-          )}
-        </main>
-      ) : (
-        <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      {showEnrollmentGate && (
+        <EnrollmentModal userId={user.id} onEnrolled={handleEnrolled} />
       )}
-
-      {needsSecurityQuestions === false &&
-        needsProfileDetails === false &&
-        isEnrolled === false && (
-          <EnrollmentModal userId={user.id} onEnrolled={handleEnrolled} />
-        )}
     </div>
   );
 }

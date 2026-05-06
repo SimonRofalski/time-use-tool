@@ -44,6 +44,16 @@ function formatDateGerman(dateString: string): string {
   });
 }
 
+// Formats a date string to compact German format: "Di., 05.05.2026"
+function formatDateCompactGerman(dateString: string): string {
+  return new Date(dateString).toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 // Strips seconds from a DB time string: "08:30:00" → "08:30"
 function normalizeDbTime(dbTime: string): string {
   return dbTime.substring(0, 5);
@@ -199,47 +209,84 @@ function CompletionBar({
   const currentIndex = allDates.indexOf(currentDate);
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex < allDates.length - 1;
+  const previousDate = canGoPrev ? allDates[currentIndex - 1] : null;
+  const nextDate = canGoNext ? allDates[currentIndex + 1] : null;
   const progressPercent = Math.min(
     Math.round((coveredSlots / TOTAL_SLOTS_PER_DAY) * 100),
     100,
   );
+  const progressFillClass =
+    coveredSlots <= 0
+      ? "bg-slate-300"
+      : coveredSlots >= TOTAL_SLOTS_PER_DAY
+        ? "bg-green-500"
+        : "bg-orange-400";
+  const progressTextClass =
+    coveredSlots <= 0
+      ? "text-slate-500"
+      : coveredSlots >= TOTAL_SLOTS_PER_DAY
+        ? "text-green-600"
+        : "text-orange-600";
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      {/* Date row with prev/next navigation */}
-      <div className="flex items-center justify-between mb-2">
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+      {/* Date row: prev | current (with inline progress) | next */}
+      <div className="grid grid-cols-1 items-stretch gap-2 sm:grid-cols-[140px_1fr_140px]">
         <button
           type="button"
           onClick={() => canGoPrev && onDateChange(allDates[currentIndex - 1])}
           disabled={!canGoPrev}
-          className="text-xs font-medium text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="relative overflow-hidden rounded-md border border-slate-200 bg-white px-4 py-1.5 text-right transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
         >
-          ← Vorher
+          <span className="pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 text-5xl font-light text-slate-400 select-none leading-none">
+            ‹
+          </span>
+          <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400">
+            Letzter
+          </p>
+          <p className="relative text-xs font-medium text-slate-600">
+            {previousDate
+              ? formatDateCompactGerman(previousDate)
+              : "Kein früherer Tag"}
+          </p>
         </button>
-        <span className="text-sm font-semibold text-slate-800">
-          {formatDateGerman(currentDate)}
-        </span>
+
+        {/* Current date + progress inline */}
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+          <p className="text-sm font-bold text-blue-950 sm:text-[15px] leading-tight">
+            {formatDateGerman(currentDate)}
+          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full bg-blue-100">
+              <div
+                className={`h-1.5 rounded-full ${progressFillClass} transition-all duration-500`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span
+              className={`text-[10px] font-semibold whitespace-nowrap ${progressTextClass}`}
+            >
+              {coveredSlots}/{TOTAL_SLOTS_PER_DAY} · {progressPercent}%
+            </span>
+          </div>
+        </div>
+
         <button
           type="button"
           onClick={() => canGoNext && onDateChange(allDates[currentIndex + 1])}
           disabled={!canGoNext}
-          className="text-xs font-medium text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="relative overflow-hidden rounded-md border border-slate-200 bg-white px-4 py-1.5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
         >
-          Nächster →
+          <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-5xl font-light text-slate-400 select-none leading-none">
+            ›
+          </span>
+          <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400">
+            Nächster
+          </p>
+          <p className="relative text-xs font-medium text-slate-600">
+            {nextDate ? formatDateCompactGerman(nextDate) : "Kein späterer Tag"}
+          </p>
         </button>
-      </div>
-
-      {/* Progress bar + slot count */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-2 rounded-full bg-slate-100">
-          <div
-            className="h-2 rounded-full bg-blue-500 transition-all duration-500"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-        <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
-          {coveredSlots} / {TOTAL_SLOTS_PER_DAY} · {progressPercent}%
-        </span>
       </div>
     </div>
   );
@@ -266,6 +313,8 @@ export default function ZeiterfassungPage() {
   // Grid + questionnaire
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
   const [pendingEntry, setPendingEntry] = useState<PendingEntry | null>(null);
+  // true when the pending entry was loaded from an existing (already saved) entry
+  const [pendingIsExisting, setPendingIsExisting] = useState(false);
   const [currentStep, setCurrentStep] = useState<QuestionnaireStep | null>(
     null,
   );
@@ -278,6 +327,10 @@ export default function ZeiterfassungPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [gridCollapsed, setGridCollapsed] = useState(false);
+  const [isDeletingSelection, setIsDeletingSelection] = useState(false);
+
+  // Confirmation dialog when user tries to navigate away with progress
+  const [abandonDialog, setAbandonDialog] = useState<null | (() => void)>(null);
 
   useEffect(() => {
     loadPageData();
@@ -484,17 +537,36 @@ export default function ZeiterfassungPage() {
 
   // ── Grid interaction ──────────────────────────────────────────────────────
 
+  // Returns true when the user has made unsaved progress on a NEW entry
+  function hasProgress(): boolean {
+    return !!(
+      pendingEntry &&
+      pendingEntry.primary_activity_id !== null &&
+      !pendingIsExisting
+    );
+  }
+
   // Triggered when the user finishes a drag — starts the questionnaire
   const handleSlotsSelected = useCallback(
     (slots: Set<string>) => {
       if (slots.size === 0) return;
-      const preloaded = getPreloadedEntry(slots, existingEntries);
-      setPendingEntry(preloaded ?? createEmptyPendingEntry([...slots].sort()));
-      setSelectedSlots(slots);
-      setCurrentStep("primary_activity");
-      setStepHistory([]);
+      const proceed = () => {
+        const preloaded = getPreloadedEntry(slots, existingEntries);
+        setPendingEntry(
+          preloaded ?? createEmptyPendingEntry([...slots].sort()),
+        );
+        setPendingIsExisting(!!preloaded);
+        setSelectedSlots(slots);
+        setCurrentStep("primary_activity");
+        setStepHistory([]);
+      };
+      if (hasProgress()) {
+        setAbandonDialog(() => proceed);
+      } else {
+        proceed();
+      }
     },
-    [existingEntries],
+    [existingEntries, pendingEntry],
   );
 
   // ── Questionnaire logic ───────────────────────────────────────────────────
@@ -522,6 +594,8 @@ export default function ZeiterfassungPage() {
     }
 
     setPendingEntry(updatedEntry);
+    // Once the user actively advances a step, treat as unsaved new progress
+    setPendingIsExisting(false);
 
     if (shouldSave) {
       saveEntry(updatedEntry);
@@ -547,6 +621,54 @@ export default function ZeiterfassungPage() {
     setSelectedSlots(new Set());
     setPendingEntry(null);
     setCurrentStep(null);
+    setStepHistory([]);
+  }
+
+  async function handleDeleteSelectedEntries() {
+    if (selectedSlots.size === 0) return;
+
+    // If no day exists yet, there is nothing persisted to remove.
+    if (dayId === null) {
+      handleCancel();
+      return;
+    }
+
+    setIsDeletingSelection(true);
+    try {
+      await deleteOverlappingEntries(dayId, [...selectedSlots].sort());
+      await loadEntriesForDay(dayId);
+      await updateDayCompletion(dayId);
+      handleCancel();
+    } catch {
+      setErrorMessage("Einträge konnten nicht gelöscht werden.");
+    } finally {
+      setIsDeletingSelection(false);
+    }
+  }
+
+  async function handleDeleteSlots(slots: string[]) {
+    if (slots.length === 0) return;
+    if (dayId === null) return;
+    setIsDeletingSelection(true);
+    try {
+      await deleteOverlappingEntries(dayId, slots.sort());
+      await loadEntriesForDay(dayId);
+      await updateDayCompletion(dayId);
+    } catch {
+      setErrorMessage("Einträge konnten nicht gelöscht werden.");
+    } finally {
+      setIsDeletingSelection(false);
+    }
+  }
+
+  function handleReselectSlots(slots: string[]) {
+    if (slots.length === 0) return;
+    const newSet = new Set(slots);
+    const preloaded = getPreloadedEntry(newSet, existingEntries);
+    setPendingEntry(preloaded ?? createEmptyPendingEntry(slots.sort()));
+    setPendingIsExisting(!!preloaded);
+    setSelectedSlots(newSet);
+    setCurrentStep("primary_activity");
     setStepHistory([]);
   }
 
@@ -685,10 +807,17 @@ export default function ZeiterfassungPage() {
   // ── Date navigation ───────────────────────────────────────────────────────
 
   function handleDateChange(date: string) {
-    handleCancel(); // reset questionnaire state before switching days
-    setGridCollapsed(false);
-    setCurrentDate(date);
-    router.replace(`/zeiterfassung?date=${date}`);
+    const proceed = () => {
+      handleCancel();
+      setGridCollapsed(false);
+      setCurrentDate(date);
+      router.replace(`/zeiterfassung?date=${date}`);
+    };
+    if (hasProgress()) {
+      setAbandonDialog(() => proceed);
+    } else {
+      proceed();
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -788,13 +917,15 @@ export default function ZeiterfassungPage() {
               step={currentStep}
               pendingEntry={pendingEntry}
               selectedSlots={selectedSlots}
+              existingEntries={existingEntries}
               lookupData={lookupData}
               onStepComplete={handleStepComplete}
               onBack={handleBack}
-              onCancel={() => {
-                setGridCollapsed(false);
-                handleCancel();
-              }}
+              onDeleteSelection={handleDeleteSelectedEntries}
+              onDeleteSlots={handleDeleteSlots}
+              onReselectSlots={handleReselectSlots}
+              showDeleteSelection={selectedSlots.size > 0}
+              isDeletingSelection={isDeletingSelection}
             />
           ) : (
             <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-10 text-center">
@@ -811,6 +942,40 @@ export default function ZeiterfassungPage() {
           )}
         </div>
       </div>
+
+      {/* Abandon-progress confirmation dialog */}
+      {abandonDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <h2 className="text-base font-semibold text-slate-900">
+              Eingabe abbrechen?
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Du hast bereits Angaben gemacht. Wenn du jetzt wechselst, gehen
+              deine bisherigen Eingaben verloren.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAbandonDialog(null)}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Weiter eingeben
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  abandonDialog();
+                  setAbandonDialog(null);
+                }}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+              >
+                Ja, verwerfen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
