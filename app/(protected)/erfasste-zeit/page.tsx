@@ -355,21 +355,28 @@ export default function ErfassteZeitPage() {
   const [courseDays, setCourseDays] = useState<CourseDay[]>([]);
   const [periods, setPeriods] = useState<CoursePeriodInfo[]>([]);
 
+  // Tracks the last time data was loaded to avoid unnecessary reloads on tab switch
+  const lastLoadTimeRef = useRef<number>(0);
+  const RELOAD_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
   // Load all overview data when the component mounts
   // and whenever the tab/page becomes visible again (e.g. after returning from Zeiterfassung)
   useEffect(() => {
     loadOverviewData();
 
+    const shouldReload = () =>
+      Date.now() - lastLoadTimeRef.current > RELOAD_THRESHOLD_MS;
+
     const handleFocus = () => {
-      void loadOverviewData();
+      if (shouldReload()) void loadOverviewData();
     };
 
     const handlePageShow = () => {
-      void loadOverviewData();
+      if (shouldReload()) void loadOverviewData();
     };
 
     const handleVisibility = () => {
-      if (!document.hidden) void loadOverviewData();
+      if (!document.hidden && shouldReload()) void loadOverviewData();
     };
 
     window.addEventListener("focus", handleFocus);
@@ -406,7 +413,7 @@ export default function ErfassteZeitPage() {
 
     if (userCourseError || !userCourseData) {
       setErrorMessage(
-        "Kein Kurs gefunden. Bitte wenden Sie sich an Ihren Administrator.",
+        "Kein Kurs gefunden. Bitte wende dich an deinen Administrator.",
       );
       setIsLoading(false);
       return;
@@ -531,6 +538,7 @@ export default function ErfassteZeitPage() {
     });
 
     setCourseDays(mergedCourseDays);
+    lastLoadTimeRef.current = Date.now();
     setIsLoading(false);
   }
 

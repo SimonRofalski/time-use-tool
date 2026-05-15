@@ -285,8 +285,8 @@ function SearchableSelect({
             disabled
               ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
               : invalid
-                ? "border-red-300 bg-white focus:border-red-500 focus:ring-red-500"
-                : "border-slate-300 bg-white focus:border-blue-500 focus:ring-blue-500"
+                ? "border-red-300 bg-white text-slate-800 focus:border-red-500 focus:ring-red-500"
+                : "border-slate-300 bg-white text-slate-800 focus:border-blue-500 focus:ring-blue-500"
           }`}
         />
       </div>
@@ -698,7 +698,7 @@ export default function ProfileDetailsForm({
     const missingFields = getMissingRequiredFields(formData);
     if (missingFields.length > 0) {
       setMissingRequiredFields(missingFields);
-      setSaveError("Bitte füllen Sie alle Pflichtfelder aus.");
+      setSaveError("Bitte fülle alle Pflichtfelder aus.");
       setSaving(false);
 
       if (typeof document !== "undefined") {
@@ -858,7 +858,7 @@ export default function ProfileDetailsForm({
       )}
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="sticky top-0 z-20 flex items-start justify-between gap-4 rounded-t-xl border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+        <div className="sticky top-0 z-20 flex items-start justify-between gap-4 rounded-t-xl border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center gap-3">
             <User className="text-blue-600" size={28} />
             <div>
@@ -866,11 +866,11 @@ export default function ProfileDetailsForm({
                 Profil
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Ihre persönlichen Angaben
+                Deine persönlichen Angaben
               </p>
               {showPopupHint && (
                 <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                  Die wichtigsten Kontodaten finden Sie zusätzlich im
+                  Die wichtigsten Kontodaten findest du zusätzlich im
                   Profil-Popup oben rechts.
                 </p>
               )}

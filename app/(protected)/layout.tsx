@@ -520,7 +520,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     >
                       <ArrowLeft size={16} className="shrink-0" />
                       <span className="text-center leading-[1.05] sm:leading-none">
-                        <span className="block sm:inline">Zuruck zur</span>
+                        <span className="block sm:inline">Zurück zur</span>
                         <span className="block sm:inline sm:ml-1">Eingabe</span>
                       </span>
                     </button>
@@ -779,9 +779,9 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                   handleProfileModalClose();
                 }}
               />
-              <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+              <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white px-6 pb-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
                 {!profileModalMandatory && (
-                  <div className="mb-4 flex justify-end">
+                  <div className="mb-4 mt-4 flex justify-end">
                     <button
                       type="button"
                       className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
@@ -812,9 +812,9 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                   onClick={handleSecurityQuestionsModalClose}
                 />
               )}
-              <div className="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+              <div className="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white px-6 pb-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
                 {!securityQuestionsMandatory && (
-                  <div className="mb-4 flex justify-end">
+                  <div className="mb-4 mt-4 flex justify-end">
                     <button
                       type="button"
                       className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
@@ -868,7 +868,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
       {showProfileDetailsGate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
-          <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white px-6 pb-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
             <ProfileDetailsForm
               allowEditToggle={false}
               initialEditMode={true}
@@ -884,7 +884,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
       {showSecurityQuestionsGate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
-          <div className="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white px-6 pb-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
             <SecurityQuestionsForm
               allowEditToggle={false}
               requireCompletion={true}

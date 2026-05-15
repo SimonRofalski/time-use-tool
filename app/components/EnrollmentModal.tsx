@@ -76,13 +76,13 @@ export default function EnrollmentModal({
     setErrorMessage("");
 
     if (!selectedCourseId) {
-      setErrorMessage("Bitte wählen Sie einen Kurs aus.");
+      setErrorMessage("Bitte wähle einen Kurs aus.");
       setIsSubmitting(false);
       return;
     }
 
     if (!accessCode.trim()) {
-      setErrorMessage("Bitte geben Sie den Zugangscode ein.");
+      setErrorMessage("Bitte gib den Zugangscode ein.");
       setIsSubmitting(false);
       return;
     }
@@ -95,14 +95,14 @@ export default function EnrollmentModal({
 
     if (fetchError || !courseData) {
       setErrorMessage(
-        "Kurs konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
+        "Kurs konnte nicht geladen werden. Bitte versuche es erneut.",
       );
       setIsSubmitting(false);
       return;
     }
 
     if (courseData.accessCode !== accessCode.trim()) {
-      setErrorMessage("Ungültiger Zugangscode. Bitte versuchen Sie es erneut.");
+      setErrorMessage("Ungültiger Zugangscode. Bitte versuche es erneut.");
       setIsSubmitting(false);
       return;
     }
@@ -113,7 +113,7 @@ export default function EnrollmentModal({
 
     if (enrollError) {
       setErrorMessage(
-        "Einschreibung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+        "Einschreibung fehlgeschlagen. Bitte versuche es erneut.",
       );
       setIsSubmitting(false);
       return;
@@ -130,8 +130,8 @@ export default function EnrollmentModal({
             Kurs beitreten
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Sie sind noch keinem Kurs zugewiesen. Wählen Sie einen Kurs aus und
-            geben Sie den Zugangscode ein, um fortzufahren.
+            Du bist noch keinem Kurs zugewiesen. Wähle einen Kurs aus und
+            gib den Zugangscode ein, um fortzufahren.
           </p>
         </div>
 
@@ -141,7 +141,7 @@ export default function EnrollmentModal({
 
         {!isLoadingCourses && availableCourses.length === 0 && (
           <p className="text-center text-sm text-slate-500">
-            Derzeit sind keine Kurse verfügbar. Bitte wenden Sie sich an Ihren
+            Derzeit sind keine Kurse verfügbar. Bitte wende dich an deinen
             Administrator.
           </p>
         )}

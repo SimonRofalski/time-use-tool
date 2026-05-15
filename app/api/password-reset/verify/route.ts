@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
   if (!body.profileId || !body.answers || body.answers.length !== 2) {
     return NextResponse.json(
-      { error: "Bitte beantworten Sie beide Sicherheitsfragen." },
+      { error: "Bitte beantworte beide Sicherheitsfragen." },
       { status: 400 },
     );
   }

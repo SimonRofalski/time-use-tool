@@ -87,6 +87,9 @@ function DistributionStrip({
 
   // Generate a friendly German description of the user's position
   function buildPositionText(): string {
+    if (userValue === 0) {
+      return "Keine eigenen Einträge in diesem Zeitraum";
+    }
     if (userPercentile >= 50) {
       return `Du liegst über ${userPercentile}% der Kursgruppe`;
     }

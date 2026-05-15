@@ -127,14 +127,14 @@ export default function SecurityQuestionsForm({
 
     if (!isComplete) {
       setSaveError(
-        "Bitte wählen Sie zwei Fragen und geben Sie beide Antworten an.",
+        "Bitte wähle zwei Fragen und gib beide Antworten an.",
       );
       return;
     }
 
     if (hasDuplicateQuestion) {
       setSaveError(
-        "Bitte wählen Sie zwei unterschiedliche Sicherheitsfragen aus.",
+        "Bitte wähle zwei unterschiedliche Sicherheitsfragen aus.",
       );
       return;
     }
@@ -252,7 +252,7 @@ export default function SecurityQuestionsForm({
               Sicherheitsfragen
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Wählen Sie zwei unterschiedliche Fragen aus und beantworten Sie
+              Wähle zwei unterschiedliche Fragen aus und beantworte
               sie möglichst mit einem kurzen Wort.
             </p>
             {existingRows.length === 2 && (

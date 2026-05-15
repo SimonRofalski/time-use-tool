@@ -27,7 +27,7 @@ const modeContent: Record<
     submitLabel: "Jetzt anmelden",
   },
   signup: {
-    title: "Neuen Account erstellen",
+    title: "Registrieren",
     submitLabel: "Account erstellen",
   },
   "forgot-password": {
@@ -162,7 +162,7 @@ export default function Home() {
         setMode("signin");
         setPassword("");
         setPasswordHasError(false);
-        setStatus("Account erstellt. Sie können sich jetzt anmelden.");
+        setStatus("Account erstellt. Du kannst dich jetzt anmelden.");
         setStatusTone("success");
       }
     } else {
@@ -197,7 +197,7 @@ export default function Home() {
     }
 
     if (resetAnswers.some((answer) => answer.trim().length === 0)) {
-      setStatus("Bitte beantworten Sie beide Sicherheitsfragen.");
+      setStatus("Bitte beantworte beide Sicherheitsfragen.");
       setStatusTone("error");
       return;
     }
@@ -276,7 +276,7 @@ export default function Home() {
     }
 
     setStatus(
-      "Passwort erfolgreich zurückgesetzt. Sie können sich jetzt anmelden.",
+      "Passwort erfolgreich zurückgesetzt. Du kannst dich jetzt anmelden.",
     );
     setStatusTone("success");
     setMode("signin");
@@ -332,7 +332,7 @@ export default function Home() {
               }`}
             >
               <span className="block font-semibold">
-                Neuen Account erstellen
+                Registrieren
               </span>
             </button>
           </div>
