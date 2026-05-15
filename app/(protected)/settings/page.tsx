@@ -6,7 +6,7 @@ export default function SettingsPage() {
       </h1>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
         Die Einstellungen wurden in das Panel oben rechts verschoben. Dort
-        können Sie den Night Modus umstellen und Ihre Kontoinformationen
+        kannst du den Night Modus umstellen und deine Kontoinformationen
         einsehen.
       </p>
     </div>

@@ -69,14 +69,14 @@ export async function POST(request: Request) {
       };
     } catch {
       return NextResponse.json(
-        { error: "Ungültige Anfrage. Bitte versuchen Sie es erneut." },
+        { error: "Ungültige Anfrage. Bitte versuche es erneut." },
         { status: 400 },
       );
     }
 
     if (!body.answers || body.answers.length !== 2) {
       return NextResponse.json(
-        { error: "Bitte geben Sie genau zwei Sicherheitsfragen an." },
+        { error: "Bitte gib genau zwei Sicherheitsfragen an." },
         { status: 400 },
       );
     }
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         {
-          error: "Bitte geben Sie zwei unterschiedliche Fragen mit Antwort an.",
+          error: "Bitte gib zwei unterschiedliche Fragen mit Antwort an.",
         },
         { status: 400 },
       );

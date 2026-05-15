@@ -679,19 +679,26 @@ export default function StatistikenPage() {
     useState<ComparisonMetaStats | null>(null);
   const [qualifyingUserCount, setQualifyingUserCount] = useState(0);
 
+  // Tracks the last time data was loaded to avoid unnecessary reloads on tab switch
+  const lastLoadTimeRef = useRef<number>(0);
+  const RELOAD_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
   useEffect(() => {
     loadAllData();
 
+    const shouldReload = () =>
+      Date.now() - lastLoadTimeRef.current > RELOAD_THRESHOLD_MS;
+
     const handleFocus = () => {
-      void loadAllData();
+      if (shouldReload()) void loadAllData();
     };
 
     const handlePageShow = () => {
-      void loadAllData();
+      if (shouldReload()) void loadAllData();
     };
 
     const handleVisibility = () => {
-      if (!document.hidden) void loadAllData();
+      if (!document.hidden && shouldReload()) void loadAllData();
     };
 
     window.addEventListener("focus", handleFocus);
@@ -1326,6 +1333,7 @@ export default function StatistikenPage() {
       );
     }
 
+    lastLoadTimeRef.current = Date.now();
     setIsLoading(false);
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -84,6 +84,16 @@ function formatMinutesCompact(minutes: number): string {
   if (hours === 0) return `${mins}m`;
   if (mins === 0) return `${hours}h`;
   return `${hours}h ${mins}m`;
+}
+
+// Returns formatted minutes for "total" or "avgPerDay" view mode
+function displayMinutesWithMode(
+  minutes: number,
+  viewMode: "total" | "avgPerDay",
+  submittedDaysCount: number,
+): string {
+  if (viewMode === "total" || submittedDaysCount === 0) return formatMinutes(minutes);
+  return formatMinutes(Math.round(minutes / submittedDaysCount));
 }
 
 // Use the shared category palette and bind colors to category ID so
@@ -400,12 +410,16 @@ function SubcategoryAccordion({
   totalMinutes,
   color,
   showActivityMeta,
+  viewMode,
+  submittedDaysCount,
   onToggle,
 }: {
   sub: SubcategoryRow;
   totalMinutes: number;
   color: string;
   showActivityMeta: boolean;
+  viewMode: "total" | "avgPerDay";
+  submittedDaysCount: number;
   onToggle: () => void;
 }) {
   return (
@@ -444,7 +458,7 @@ function SubcategoryAccordion({
           </div>
         </td>
         <td className="py-2 px-3 text-sm text-slate-700 text-right whitespace-nowrap">
-          {formatMinutes(sub.totalMinutes)}
+          {displayMinutesWithMode(sub.totalMinutes, viewMode, submittedDaysCount)}
         </td>
         <td className="py-2 px-3 text-sm text-slate-500 text-right whitespace-nowrap">
           {sub.percentOfTotal.toFixed(1)}%
@@ -501,7 +515,7 @@ function SubcategoryAccordion({
               {act.name}
             </td>
             <td className="py-1.5 px-3 text-xs text-slate-500 text-right whitespace-nowrap">
-              {formatMinutes(act.totalMinutes)}
+              {displayMinutesWithMode(act.totalMinutes, viewMode, submittedDaysCount)}
             </td>
             <td className="py-1.5 px-3 text-xs text-slate-400 text-right whitespace-nowrap">
               {act.percentOfTotal.toFixed(1)}%
@@ -635,7 +649,45 @@ export default function ZeitverteilungTab({
   onToggleCategory: (categoryId: number) => void;
   onToggleSubcategory: (categoryId: number, subcategoryId: number) => void;
 }) {
+  type SortColumn = "name" | "time" | "percent" | "itDevice" | "social" | "location" | "satisfaction";
+
   const [showActivityMeta, setShowActivityMeta] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("time");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [viewMode, setViewMode] = useState<"total" | "avgPerDay">("total");
+
+  const submittedDaysCount = barData.filter((d) => d.isSubmitted).length;
+
+  function toggleSort(col: SortColumn) {
+    if (sortColumn === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(col);
+      setSortDir(col === "name" ? "asc" : "desc");
+    }
+  }
+
+  // Pre-compute category-level meta values for sorting
+  const categoryMetaValues = useMemo(() => {
+    const result = new Map<number, {
+      itDeviceLeft: number;
+      socialLeft: number;
+      locationLeft: number;
+      satisfactionValue: number;
+    }>();
+    for (const cat of categoryRows) {
+      const allActs = cat.subcategories.flatMap((s) => s.activities);
+      const meta = aggregateActivitiesMeta(allActs);
+      const satParsed = parseSatisfactionLabel(meta.avgSatisfaction ?? undefined);
+      result.set(cat.categoryId, {
+        itDeviceLeft: meta.devices?.leftPercent ?? 0,
+        socialLeft: meta.social?.leftPercent ?? 0,
+        locationLeft: meta.location?.leftPercent ?? 0,
+        satisfactionValue: satParsed ? satParsed.value : 0,
+      });
+    }
+    return result;
+  }, [categoryRows]);
 
   // Build a stable color map: category name → hex color (based on categoryId)
   const categoryColorMap: Record<string, string> = {};
@@ -648,6 +700,22 @@ export default function ZeitverteilungTab({
     (sum, row) => sum + row.totalMinutes,
     0,
   );
+
+  const sortedCategoryRows = [...categoryRows].sort((a, b) => {
+    let cmp = 0;
+    if (sortColumn === "name") cmp = a.name.localeCompare(b.name, "de");
+    else if (sortColumn === "time") cmp = a.totalMinutes - b.totalMinutes;
+    else if (sortColumn === "percent") cmp = a.percentOfTotal - b.percentOfTotal;
+    else {
+      const am = categoryMetaValues.get(a.categoryId);
+      const bm = categoryMetaValues.get(b.categoryId);
+      if (sortColumn === "itDevice") cmp = (am?.itDeviceLeft ?? 0) - (bm?.itDeviceLeft ?? 0);
+      else if (sortColumn === "social") cmp = (am?.socialLeft ?? 0) - (bm?.socialLeft ?? 0);
+      else if (sortColumn === "location") cmp = (am?.locationLeft ?? 0) - (bm?.locationLeft ?? 0);
+      else if (sortColumn === "satisfaction") cmp = (am?.satisfactionValue ?? 0) - (bm?.satisfactionValue ?? 0);
+    }
+    return sortDir === "asc" ? cmp : -cmp;
+  });
 
   const selectedWeekSet = new Set(selectedWeeks);
 
@@ -831,18 +899,33 @@ export default function ZeitverteilungTab({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetaList
-          title="Geräte-Nutzung"
-          items={metaAggregates?.devices ?? []}
+          title={viewMode === "avgPerDay" ? "Geräte-Nutzung (Ø/Tag)" : "Geräte-Nutzung"}
+          items={(metaAggregates?.devices ?? []).map((item) => ({
+            ...item,
+            minutes: viewMode === "avgPerDay" && submittedDaysCount > 0
+              ? item.minutes / submittedDaysCount
+              : item.minutes,
+          }))}
           getIcon={getDeviceIcon}
         />
         <MetaList
-          title="Sozialer Kontext"
-          items={metaAggregates?.social ?? []}
+          title={viewMode === "avgPerDay" ? "Sozialer Kontext (Ø/Tag)" : "Sozialer Kontext"}
+          items={(metaAggregates?.social ?? []).map((item) => ({
+            ...item,
+            minutes: viewMode === "avgPerDay" && submittedDaysCount > 0
+              ? item.minutes / submittedDaysCount
+              : item.minutes,
+          }))}
           getIcon={getSocialIcon}
         />
         <MetaList
-          title="Orte & Transport"
-          items={metaAggregates?.locations ?? []}
+          title={viewMode === "avgPerDay" ? "Orte & Transport (Ø/Tag)" : "Orte & Transport"}
+          items={(metaAggregates?.locations ?? []).map((item) => ({
+            ...item,
+            minutes: viewMode === "avgPerDay" && submittedDaysCount > 0
+              ? item.minutes / submittedDaysCount
+              : item.minutes,
+          }))}
           getIcon={getLocationIcon}
         />
         <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -865,11 +948,35 @@ export default function ZeitverteilungTab({
 
       {/* ── Drill-down table ────────────────────────────────────────────── */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-700">
             Zeitverteilung nach Kategorie
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode("total")}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  viewMode === "total"
+                    ? "bg-white text-slate-700 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Gesamt
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("avgPerDay")}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  viewMode === "avgPerDay"
+                    ? "bg-white text-slate-700 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Ø / Tag
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => setShowActivityMeta((v) => !v)}
@@ -895,38 +1002,73 @@ export default function ZeitverteilungTab({
             <thead>
               <tr className="border-b border-slate-100">
                 <th className="py-2.5 pl-4 pr-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">
-                  Kategorie
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("name")}
+                    className="flex items-center gap-1 hover:text-slate-600 transition-colors"
+                  >
+                    Kategorie
+                    <span className="text-[10px]">
+                      {sortColumn === "name" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                    </span>
+                  </button>
                 </th>
                 <th className="py-2.5 px-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wide">
-                  Zeit
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("time")}
+                    className="flex items-center gap-1 ml-auto hover:text-slate-600 transition-colors"
+                  >
+                    {viewMode === "total" ? "Zeit" : "Ø / Tag"}
+                    <span className="text-[10px]">
+                      {sortColumn === "time" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                    </span>
+                  </button>
                 </th>
                 <th className="py-2.5 px-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wide">
-                  Anteil
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("percent")}
+                    className="flex items-center gap-1 ml-auto hover:text-slate-600 transition-colors"
+                  >
+                    Anteil
+                    <span className="text-[10px]">
+                      {sortColumn === "percent" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                    </span>
+                  </button>
                 </th>
                 {!showActivityMeta && <th className="py-2.5 pl-3 pr-4 w-32" />}
                 {showActivityMeta && (
                   <>
-                    <th className="py-2.5 px-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wide whitespace-nowrap">
-                      IT Gerät
-                    </th>
-                    <th className="py-2.5 px-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wide whitespace-nowrap">
-                      Sozial
-                    </th>
-                    <th className="py-2.5 px-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wide whitespace-nowrap">
-                      Ort
-                    </th>
-                    <th
-                      title="Zeitgewichteter Mittelwert der ausgewählten Gefühlsstufen innerhalb der Zeile"
-                      className="py-2.5 px-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wide whitespace-nowrap"
-                    >
-                      Ø Gefühl
-                    </th>
+                    {(["itDevice", "social", "location", "satisfaction"] as const).map(
+                      (col, i) => {
+                        const labels = ["IT Gerät", "Sozial", "Ort", "Ø Gefühl"] as const;
+                        return (
+                          <th
+                            key={col}
+                            className="py-2.5 px-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wide whitespace-nowrap"
+                            title={col === "satisfaction" ? "Zeitgewichteter Mittelwert der ausgewählten Gefühlsstufen innerhalb der Zeile" : undefined}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => toggleSort(col)}
+                              className="flex items-center gap-1 ml-auto hover:text-slate-600 transition-colors"
+                            >
+                              {labels[i]}
+                              <span className="text-[10px]">
+                                {sortColumn === col ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+                              </span>
+                            </button>
+                          </th>
+                        );
+                      }
+                    )}
                   </>
                 )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {categoryRows.map((cat) => {
+              {sortedCategoryRows.map((cat) => {
                 const catColor = getCategoryColorById(cat.categoryId);
                 return (
                   <Fragment key={cat.categoryId}>
@@ -966,7 +1108,7 @@ export default function ZeitverteilungTab({
                         </div>
                       </td>
                       <td className="py-3 px-3 text-sm font-semibold text-slate-800 text-right whitespace-nowrap">
-                        {formatMinutes(cat.totalMinutes)}
+                        {displayMinutesWithMode(cat.totalMinutes, viewMode, submittedDaysCount)}
                       </td>
                       <td className="py-3 px-3 text-sm text-slate-600 text-right whitespace-nowrap">
                         {cat.percentOfTotal.toFixed(1)}%
@@ -1025,6 +1167,8 @@ export default function ZeitverteilungTab({
                           totalMinutes={grandTotalMinutes}
                           color={getCategoryColorById(cat.categoryId)}
                           showActivityMeta={showActivityMeta}
+                          viewMode={viewMode}
+                          submittedDaysCount={submittedDaysCount}
                           onToggle={() =>
                             onToggleSubcategory(
                               cat.categoryId,

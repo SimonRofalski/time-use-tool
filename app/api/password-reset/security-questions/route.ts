@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     if (!email) {
       return NextResponse.json(
-        { error: "Bitte geben Sie eine E-Mail-Adresse ein." },
+        { error: "Bitte gib eine E-Mail-Adresse ein." },
         { status: 400 },
       );
     }
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Für dieses Konto sind noch keine zwei Sicherheitsfragen hinterlegt. Bitte wenden Sie sich an einen Admin.",
+            "Für dieses Konto sind noch keine zwei Sicherheitsfragen hinterlegt. Bitte wende dich an einen Admin.",
         },
         { status: 409 },
       );
