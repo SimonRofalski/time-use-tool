@@ -44,7 +44,7 @@ function renderStatus(status: string, tone: "error" | "success") {
   return (
     <p
       className={`mt-3 text-center text-sm ${
-        tone === "success" ? "text-green-600" : "text-red-600"
+        tone === "success" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
       }`}
       role="status"
     >
@@ -290,7 +290,7 @@ export default function Home() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950 px-4">
       <div
         className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/login-bg.svg')" }}
@@ -304,20 +304,20 @@ export default function Home() {
             alt="Time Use Tool"
             className="h-16 w-16 drop-shadow-lg"
           />
-          <h1 className="text-2xl font-semibold text-slate-800">
+          <h1 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
             Time Use Tool
           </h1>
         </div>
 
         {mode !== "forgot-password" && (
-          <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white/90 p-2 shadow-sm backdrop-blur-sm">
+          <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 p-2 shadow-sm backdrop-blur-sm">
             <button
               type="button"
               onClick={() => handleModeChange("signin")}
               className={`rounded-lg px-4 py-3 text-left text-sm transition ${
                 mode === "signin"
                   ? "bg-slate-800 text-white shadow-sm"
-                  : "bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+                  : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-slate-100"
               }`}
             >
               <span className="block font-semibold">Anmeldung</span>
@@ -328,7 +328,7 @@ export default function Home() {
               className={`rounded-lg px-4 py-3 text-left text-sm transition ${
                 mode === "signup"
                   ? "bg-slate-800 text-white shadow-sm"
-                  : "bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+                  : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-slate-100"
               }`}
             >
               <span className="block font-semibold">
@@ -338,15 +338,15 @@ export default function Home() {
           </div>
         )}
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-5 text-center text-lg font-semibold text-slate-900">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
+          <h2 className="mb-5 text-center text-lg font-semibold text-slate-900 dark:text-slate-100">
             {currentMode.title}
           </h2>
 
           {mode !== "forgot-password" && (
             <form onSubmit={handleSubmit} noValidate>
               <div className="space-y-4">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                   E-Mail
                   <input
                     type="email"
@@ -360,16 +360,16 @@ export default function Home() {
                     inputMode="email"
                     autoComplete="email"
                     pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-                    className={`mt-1.5 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
+                    className={`mt-1.5 w-full rounded-md border bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 ${
                       emailHasError
                         ? "border-red-400 focus:border-red-500 focus:ring-red-500"
-                        : "border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                        : "border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500"
                     }`}
                     placeholder="name@beispiel.de"
                   />
                 </label>
 
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Passwort
                   <input
                     type="password"
@@ -381,10 +381,10 @@ export default function Home() {
                     }}
                     required
                     minLength={6}
-                    className={`mt-1.5 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
+                    className={`mt-1.5 w-full rounded-md border bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 ${
                       passwordHasError
                         ? "border-red-400 focus:border-red-500 focus:ring-red-500"
-                        : "border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                        : "border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500"
                     }`}
                     placeholder="Mindestens 6 Zeichen"
                   />
@@ -405,7 +405,7 @@ export default function Home() {
           {mode === "forgot-password" && resetQuestions.length === 0 && (
             <form onSubmit={handleSubmit} noValidate>
               <div className="space-y-4">
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                   E-Mail
                   <input
                     type="email"
@@ -419,10 +419,10 @@ export default function Home() {
                     inputMode="email"
                     autoComplete="email"
                     pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-                    className={`mt-1.5 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 ${
+                    className={`mt-1.5 w-full rounded-md border bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 ${
                       emailHasError
                         ? "border-red-400 focus:border-red-500 focus:ring-red-500"
-                        : "border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                        : "border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500"
                     }`}
                     placeholder="name@beispiel.de"
                   />
@@ -447,20 +447,20 @@ export default function Home() {
                 onSubmit={handleVerifySecurityAnswers}
                 className="space-y-4"
               >
-                <label className="block text-sm font-medium text-slate-700">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                   E-Mail
                   <input
                     type="email"
                     value={email}
                     readOnly
-                    className="mt-1.5 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                    className="mt-1.5 w-full rounded-md border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-500 dark:text-slate-400"
                   />
                 </label>
 
                 {resetQuestions.map((question, index) => (
                   <label
                     key={question.questionId}
-                    className="block text-sm font-medium text-slate-700"
+                    className="block text-sm font-medium text-slate-700 dark:text-slate-300"
                   >
                     {question.questionText}
                     <input
@@ -475,7 +475,7 @@ export default function Home() {
                         );
                         setStatus("");
                       }}
-                      className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       placeholder="Antwort"
                     />
                   </label>
@@ -504,7 +504,7 @@ export default function Home() {
                 />
               </label>
 
-              <label className="block text-sm font-medium text-slate-700">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Neues Passwort
                 <input
                   type="password"
@@ -514,12 +514,12 @@ export default function Home() {
                     setStatus("");
                   }}
                   minLength={6}
-                  className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   placeholder="Mindestens 6 Zeichen"
                 />
               </label>
 
-              <label className="block text-sm font-medium text-slate-700">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                 Passwort bestätigen
                 <input
                   type="password"
@@ -529,7 +529,7 @@ export default function Home() {
                     setStatus("");
                   }}
                   minLength={6}
-                  className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   placeholder="Passwort wiederholen"
                 />
               </label>
@@ -545,20 +545,20 @@ export default function Home() {
             </form>
           )}
 
-          <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 text-sm">
+          <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 dark:border-slate-700 pt-4 text-sm">
             {mode === "signin" ? (
               <>
                 <button
                   type="button"
                   onClick={() => handleModeChange("signup")}
-                  className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 font-medium text-blue-700 transition hover:bg-blue-100"
+                  className="rounded-md border border-blue-200 dark:border-blue-600/40 bg-blue-50 dark:bg-blue-500/10 px-3 py-2 font-medium text-blue-700 dark:text-blue-300 transition hover:bg-blue-100 dark:hover:bg-blue-500/15"
                 >
                   Noch kein Konto? Hier neuen Account erstellen
                 </button>
                 <button
                   type="button"
                   onClick={() => handleModeChange("forgot-password")}
-                  className="text-center text-sm text-slate-500 transition hover:text-slate-700"
+                  className="text-center text-sm text-slate-500 dark:text-slate-400 transition hover:text-slate-700 dark:hover:text-slate-200"
                 >
                   Passwort vergessen?
                 </button>
@@ -568,7 +568,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => handleModeChange("signin")}
-                  className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 font-medium text-slate-700 transition hover:bg-slate-100"
+                  className="rounded-md border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3 py-2 font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-700"
                 >
                   Zurück zur Anmeldung
                 </button>

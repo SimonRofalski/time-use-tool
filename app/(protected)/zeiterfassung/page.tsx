@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import {
@@ -14,7 +14,7 @@ import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
 
 const TimeGrid = dynamic(() => import("./TimeGrid"), {
   loading: () => (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
       Raster wird geladen...
     </div>
   ),
@@ -22,7 +22,7 @@ const TimeGrid = dynamic(() => import("./TimeGrid"), {
 
 const ActivitySelector = dynamic(() => import("./ActivitySelector"), {
   loading: () => (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
       Fragebogen wird geladen...
     </div>
   ),
@@ -229,22 +229,22 @@ function CompletionBar({
         : "text-orange-600";
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm">
       {/* Date row: prev | current (with inline progress) | next */}
       <div className="grid grid-cols-1 items-stretch gap-2 sm:grid-cols-[140px_1fr_140px]">
         <button
           type="button"
           onClick={() => canGoPrev && onDateChange(allDates[currentIndex - 1])}
           disabled={!canGoPrev}
-          className="relative overflow-hidden rounded-md border border-slate-200 bg-white px-4 py-1.5 text-right transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+          className="relative overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-1.5 text-right transition-colors hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-35"
         >
           <span className="pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 text-5xl font-light text-slate-400 select-none leading-none">
             ‹
           </span>
-          <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400">
+          <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
             Letzter
           </p>
-          <p className="relative text-xs font-medium text-slate-600">
+          <p className="relative text-xs font-medium text-slate-600 dark:text-slate-300">
             {previousDate
               ? formatDateCompactGerman(previousDate)
               : "Kein früherer Tag"}
@@ -252,8 +252,8 @@ function CompletionBar({
         </button>
 
         {/* Current date + progress inline */}
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-          <p className="text-sm font-bold text-blue-950 sm:text-[15px] leading-tight">
+        <div className="rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-none">
+          <p className="text-sm font-bold text-blue-950 dark:text-blue-200 sm:text-[15px] leading-tight">
             {formatDateGerman(currentDate)}
           </p>
           <div className="mt-1 flex items-center gap-2">
@@ -275,15 +275,15 @@ function CompletionBar({
           type="button"
           onClick={() => canGoNext && onDateChange(allDates[currentIndex + 1])}
           disabled={!canGoNext}
-          className="relative overflow-hidden rounded-md border border-slate-200 bg-white px-4 py-1.5 text-left transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+          className="relative overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-1.5 text-left transition-colors hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-35"
         >
           <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-5xl font-light text-slate-400 select-none leading-none">
             ›
           </span>
-          <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400">
+          <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
             Nächster
           </p>
-          <p className="relative text-xs font-medium text-slate-600">
+          <p className="relative text-xs font-medium text-slate-600 dark:text-slate-300">
             {nextDate ? formatDateCompactGerman(nextDate) : "Kein späterer Tag"}
           </p>
         </button>
@@ -328,6 +328,7 @@ export default function ZeiterfassungPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [gridCollapsed, setGridCollapsed] = useState(false);
   const [isDeletingSelection, setIsDeletingSelection] = useState(false);
+  const isSavingRef = useRef(false);
 
   // Confirmation dialog when user tries to navigate away with progress
   const [abandonDialog, setAbandonDialog] = useState<null | (() => void)>(null);
@@ -675,8 +676,10 @@ export default function ZeiterfassungPage() {
   // ── Saving ────────────────────────────────────────────────────────────────
 
   async function saveEntry(finalEntry: PendingEntry) {
+    if (isSavingRef.current) return;
     if (!userId || courseId === null || !finalEntry.primary_activity_id) return;
 
+    isSavingRef.current = true;
     const sortedSlots = [...finalEntry.slots].sort();
 
     // Ensure a day record exists before inserting entries
@@ -707,6 +710,7 @@ export default function ZeiterfassungPage() {
       setErrorMessage(
         `Eintrag konnte nicht gespeichert werden: ${insertError?.message ?? "unbekannter Fehler"}`,
       );
+      isSavingRef.current = false;
       return;
     }
 
@@ -738,6 +742,7 @@ export default function ZeiterfassungPage() {
     // Refresh the grid and update day completion flag
     await loadEntriesForDay(activeDayId);
     await updateDayCompletion(activeDayId);
+    isSavingRef.current = false;
     handleCancel();
   }
 
@@ -825,28 +830,29 @@ export default function ZeiterfassungPage() {
   if (isLoading || !lookupData || !currentDate) {
     return (
       <div className="space-y-4">
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="h-4 w-44 animate-pulse rounded bg-slate-200" />
-          <div className="mt-3 h-2 w-full animate-pulse rounded-full bg-slate-100" />
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 shadow-sm">
+          <div className="h-4 w-44 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+          <div className="mt-3 h-2 w-full animate-pulse rounded-full bg-slate-100 dark:bg-slate-700" />
         </div>
 
         <div className="flex flex-col gap-4 md:flex-row md:items-start">
           <div className="w-full md:w-1/3 min-w-0 md:self-start">
-            <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
               Raster wird geladen...
             </div>
           </div>
 
           <div className="w-full md:w-2/3 min-w-0">
-            <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-10 text-center">
+            <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-10 text-center">
               <p className="text-3xl mb-4">⏱️</p>
-              <p className="text-base font-semibold text-slate-700">
+              <p className="text-base font-semibold text-slate-700 dark:text-slate-200">
                 Zeitslot auswählen
               </p>
               <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-                Markiere zuerst einen oder mehrere Slots im Raster.
-                <br className="hidden sm:block" /> Danach wählst du die passende
-                Kategorie als Kachel und direkt die Aktivität.
+                Klicke auf einen Slot – oder halte und ziehe über mehrere
+                aufeinanderfolgende Slots, um eine Zeitspanne auf einmal zu markieren.
+                <br className="hidden sm:block" /> Danach wählst du Kategorie und
+                Aktivität aus.
               </p>
             </div>
           </div>
@@ -884,7 +890,7 @@ export default function ZeiterfassungPage() {
           {isQuestionnaireActive && (
             <button
               type="button"
-              className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 md:hidden"
+              className="flex w-full items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-700 md:hidden"
               onClick={() => setGridCollapsed((v) => !v)}
             >
               <span>Zeitraster</span>
@@ -928,15 +934,16 @@ export default function ZeiterfassungPage() {
               isDeletingSelection={isDeletingSelection}
             />
           ) : (
-            <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-10 text-center">
+            <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-10 text-center">
               <p className="text-3xl mb-4">⏱️</p>
-              <p className="text-base font-semibold text-slate-700">
+              <p className="text-base font-semibold text-slate-700 dark:text-slate-200">
                 Zeitslot auswählen
               </p>
               <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-                Markiere zuerst einen oder mehrere Slots im Raster.
-                <br className="hidden sm:block" /> Danach wählst du die passende
-                Kategorie als Kachel und direkt die Aktivität.
+                Klicke auf einen Slot – oder halte und ziehe über mehrere
+                aufeinanderfolgende Slots, um eine Zeitspanne auf einmal zu markieren.
+                <br className="hidden sm:block" /> Danach wählst du Kategorie und
+                Aktivität aus.
               </p>
             </div>
           )}

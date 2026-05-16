@@ -268,10 +268,10 @@ export default function TimeGrid({
   return (
     <div
       ref={containerRef}
-      className="overflow-hidden overflow-x-hidden rounded-xl border border-slate-200 bg-white shadow-sm select-none md:overflow-y-auto md:scrollbar-thin md:max-h-[calc(100vh-150px)]"
+      className="overflow-hidden overflow-x-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm select-none md:overflow-y-auto md:scrollbar-thin md:max-h-[calc(100vh-150px)]"
     >
       {/* Sticky header row: minute-offset labels at left edge of each column */}
-      <div className="grid grid-cols-[1.5rem_repeat(6,minmax(0,1fr))_auto] border-b-2 border-slate-100 bg-white md:sticky md:top-0 md:z-10 md:grid-cols-[2rem_repeat(6,minmax(0,1fr))_auto]">
+      <div className="grid grid-cols-[1.5rem_repeat(6,minmax(0,1fr))_auto] border-b-2 border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 md:sticky md:top-0 md:z-10 md:grid-cols-[2rem_repeat(6,minmax(0,1fr))_auto]">
         <div className="h-6 md:h-8" /> {/* empty corner above hour labels */}
         {MINUTE_LABELS.map((label) => (
           <div
@@ -317,7 +317,7 @@ export default function TimeGrid({
                         ? "ring-1 ring-blue-500 ring-inset brightness-75 md:ring-2"
                         : isFilled
                           ? "hover:brightness-90"
-                          : "bg-slate-100 hover:bg-slate-200"
+                          : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
                     }
                   `}
                   style={{

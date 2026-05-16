@@ -993,6 +993,7 @@ export default function StatistikenPage() {
   // ── Data loading ────────────────────────────────────────────────────────────
 
   async function loadAllData() {
+    lastLoadTimeRef.current = Date.now();
     setIsLoading(true);
     setErrorMessage("");
 
@@ -1414,14 +1415,14 @@ export default function StatistikenPage() {
     <div className="space-y-5">
       {/* Tab bar */}
       {isCourseComparisonEnabled && (
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+        <div className="flex gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
           <button
             type="button"
             onClick={() => setActiveTab("zeitverteilung")}
             className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
               activeTab === "zeitverteilung"
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
+                ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
             }`}
           >
             Zeitverteilung
@@ -1431,8 +1432,8 @@ export default function StatistikenPage() {
             onClick={() => setActiveTab("kursvergleich")}
             className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
               activeTab === "kursvergleich"
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
+                ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
             }`}
           >
             Kursvergleich
