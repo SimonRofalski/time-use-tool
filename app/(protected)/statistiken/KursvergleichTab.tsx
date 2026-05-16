@@ -163,11 +163,11 @@ function TopicCard({
   icon: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-sm">
       {/* Card header */}
       <div className="flex items-center gap-2 mb-1">
         <span className="text-base">{icon}</span>
-        <h3 className="text-sm font-semibold text-slate-800">{topic.label}</h3>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{topic.label}</h3>
       </div>
       <p className="text-xs text-slate-400">
         Durchschnittliche Stunden pro Tag
@@ -192,7 +192,7 @@ function MetaComparisonCard({
   courseValue: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
         {title}
       </p>
@@ -207,9 +207,9 @@ function MetaComparisonCard({
           <p className="text-[10px] text-blue-600">Du</p>
           <p className="font-semibold text-blue-700">{userValue}</p>
         </div>
-        <div className="rounded-md bg-slate-100 px-2 py-1">
-          <p className="text-[10px] text-slate-500">Kurs</p>
-          <p className="font-semibold text-slate-700">{courseValue}</p>
+        <div className="rounded-md bg-slate-100 dark:bg-slate-700 px-2 py-1">
+          <p className="text-[10px] text-slate-500 dark:text-slate-400">Kurs</p>
+          <p className="font-semibold text-slate-700 dark:text-slate-200">{courseValue}</p>
         </div>
       </div>
     </div>
@@ -263,7 +263,7 @@ export default function KursvergleichTab({
       </div>
 
       {/* Global filters (same structure as Zeitverteilung) */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 shrink-0">
             Tage
@@ -274,8 +274,8 @@ export default function KursvergleichTab({
               onClick={() => onSetDayFilter("alle")}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 dayFilter === "alle"
-                  ? "bg-white text-slate-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-100 shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
               Alle
@@ -285,8 +285,8 @@ export default function KursvergleichTab({
               onClick={() => onSetDayFilter("werktage")}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 dayFilter === "werktage"
-                  ? "bg-white text-slate-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-100 shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
               Werktage
@@ -296,8 +296,8 @@ export default function KursvergleichTab({
               onClick={() => onSetDayFilter("wochenende")}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 dayFilter === "wochenende"
-                  ? "bg-white text-slate-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-100 shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
               Wochenende
@@ -319,8 +319,8 @@ export default function KursvergleichTab({
               onClick={onClearWeeks}
               className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                 selectedWeeks.length === 0
-                  ? "border-slate-300 bg-slate-100 text-slate-700"
-                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                  ? "border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+                  : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
               Alle
@@ -332,8 +332,8 @@ export default function KursvergleichTab({
                 onClick={() => onToggleWeek(w.key)}
                 className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                   selectedWeekSet.has(w.key)
-                    ? "border-blue-200 bg-blue-50 text-blue-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                    ? "border-blue-200 dark:border-blue-600/40 bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
                 }`}
               >
                 {w.label}
@@ -402,7 +402,7 @@ export default function KursvergleichTab({
       )}
 
       {/* One shared legend for all comparison charts */}
-      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 shadow-sm">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
           <div className="flex items-center gap-1.5">
             <span className="h-3 w-0 border-l-2 border-dashed border-slate-300" />

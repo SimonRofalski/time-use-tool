@@ -132,35 +132,35 @@ function getStatusColors(status: DayStatus): {
   switch (status) {
     case "nicht_verfuegbar":
       return {
-        cardBg: "bg-slate-50 opacity-60",
-        labelBg: "bg-slate-100",
-        labelText: "text-slate-400",
-        barFill: "bg-slate-200",
-        percentText: "text-slate-400",
+        cardBg: "bg-slate-50 dark:bg-slate-900 opacity-60",
+        labelBg: "bg-slate-100 dark:bg-slate-700",
+        labelText: "text-slate-400 dark:text-slate-500",
+        barFill: "bg-slate-200 dark:bg-slate-600",
+        percentText: "text-slate-400 dark:text-slate-500",
       };
     case "nicht_begonnen":
       return {
-        cardBg: "bg-white",
-        labelBg: "bg-slate-100",
-        labelText: "text-slate-500",
-        barFill: "bg-slate-300",
-        percentText: "text-slate-500",
+        cardBg: "bg-white dark:bg-slate-800",
+        labelBg: "bg-slate-100 dark:bg-slate-700",
+        labelText: "text-slate-500 dark:text-slate-400",
+        barFill: "bg-slate-300 dark:bg-slate-500",
+        percentText: "text-slate-500 dark:text-slate-400",
       };
     case "in_bearbeitung":
       return {
-        cardBg: "bg-orange-50",
-        labelBg: "bg-orange-100",
-        labelText: "text-orange-700",
+        cardBg: "bg-orange-50 dark:bg-orange-900/20",
+        labelBg: "bg-orange-100 dark:bg-orange-900/40",
+        labelText: "text-orange-700 dark:text-orange-300",
         barFill: "bg-orange-400",
-        percentText: "text-orange-600",
+        percentText: "text-orange-600 dark:text-orange-400",
       };
     case "abgeschlossen":
       return {
-        cardBg: "bg-green-50",
-        labelBg: "bg-green-100",
-        labelText: "text-green-700",
+        cardBg: "bg-green-50 dark:bg-green-900/20",
+        labelBg: "bg-green-100 dark:bg-green-900/40",
+        labelText: "text-green-700 dark:text-green-300",
         barFill: "bg-green-500",
-        percentText: "text-green-600",
+        percentText: "text-green-600 dark:text-green-400",
       };
   }
 }
@@ -199,7 +199,7 @@ function DayCarouselCard({
 
   return (
     <div
-      className={`${colors.cardBg} flex-shrink-0 rounded-lg border border-slate-200 p-3 transition-shadow ${
+      className={`${colors.cardBg} flex-shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 p-3 transition-shadow ${
         isAvailable
           ? "cursor-pointer hover:shadow-md"
           : "cursor-default opacity-60"
@@ -208,8 +208,8 @@ function DayCarouselCard({
       onClick={isAvailable ? onClick : undefined}
     >
       {/* Date */}
-      <p className="text-xs font-medium text-slate-400">{weekday}</p>
-      <p className="text-sm font-semibold text-slate-800 leading-tight">
+      <p className="text-xs font-medium text-slate-400 dark:text-slate-500">{weekday}</p>
+      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-tight">
         {dayMonth}
       </p>
 
@@ -221,7 +221,7 @@ function DayCarouselCard({
       </span>
 
       {/* Progress bar */}
-      <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100">
+      <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-700">
         <div
           className={`h-1.5 rounded-full ${colors.barFill} transition-all duration-300`}
           style={{ width: `${completionPercentage}%` }}
@@ -315,25 +315,25 @@ function SummaryBar({ days }: { days: CourseDay[] }) {
   return (
     <div className="flex flex-wrap items-stretch gap-2">
       {/* Completed days */}
-      <div className="w-full rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-center sm:w-[220px]">
-        <p className="text-xl font-bold text-green-600">{completedCount}</p>
-        <p className="mt-0.5 text-xs font-medium text-green-700">
+      <div className="w-full rounded-lg border border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/20 px-3 py-2.5 text-center sm:w-[220px]">
+        <p className="text-xl font-bold text-green-600 dark:text-green-400">{completedCount}</p>
+        <p className="mt-0.5 text-xs font-medium text-green-700 dark:text-green-300">
           Abgeschlossen
         </p>
       </div>
 
       {/* In-progress days */}
-      <div className="w-full rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-center sm:w-[220px]">
-        <p className="text-xl font-bold text-orange-500">{inProgressCount}</p>
-        <p className="mt-0.5 text-xs font-medium text-orange-700">
+      <div className="w-full rounded-lg border border-orange-200 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-900/20 px-3 py-2.5 text-center sm:w-[220px]">
+        <p className="text-xl font-bold text-orange-500 dark:text-orange-400">{inProgressCount}</p>
+        <p className="mt-0.5 text-xs font-medium text-orange-700 dark:text-orange-300">
           In Bearbeitung
         </p>
       </div>
 
       {/* Not started days */}
-      <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-center sm:w-[220px]">
-        <p className="text-xl font-bold text-slate-500">{notStartedCount}</p>
-        <p className="mt-0.5 text-xs font-medium text-slate-600">
+      <div className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2.5 text-center sm:w-[220px]">
+        <p className="text-xl font-bold text-slate-500 dark:text-slate-300">{notStartedCount}</p>
+        <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
           Nicht begonnen
         </p>
       </div>
@@ -392,6 +392,7 @@ export default function ErfassteZeitPage() {
   // Orchestrates all data fetching steps:
   // user → course enrollment → course details → day records → entry counts → merge
   async function loadOverviewData() {
+    lastLoadTimeRef.current = Date.now();
     setIsLoading(true);
     setErrorMessage("");
 
@@ -554,41 +555,41 @@ export default function ErfassteZeitPage() {
       <div className="space-y-4" aria-busy="true" aria-label="Wird geladen">
         {/* Skeleton SummaryBar */}
         <div className="flex flex-wrap items-stretch gap-2">
-          <div className="w-full rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-center sm:w-[220px]">
-            <div className="mx-auto h-7 w-8 animate-pulse rounded bg-green-200" />
-            <p className="mt-0.5 text-xs font-medium text-green-700">
+          <div className="w-full rounded-lg border border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/20 px-3 py-2.5 text-center sm:w-[220px]">
+            <div className="mx-auto h-7 w-8 animate-pulse rounded bg-green-200 dark:bg-green-800/50" />
+            <p className="mt-0.5 text-xs font-medium text-green-700 dark:text-green-400">
               Abgeschlossen
             </p>
           </div>
-          <div className="w-full rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5 text-center sm:w-[220px]">
-            <div className="mx-auto h-7 w-8 animate-pulse rounded bg-orange-200" />
-            <p className="mt-0.5 text-xs font-medium text-orange-700">
+          <div className="w-full rounded-lg border border-orange-200 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-900/20 px-3 py-2.5 text-center sm:w-[220px]">
+            <div className="mx-auto h-7 w-8 animate-pulse rounded bg-orange-200 dark:bg-orange-800/50" />
+            <p className="mt-0.5 text-xs font-medium text-orange-700 dark:text-orange-400">
               In Bearbeitung
             </p>
           </div>
-          <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-center sm:w-[220px]">
-            <div className="mx-auto h-7 w-8 animate-pulse rounded bg-slate-200" />
-            <p className="mt-0.5 text-xs font-medium text-slate-600">
+          <div className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2.5 text-center sm:w-[220px]">
+            <div className="mx-auto h-7 w-8 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+            <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
               Nicht begonnen
             </p>
           </div>
         </div>
 
         {/* Skeleton carousel section */}
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
           <div className="mb-3 flex items-center">
-            <p className="text-sm font-medium text-slate-600">Wird geladen…</p>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Wird geladen…</p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:hidden">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="flex-shrink-0 rounded-lg border border-slate-200 bg-white p-3 animate-pulse"
+                className="flex-shrink-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 animate-pulse"
               >
-                <div className="h-3 w-8 rounded bg-slate-200" />
-                <div className="mt-1 h-4 w-14 rounded bg-slate-200" />
-                <div className="mt-2 h-4 w-20 rounded-full bg-slate-100" />
-                <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100" />
+                <div className="h-3 w-8 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="mt-1 h-4 w-14 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="mt-2 h-4 w-20 rounded-full bg-slate-100 dark:bg-slate-700" />
+                <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-700" />
               </div>
             ))}
           </div>
@@ -596,12 +597,12 @@ export default function ErfassteZeitPage() {
             {Array.from({ length: 7 }).map((_, i) => (
               <div
                 key={i}
-                className="flex-shrink-0 w-28 rounded-lg border border-slate-200 bg-white p-3 animate-pulse"
+                className="flex-shrink-0 w-28 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 animate-pulse"
               >
-                <div className="h-3 w-8 rounded bg-slate-200" />
-                <div className="mt-1 h-4 w-14 rounded bg-slate-200" />
-                <div className="mt-2 h-4 w-20 rounded-full bg-slate-100" />
-                <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100" />
+                <div className="h-3 w-8 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="mt-1 h-4 w-14 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="mt-2 h-4 w-20 rounded-full bg-slate-100 dark:bg-slate-700" />
+                <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-700" />
               </div>
             ))}
           </div>
@@ -638,7 +639,7 @@ export default function ErfassteZeitPage() {
       {groupedPeriods.map(({ period, days: periodDays }) => (
         <section
           key={period.course_period_id}
-          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
         >
           <DayCarousel
             days={periodDays}

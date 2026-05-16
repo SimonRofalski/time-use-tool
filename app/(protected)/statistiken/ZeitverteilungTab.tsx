@@ -225,7 +225,7 @@ function ChartTooltip({
   const isUnsubmitted = payload.some((p) => p.dataKey === "unsubmitted");
   if (isUnsubmitted) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg text-xs">
+      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 shadow-lg text-xs">
         <p className="font-semibold text-slate-700">{label}</p>
         <p className="mt-1 text-slate-400">Noch nicht eingereicht</p>
       </div>
@@ -238,8 +238,8 @@ function ChartTooltip({
   );
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg text-xs min-w-[160px]">
-      <p className="font-semibold text-slate-700 mb-2">{label}</p>
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 shadow-lg text-xs min-w-[160px]">
+      <p className="font-semibold text-slate-700 dark:text-slate-200 mb-2">{label}</p>
       {entries.map((entry) => (
         <div
           key={entry.dataKey}
@@ -250,9 +250,9 @@ function ChartTooltip({
               className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
               style={{ backgroundColor: categoryColorMap[entry.dataKey] }}
             />
-            <span className="text-slate-600">{entry.dataKey}</span>
+            <span className="text-slate-600 dark:text-slate-300">{entry.dataKey}</span>
           </div>
-          <span className="font-medium text-slate-800">
+          <span className="font-medium text-slate-800 dark:text-slate-100">
             {formatMinutes(entry.value)}
           </span>
         </div>
@@ -353,7 +353,7 @@ function PairCell({
     );
   }
 
-  const textClass = dim ? "text-slate-500" : "text-slate-700";
+  const textClass = dim ? "text-slate-500 dark:text-slate-400" : "text-slate-700 dark:text-slate-200";
   return (
     <td className="py-2 px-2 whitespace-nowrap">
       <div className="text-right leading-tight">
@@ -438,7 +438,7 @@ function SubcategoryAccordion({
       >
         {/* Indent + expand icon */}
         <td className="py-2 pl-8 pr-2">
-          <div className="flex items-center gap-1.5 text-slate-700 text-sm">
+          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-200 text-sm">
             {sub.activities.length > 0 ? (
               sub.isExpanded ? (
                 <ChevronDown
@@ -457,16 +457,16 @@ function SubcategoryAccordion({
             {sub.name}
           </div>
         </td>
-        <td className="py-2 px-3 text-sm text-slate-700 text-right whitespace-nowrap">
+        <td className="py-2 px-3 text-sm text-slate-700 dark:text-slate-200 text-right whitespace-nowrap">
           {displayMinutesWithMode(sub.totalMinutes, viewMode, submittedDaysCount)}
         </td>
-        <td className="py-2 px-3 text-sm text-slate-500 text-right whitespace-nowrap">
+        <td className="py-2 px-3 text-sm text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
           {sub.percentOfTotal.toFixed(1)}%
         </td>
         {/* Mini progress bar — hidden when meta cols are shown */}
         {!showActivityMeta && (
           <td className="py-2 pl-3 pr-4 w-32">
-            <div className="h-1.5 w-full rounded-full bg-slate-100">
+            <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-700">
               <div
                 className="h-1.5 rounded-full transition-all"
                 style={{
@@ -511,18 +511,18 @@ function SubcategoryAccordion({
       {sub.isExpanded &&
         sub.activities.map((act) => (
           <tr key={act.activityId} style={{ backgroundColor: `${color}0c` }}>
-            <td className="py-1.5 pl-14 pr-2 text-xs text-slate-500">
+            <td className="py-1.5 pl-14 pr-2 text-xs text-slate-500 dark:text-slate-400">
               {act.name}
             </td>
-            <td className="py-1.5 px-3 text-xs text-slate-500 text-right whitespace-nowrap">
+            <td className="py-1.5 px-3 text-xs text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
               {displayMinutesWithMode(act.totalMinutes, viewMode, submittedDaysCount)}
             </td>
-            <td className="py-1.5 px-3 text-xs text-slate-400 text-right whitespace-nowrap">
+            <td className="py-1.5 px-3 text-xs text-slate-400 dark:text-slate-500 text-right whitespace-nowrap">
               {act.percentOfTotal.toFixed(1)}%
             </td>
             {!showActivityMeta && (
               <td className="py-1.5 pl-3 pr-4 w-32">
-                <div className="h-1 w-full rounded-full bg-slate-100">
+                <div className="h-1 w-full rounded-full bg-slate-100 dark:bg-slate-700">
                   <div
                     className="h-1 rounded-full"
                     style={{
@@ -587,12 +587,12 @@ function MetaList({
   getIcon?: (name: string) => LucideIcon;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {title}
       </p>
       {items.length === 0 ? (
-        <p className="text-xs text-slate-400">Keine Daten</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">Keine Daten</p>
       ) : (
         <div className="space-y-1.5">
           {items.slice(0, 5).map((item) => {
@@ -604,11 +604,11 @@ function MetaList({
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   {Icon && (
-                    <Icon size={12} className="shrink-0 text-slate-400" />
+                    <Icon size={12} className="shrink-0 text-slate-400 dark:text-slate-500" />
                   )}
-                  <span className="truncate text-slate-600">{item.name}</span>
+                  <span className="truncate text-slate-600 dark:text-slate-300">{item.name}</span>
                 </div>
-                <span className="whitespace-nowrap font-medium text-slate-700">
+                <span className="whitespace-nowrap font-medium text-slate-700 dark:text-slate-200">
                   {formatMinutesCompact(item.minutes)}
                 </span>
               </div>
@@ -724,20 +724,20 @@ export default function ZeitverteilungTab({
   return (
     <div className="space-y-4">
       {/* ── Global filters ───────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
         {/* Day filter */}
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 shrink-0">
             Tage
           </span>
-          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+          <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-0.5">
             <button
               type="button"
               onClick={() => onSetDayFilter("alle")}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 dayFilter === "alle"
-                  ? "bg-white text-slate-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-100 shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
               Alle
@@ -747,8 +747,8 @@ export default function ZeitverteilungTab({
               onClick={() => onSetDayFilter("werktage")}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 dayFilter === "werktage"
-                  ? "bg-white text-slate-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-100 shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
               Werktage
@@ -758,8 +758,8 @@ export default function ZeitverteilungTab({
               onClick={() => onSetDayFilter("wochenende")}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                 dayFilter === "wochenende"
-                  ? "bg-white text-slate-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-100 shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
               Wochenende
@@ -783,8 +783,8 @@ export default function ZeitverteilungTab({
               onClick={onClearWeeks}
               className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                 selectedWeeks.length === 0
-                  ? "border-slate-300 bg-slate-100 text-slate-700"
-                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                  ? "border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+                  : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
               Alle
@@ -797,7 +797,7 @@ export default function ZeitverteilungTab({
                 className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                   selectedWeekSet.has(w.key)
                     ? "border-blue-200 bg-blue-50 text-blue-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600"
                 }`}
               >
                 {w.label}
@@ -808,7 +808,7 @@ export default function ZeitverteilungTab({
       </div>
 
       {/* ── Stacked bar chart ───────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
         <h3 className="mb-3 text-sm font-semibold text-slate-700">
           Tägliche Zeitverteilung
         </h3>
@@ -928,7 +928,7 @@ export default function ZeitverteilungTab({
           }))}
           getIcon={getLocationIcon}
         />
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Ø Wohlbefinden
           </p>
@@ -947,20 +947,20 @@ export default function ZeitverteilungTab({
       </div>
 
       {/* ── Drill-down table ────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-700">
             Zeitverteilung nach Kategorie
           </h3>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-0.5">
               <button
                 type="button"
                 onClick={() => setViewMode("total")}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                   viewMode === "total"
-                    ? "bg-white text-slate-700 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
+                    ? "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-100 shadow-sm"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 }`}
               >
                 Gesamt
@@ -970,8 +970,8 @@ export default function ZeitverteilungTab({
                 onClick={() => setViewMode("avgPerDay")}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                   viewMode === "avgPerDay"
-                    ? "bg-white text-slate-700 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
+                    ? "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-100 shadow-sm"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 }`}
               >
                 Ø / Tag
@@ -982,8 +982,8 @@ export default function ZeitverteilungTab({
               onClick={() => setShowActivityMeta((v) => !v)}
               className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
                 showActivityMeta
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                  ? "border-blue-200 dark:border-blue-600/40 bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                  : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
               {showActivityMeta
@@ -1000,12 +1000,12 @@ export default function ZeitverteilungTab({
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-100">
+              <tr className="border-b border-slate-100 dark:border-slate-700">
                 <th className="py-2.5 pl-4 pr-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">
                   <button
                     type="button"
                     onClick={() => toggleSort("name")}
-                    className="flex items-center gap-1 hover:text-slate-600 transition-colors"
+                    className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                   >
                     Kategorie
                     <span className="text-[10px]">
@@ -1017,7 +1017,7 @@ export default function ZeitverteilungTab({
                   <button
                     type="button"
                     onClick={() => toggleSort("time")}
-                    className="flex items-center gap-1 ml-auto hover:text-slate-600 transition-colors"
+                    className="flex items-center gap-1 ml-auto hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                   >
                     {viewMode === "total" ? "Zeit" : "Ø / Tag"}
                     <span className="text-[10px]">
@@ -1029,7 +1029,7 @@ export default function ZeitverteilungTab({
                   <button
                     type="button"
                     onClick={() => toggleSort("percent")}
-                    className="flex items-center gap-1 ml-auto hover:text-slate-600 transition-colors"
+                    className="flex items-center gap-1 ml-auto hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                   >
                     Anteil
                     <span className="text-[10px]">
@@ -1052,7 +1052,7 @@ export default function ZeitverteilungTab({
                             <button
                               type="button"
                               onClick={() => toggleSort(col)}
-                              className="flex items-center gap-1 ml-auto hover:text-slate-600 transition-colors"
+                              className="flex items-center gap-1 ml-auto hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                             >
                               {labels[i]}
                               <span className="text-[10px]">
@@ -1067,7 +1067,7 @@ export default function ZeitverteilungTab({
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-50 dark:divide-slate-700/50">
               {sortedCategoryRows.map((cat) => {
                 const catColor = getCategoryColorById(cat.categoryId);
                 return (
@@ -1102,21 +1102,21 @@ export default function ZeitverteilungTab({
                           ) : (
                             <span className="w-4" />
                           )}
-                          <span className="text-sm font-semibold text-slate-800">
+                          <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                             {cat.name}
                           </span>
                         </div>
                       </td>
-                      <td className="py-3 px-3 text-sm font-semibold text-slate-800 text-right whitespace-nowrap">
+                      <td className="py-3 px-3 text-sm font-semibold text-slate-800 dark:text-slate-100 text-right whitespace-nowrap">
                         {displayMinutesWithMode(cat.totalMinutes, viewMode, submittedDaysCount)}
                       </td>
-                      <td className="py-3 px-3 text-sm text-slate-600 text-right whitespace-nowrap">
+                      <td className="py-3 px-3 text-sm text-slate-600 dark:text-slate-300 text-right whitespace-nowrap">
                         {cat.percentOfTotal.toFixed(1)}%
                       </td>
                       {/* Mini progress bar — hidden when meta cols shown */}
                       {!showActivityMeta && (
                         <td className="py-3 pl-3 pr-4 w-32">
-                          <div className="h-2 w-full rounded-full bg-slate-100">
+                          <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700">
                             <div
                               className="h-2 rounded-full transition-all"
                               style={{

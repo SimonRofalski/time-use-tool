@@ -539,13 +539,13 @@ function ActivityList({
     <div className="flex flex-col gap-3">
       {topSlot}
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/60 p-3">
         <div className="flex items-center gap-2">
           {!isSearching && activeCategory && (
             <button
               type="button"
               onClick={() => onActiveCategoryChange(null)}
-              className="flex shrink-0 flex-col items-center gap-0.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-400 hover:text-slate-800"
+              className="flex shrink-0 flex-col items-center gap-0.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 shadow-sm transition-colors hover:border-slate-400 dark:hover:border-slate-500 hover:text-slate-800 dark:hover:text-slate-100"
             >
               <span>←</span>
               <span className="text-[10px] font-normal text-slate-400 leading-none">
@@ -562,7 +562,7 @@ function ActivityList({
               placeholder={
                 activeCategory ? activeCategory.name : searchPlaceholder
               }
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30"
             />
           </label>
         </div>
@@ -596,10 +596,10 @@ function ActivityList({
                   key={category.category_id}
                   type="button"
                   onClick={() => onActiveCategoryChange(category.category_id)}
-                  className={`group overflow-hidden rounded-2xl bg-white text-left shadow-sm transition-all hover:shadow-md ${
+                  className={`group overflow-hidden rounded-2xl bg-white dark:bg-slate-800 text-left shadow-sm transition-all hover:shadow-md ${
                     isSelectedCategory
                       ? "border-2"
-                      : "border border-slate-200 hover:border-slate-300"
+                      : "border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
                   }`}
                   style={
                     isSelectedCategory
@@ -614,11 +614,11 @@ function ActivityList({
                   <div
                     className="flex flex-col gap-3 p-3"
                     style={{
-                      background: `linear-gradient(160deg, ${category.color}14 0%, rgba(255,255,255,1) 60%)`,
+                      background: `linear-gradient(160deg, ${category.color}14 0%, transparent 60%)`,
                     }}
                   >
                     <div className="flex items-start justify-between gap-1">
-                      <h4 className="text-sm font-semibold leading-snug text-slate-900">
+                      <h4 className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
                         {category.name}
                       </h4>
                       {isSelectedCategory && (
@@ -631,13 +631,13 @@ function ActivityList({
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 text-slate-500 ring-1 ring-slate-200">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 dark:bg-slate-700/80 text-slate-500 dark:text-slate-400 ring-1 ring-slate-200 dark:ring-slate-600">
                         <PrimaryIcon className="h-4 w-4" />
                       </div>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 text-slate-500 ring-1 ring-slate-200">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 dark:bg-slate-700/80 text-slate-500 dark:text-slate-400 ring-1 ring-slate-200 dark:ring-slate-600">
                         <SecondaryIcon className="h-4 w-4" />
                       </div>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 text-slate-500 ring-1 ring-slate-200">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 dark:bg-slate-700/80 text-slate-500 dark:text-slate-400 ring-1 ring-slate-200 dark:ring-slate-600">
                         <TertiaryIcon className="h-4 w-4" />
                       </div>
                     </div>
@@ -664,7 +664,7 @@ function ActivityList({
             ).map((category) => (
               <div
                 key={category.category_id}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
               >
                 {isSearching && (
                   <div
@@ -910,7 +910,7 @@ export default function ActivitySelector({
           <button
             type="button"
             onClick={() => onStepComplete({ secondary_activity_id: null })}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+            className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-600"
           >
             Keine Nebentätigkeit → Weiter
           </button>
@@ -938,8 +938,8 @@ export default function ActivitySelector({
                 font-medium transition-all
                 ${
                   isSelected
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300"
+                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
                 }
               `}
             >
@@ -1049,8 +1049,8 @@ export default function ActivitySelector({
                 onClick={() => toggleDevice(type.digital_media_type_id)}
                 className={`flex flex-col items-start gap-2 rounded-xl border-2 p-3 text-left transition-all ${
                   isSelected
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15"
+                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
                 }`}
               >
                 <div className="relative">
@@ -1065,7 +1065,7 @@ export default function ActivitySelector({
                 </div>
                 <span
                   className={`text-sm font-medium leading-snug ${
-                    isSelected ? "text-blue-700" : "text-slate-700"
+                    isSelected ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-300"
                   }`}
                 >
                   {type.name}
@@ -1085,7 +1085,7 @@ export default function ActivitySelector({
           disabled={isContinueDisabled}
           className={`w-full rounded-lg py-2.5 text-sm font-medium transition-colors ${
             isContinueDisabled
-              ? "cursor-not-allowed bg-slate-300 text-slate-500"
+              ? "cursor-not-allowed bg-slate-300 dark:bg-slate-600 text-slate-500 dark:text-slate-400"
               : "bg-slate-800 text-white hover:bg-slate-700"
           }`}
         >
@@ -1286,9 +1286,9 @@ export default function ActivitySelector({
           return (
             <div
               key={category}
-              className="rounded-xl border border-slate-200 bg-slate-50/60 p-3"
+              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/60 p-3"
             >
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {category}
               </h4>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
@@ -1313,8 +1313,8 @@ export default function ActivitySelector({
                       }
                       className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-all ${
                         isSelected
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-white bg-white hover:border-slate-300 hover:bg-slate-50"
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15"
+                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
                       }`}
                     >
                       <div
@@ -1322,10 +1322,10 @@ export default function ActivitySelector({
                       >
                         <IconComponent className="h-[18px] w-[18px]" />
                         {SecondaryIcon && (
-                          <SecondaryIcon className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white" />
+                          <SecondaryIcon className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white dark:bg-slate-800" />
                         )}
                       </div>
-                      <span className="text-xs font-medium leading-snug text-slate-700">
+                      <span className="text-xs font-medium leading-snug text-slate-700 dark:text-slate-300">
                         {loc.name}
                       </span>
                     </button>
@@ -1431,8 +1431,8 @@ export default function ActivitySelector({
                 onClick={() => toggleSocialContext(ctx.social_context_id)}
                 className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-all ${
                   isSelected
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15"
+                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
                 }`}
               >
                 <div
@@ -1443,7 +1443,7 @@ export default function ActivitySelector({
                     <Check className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-blue-500 text-white p-px" />
                   )}
                 </div>
-                <span className="text-xs font-medium leading-snug text-slate-700">
+                <span className="text-xs font-medium leading-snug text-slate-700 dark:text-slate-300">
                   {ctx.name}
                 </span>
               </button>
@@ -1465,7 +1465,7 @@ export default function ActivitySelector({
           disabled={isContinueDisabled}
           className={`w-full rounded-lg py-2.5 text-sm font-medium transition-colors ${
             isContinueDisabled
-              ? "cursor-not-allowed bg-slate-300 text-slate-500"
+              ? "cursor-not-allowed bg-slate-300 dark:bg-slate-600 text-slate-500 dark:text-slate-400"
               : "bg-slate-800 text-white hover:bg-slate-700"
           }`}
         >
@@ -1525,13 +1525,13 @@ export default function ActivitySelector({
                 flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-3 transition-all
                 ${
                   isSelected
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15"
+                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
                 }
               `}
             >
               <div className="text-4xl">{emoji}</div>
-              <div className="text-center text-xs font-semibold text-slate-700">
+              <div className="text-center text-xs font-semibold text-slate-700 dark:text-slate-300">
                 {sat.name}
               </div>
             </button>
@@ -1587,11 +1587,11 @@ export default function ActivitySelector({
   return (
     <div
       ref={containerRef}
-      className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+      className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden"
     >
       {/* Header: time range badge + step progress inline */}
-      <div className="flex items-center gap-3 px-4 pt-3 pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-1.5 text-blue-700 ring-1 ring-blue-100 shrink-0">
+      <div className="flex items-center gap-3 px-4 pt-3 pb-3 border-b border-slate-100 dark:border-slate-700">
+        <div className="flex items-center gap-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 text-blue-700 dark:text-blue-300 ring-1 ring-blue-100 dark:ring-blue-800/30 shrink-0">
           <Clock3 className="h-4 w-4 shrink-0" />
           <span className="text-sm font-semibold">
             {formatSlotsRange(selectedSlots)}
@@ -1619,7 +1619,7 @@ export default function ActivitySelector({
                         ? "bg-blue-500"
                         : done
                           ? "bg-blue-300"
-                          : "bg-slate-200"
+                          : "bg-slate-200 dark:bg-slate-600"
                     }`}
                   />
                 );
@@ -1635,7 +1635,7 @@ export default function ActivitySelector({
           <button
             type="button"
             onClick={onBack}
-            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500 shadow-sm transition-colors hover:bg-slate-50"
+            className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-2.5 py-1 text-xs text-slate-500 dark:text-slate-400 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-600"
             title="Zurück"
           >
             <svg
@@ -1657,7 +1657,7 @@ export default function ActivitySelector({
 
       {/* Selection overview: time-led list only */}
       {hasAnyExistingEntryInSelection && !isEditorVisible && (
-        <div className="mx-4 mb-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+        <div className="mx-4 mb-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/60 p-3">
           <div className="hidden">
             <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -1668,7 +1668,7 @@ export default function ActivitySelector({
                   mergedSlotRanges.map((range) => (
                     <span
                       key={range}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-100"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300 ring-1 ring-blue-100 dark:ring-blue-800/30"
                     >
                       <Clock3 className="h-3.5 w-3.5" />
                       {range}
@@ -1796,7 +1796,7 @@ export default function ActivitySelector({
           </div>
 
           {selectedSlotGroups.length > 0 && (
-            <div className="mt-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+            <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-2">
               <p className="hidden text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 Zeitgeführte Auflistung
               </p>
@@ -1808,9 +1808,9 @@ export default function ActivitySelector({
                     return (
                       <div
                         key={`${group.start}-${group.endExclusive}-${index}`}
-                        className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"
+                        className="flex items-center gap-2 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2 py-1.5"
                       >
-                        <span className="shrink-0 text-xs font-semibold text-slate-700">
+                        <span className="shrink-0 text-xs font-semibold text-slate-700 dark:text-slate-200">
                           {timeRange}
                         </span>
                         <span className="flex-1 text-xs text-slate-400">
@@ -1931,7 +1931,7 @@ export default function ActivitySelector({
                   return (
                     <div
                       key={`${group.start}-${group.endExclusive}-${index}`}
-                      className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5"
+                      className="flex items-center gap-2 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2 py-1.5"
                     >
                       <span className="shrink-0 text-xs font-semibold text-slate-700">
                         {timeRange}
@@ -2014,7 +2014,7 @@ export default function ActivitySelector({
                             }
                             openEditor(groupSlots);
                           }}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-100"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 shadow-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-600"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
@@ -2053,7 +2053,7 @@ export default function ActivitySelector({
           <button
             type="button"
             onClick={onBack}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50"
+            className="rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm transition-colors hover:border-slate-400 dark:hover:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-600"
           >
             ← Zurück
           </button>
@@ -2063,7 +2063,7 @@ export default function ActivitySelector({
       {/* Question + editor only shown on explicit edit action */}
       <div className={isEditorVisible ? "block" : "hidden"}>
         <div className="px-4 pb-2 pt-3">
-          <h3 className="text-base font-bold leading-snug text-slate-900">
+          <h3 className="text-base font-bold leading-snug text-slate-900 dark:text-slate-100">
             {getStepQuestion(step)}
           </h3>
         </div>
