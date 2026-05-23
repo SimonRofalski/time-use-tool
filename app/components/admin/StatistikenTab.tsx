@@ -52,6 +52,7 @@ type CategoryData = {
   categoryId: number;
   name: string;
   minutes: number;
+  percentage: number;
   color: string;
 };
 
@@ -127,6 +128,20 @@ function getSatisfactionColor(index: number, total: number): string {
   const t = index / (total - 1);
   const hue = Math.round(0 + t * 120); // red -> green
   return `hsl(${hue} 75% 48%)`;
+}
+
+function getSatisfactionSortRank(name: string): number {
+  const normalized = name.toLowerCase();
+  if (normalized.includes("sehr schlecht")) return 0;
+  if (normalized.includes("schlecht")) return 1;
+  if (
+    normalized.includes("mittelmäßig") ||
+    normalized.includes("mittelmaessig")
+  )
+    return 2;
+  if (normalized.includes("gut") && !normalized.includes("sehr gut")) return 3;
+  if (normalized.includes("sehr gut")) return 4;
+  return 2;
 }
 
 // ─── Data processors ──────────────────────────────────────────────────────────
@@ -227,12 +242,19 @@ function buildCategoryDistribution(
     }
   }
 
+  const totalMinutes = Object.values(minutesByCategory).reduce(
+    (sum, mins) => sum + mins,
+    0,
+  );
+
   return Object.entries(minutesByCategory)
     .sort((a, b) => b[1] - a[1])
     .map(([id, minutes]) => ({
       categoryId: Number(id),
       name: categoryById[Number(id)] ?? `#${id}`,
       minutes,
+      percentage:
+        totalMinutes > 0 ? Math.round((minutes / totalMinutes) * 100) : 0,
       color: getCategoryColorById(Number(id)),
     }));
 }
@@ -248,18 +270,22 @@ function buildSatisfactionData(
     }
   }
   const total = Object.values(counts).reduce((s, c) => s + c, 0);
-  // Return in DB order (typically worst → best), including zero values
-  return satisfactions.map((s) => {
-    const count = counts[s.satisfaction_id] ?? 0;
-    return {
-      name: truncate(s.name, 20),
-      count,
-      label:
-        total > 0
-          ? `${count} (${Math.round((count / total) * 100)}%)`
-          : `${count}`,
-    };
-  });
+  return [...satisfactions]
+    .sort(
+      (a, b) =>
+        getSatisfactionSortRank(a.name) - getSatisfactionSortRank(b.name),
+    )
+    .map((s) => {
+      const count = counts[s.satisfaction_id] ?? 0;
+      return {
+        name: truncate(s.name, 20),
+        count,
+        label:
+          total > 0
+            ? `${count} (${Math.round((count / total) * 100)}%)`
+            : `${count}`,
+      };
+    });
 }
 
 // ─── Custom tooltips ──────────────────────────────────────────────────────────
@@ -280,7 +306,8 @@ function TrendTooltip({ active, payload, label }: any) {
 
 function CategoryTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
-  const { name, value } = payload[0];
+  const { name, value, payload: datum } = payload[0];
+  const data = datum as CategoryData;
   const hours = Math.floor(value / 60);
   const mins = value % 60;
   const label = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
@@ -288,6 +315,9 @@ function CategoryTooltip({ active, payload }: any) {
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg text-xs dark:border-slate-700 dark:bg-slate-800">
       <p className="font-semibold text-slate-700 dark:text-slate-200">{name}</p>
       <p className="mt-1 text-slate-600 dark:text-slate-300">{label}</p>
+      <p className="mt-1 text-slate-500 dark:text-slate-400">
+        {data.percentage}%
+      </p>
     </div>
   );
 }
@@ -799,6 +829,9 @@ export default function StatistikenTab() {
                   iconType="circle"
                   iconSize={8}
                   wrapperStyle={{ fontSize: 11 }}
+                  formatter={(value, entry: any) =>
+                    `${value} ${entry?.payload?.percentage ?? 0}%`
+                  }
                 />
               </PieChart>
             </ResponsiveContainer>
