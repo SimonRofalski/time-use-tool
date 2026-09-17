@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Baby,
   Bike,
@@ -66,11 +67,11 @@ function formatMinutes(minutes: number): string {
   return `${hours}h ${mins}m`;
 }
 
-// Formats an ISO date to a short German label for the chart X-axis: "Mo 28.3."
-function formatDateShort(dateString: string): string {
+// Formats an ISO date to a short label for the chart X-axis: "Mo 28.3." (de) / "Mon 3/28" (en)
+function formatDateShort(dateString: string, locale: string): string {
   const [year, month, day] = dateString.split("-").map(Number);
   const date = new Date(year, month - 1, day);
-  return date.toLocaleDateString("de-DE", {
+  return date.toLocaleDateString(locale === "en" ? "en-US" : "de-DE", {
     weekday: "short",
     day: "numeric",
     month: "numeric",
@@ -105,102 +106,52 @@ function getCategoryColorById(categoryId: number): string {
 
 type DayFilterMode = "alle" | "werktage" | "wochenende";
 
-function parseDateLocal(dateString: string): Date {
-  const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day);
+// Icon helpers keyed by the language-neutral lookup-table `code` column
+// (mirrors ActivitySelector.tsx's *_VISUAL_BY_CODE maps) — matching on the
+// localized display name would break once names became locale-dependent.
+const DEVICE_ICON_BY_CODE: Record<string, LucideIcon> = {
+  "1": Smartphone,
+  "2": Laptop,
+  "3": Tablet,
+  "4": Tv,
+  "5": Gamepad2,
+  "6": Watch,
+};
+
+function getDeviceIcon(code: string): LucideIcon {
+  return DEVICE_ICON_BY_CODE[code] ?? HelpCircle;
 }
 
-function isWeekend(dateString: string): boolean {
-  const day = parseDateLocal(dateString).getDay();
-  return day === 0 || day === 6;
+const SOCIAL_ICON_BY_CODE: Record<string, LucideIcon> = {
+  "1": UserX, // Alleine
+  "2": Heart, // Partner / Ehepartner
+  "3": Home, // Eltern
+  "4": Home, // Haushaltsmitglied bis 9 Jahre
+  "5": Home, // Andere Haushaltsmitglieder
+  "6": UserCheck, // Andere bekannte Personen
+};
+
+function getSocialIcon(code: string): LucideIcon {
+  return SOCIAL_ICON_BY_CODE[code] ?? Users;
 }
 
-function getIsoWeekInfo(dateString: string): { key: string; label: string } {
-  const [year, month, day] = dateString.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  const dayOfWeek = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayOfWeek);
+const LOCATION_ICON_BY_CODE: Record<string, LucideIcon> = {
+  "11": Home,
+  "12": Hotel,
+  "13": Briefcase,
+  "14": Home,
+  "15": UtensilsCrossed,
+  "16": ShoppingBag,
+  "17": Hotel,
+  "18": GraduationCap,
+  "21": Footprints,
+  "22": Bike,
+  "24": Car,
+  "31": Bus,
+};
 
-  const isoYear = date.getUTCFullYear();
-  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
-  const isoWeek = Math.ceil(
-    ((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
-  );
-
-  return {
-    key: `${isoYear}-KW${String(isoWeek).padStart(2, "0")}`,
-    label: `KW ${isoWeek}`,
-  };
-}
-
-function normalizeLabel(value: string): string {
-  return value
-    .toLowerCase()
-    .replaceAll("ä", "ae")
-    .replaceAll("ö", "oe")
-    .replaceAll("ü", "ue")
-    .replaceAll("ß", "ss");
-}
-
-// Icon helpers matching ActivitySelector's visual logic
-function getDeviceIcon(name: string): LucideIcon {
-  const n = normalizeLabel(name);
-  if (n.includes("smartphone")) return Smartphone;
-  if (n.includes("computer") || n.includes("laptop")) return Laptop;
-  if (n.includes("tablet")) return Tablet;
-  if (n.includes("tv") || n.includes("streaming")) return Tv;
-  if (n.includes("spielkonsole") || n.includes("konsole")) return Gamepad2;
-  if (n.includes("smartwatch") || n.includes("wearable")) return Watch;
-  return HelpCircle;
-}
-
-function getSocialIcon(name: string): LucideIcon {
-  const n = name.toLowerCase();
-  if (n.includes("allein")) return UserX;
-  if (n.includes("partner") || n.includes("ehepartner")) return Heart;
-  if (n.includes("eltern") || n.includes("mutter") || n.includes("vater"))
-    return Users;
-  if (n.includes("kind") || n.includes("baby")) return Baby;
-  if (n.includes("haushalt")) return Home;
-  if (n.includes("freunde") || n.includes("kollegen") || n.includes("bekannte"))
-    return UserCheck;
-  return Users;
-}
-
-function getLocationIcon(name: string): LucideIcon {
-  const n = normalizeLabel(name);
-  if (n.includes("zuhause") || n.includes("zu hause") || n.includes("daheim"))
-    return Home;
-  if (
-    n.includes("hotel") ||
-    n.includes("camping") ||
-    n.includes("wochenendhaus") ||
-    n.includes("ferienwohnung")
-  )
-    return Hotel;
-  if (n.includes("arbeitsplatz")) return Briefcase;
-  if (n.includes("restaurant") || n.includes("cafe") || n.includes("bar"))
-    return UtensilsCrossed;
-  if (n.includes("einkauf") || n.includes("markt") || n.includes("geschaeft"))
-    return ShoppingBag;
-  if (
-    n.includes("schule") ||
-    n.includes("universitaet") ||
-    n.includes("universitat")
-  )
-    return GraduationCap;
-  if (n.includes("zu fuss") || n.includes("fuss")) return Footprints;
-  if (n.includes("fahrrad")) return Bike;
-  if (n.includes("pkw") || n.includes("auto")) return Car;
-  if (
-    n.includes("oeffentlich") ||
-    n.includes("zug") ||
-    n.includes("bahn") ||
-    n.includes("bus") ||
-    n.includes("tram")
-  )
-    return Bus;
-  return MapPin;
+function getLocationIcon(code: string): LucideIcon {
+  return LOCATION_ICON_BY_CODE[code] ?? MapPin;
 }
 
 // ─── Custom tooltip for the bar chart ────────────────────────────────────────
@@ -219,6 +170,7 @@ function ChartTooltip({
   categoryNames: string[];
   categoryColorMap: Record<string, string>;
 }) {
+  const t = useTranslations("statistiken.zeitverteilung");
   if (!active || !payload || payload.length === 0) return null;
 
   // Check if this is an unsubmitted day (only has the "unsubmitted" key)
@@ -227,7 +179,7 @@ function ChartTooltip({
     return (
       <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 shadow-lg text-xs">
         <p className="font-semibold text-slate-700">{label}</p>
-        <p className="mt-1 text-slate-400">Noch nicht eingereicht</p>
+        <p className="mt-1 text-slate-400">{t("chart.notSubmitted")}</p>
       </div>
     );
   }
@@ -422,6 +374,7 @@ function SubcategoryAccordion({
   submittedDaysCount: number;
   onToggle: () => void;
 }) {
+  const t = useTranslations("statistiken.zeitverteilung.table.pairLabels");
   return (
     <>
       {/* Subcategory row */}
@@ -485,20 +438,20 @@ function SubcategoryAccordion({
               <>
                 <PairCell
                   pair={agg.devices}
-                  leftLabel="mit IT"
-                  rightLabel="ohne IT"
+                  leftLabel={t("withIt")}
+                  rightLabel={t("withoutIt")}
                   dim
                 />
                 <PairCell
                   pair={agg.social}
-                  leftLabel="mit anderen"
-                  rightLabel="allein"
+                  leftLabel={t("withOthers")}
+                  rightLabel={t("alone")}
                   dim
                 />
                 <PairCell
                   pair={agg.location}
-                  leftLabel="zuhause"
-                  rightLabel="anderswo"
+                  leftLabel={t("atHome")}
+                  rightLabel={t("elsewhere")}
                   dim
                 />
                 <SatisfactionCell label={agg.avgSatisfaction} dim />
@@ -541,24 +494,24 @@ function SubcategoryAccordion({
                     act.meta.withDevicesMinutes,
                     act.meta.withoutDevicesMinutes,
                   )}
-                  leftLabel="mit IT"
-                  rightLabel="ohne IT"
+                  leftLabel={t("withIt")}
+                  rightLabel={t("withoutIt")}
                 />
                 <PairCell
                   pair={buildPair(
                     act.meta.withPeopleMinutes,
                     act.meta.aloneMinutes,
                   )}
-                  leftLabel="mit anderen"
-                  rightLabel="allein"
+                  leftLabel={t("withOthers")}
+                  rightLabel={t("alone")}
                 />
                 <PairCell
                   pair={buildPair(
                     act.meta.atHomeMinutes,
                     act.meta.elsewhereMinutes,
                   )}
-                  leftLabel="zuhause"
-                  rightLabel="anderswo"
+                  leftLabel={t("atHome")}
+                  rightLabel={t("elsewhere")}
                 />
                 <SatisfactionCell label={act.meta.avgSatisfactionLabel} />
               </>
@@ -581,10 +534,12 @@ function MetaList({
   title,
   items,
   getIcon,
+  noDataLabel,
 }: {
   title: string;
-  items: { name: string; minutes: number }[];
-  getIcon?: (name: string) => LucideIcon;
+  items: { name: string; code?: string; minutes: number }[];
+  getIcon?: (code: string) => LucideIcon;
+  noDataLabel: string;
 }) {
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
@@ -592,11 +547,11 @@ function MetaList({
         {title}
       </p>
       {items.length === 0 ? (
-        <p className="text-xs text-slate-400 dark:text-slate-500">Keine Daten</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">{noDataLabel}</p>
       ) : (
         <div className="space-y-1.5">
           {items.slice(0, 5).map((item) => {
-            const Icon = getIcon ? getIcon(item.name) : null;
+            const Icon = getIcon ? getIcon(item.code ?? "") : null;
             return (
               <div
                 key={item.name}
@@ -651,6 +606,8 @@ export default function ZeitverteilungTab({
 }) {
   type SortColumn = "name" | "time" | "percent" | "itDevice" | "social" | "location" | "satisfaction";
 
+  const t = useTranslations("statistiken.zeitverteilung");
+  const locale = useLocale();
   const [showActivityMeta, setShowActivityMeta] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>("time");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -703,7 +660,7 @@ export default function ZeitverteilungTab({
 
   const sortedCategoryRows = [...categoryRows].sort((a, b) => {
     let cmp = 0;
-    if (sortColumn === "name") cmp = a.name.localeCompare(b.name, "de");
+    if (sortColumn === "name") cmp = a.name.localeCompare(b.name, locale);
     else if (sortColumn === "time") cmp = a.totalMinutes - b.totalMinutes;
     else if (sortColumn === "percent") cmp = a.percentOfTotal - b.percentOfTotal;
     else {
@@ -728,7 +685,7 @@ export default function ZeitverteilungTab({
         {/* Day filter */}
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 shrink-0">
-            Tage
+            {t("dayFilter.label")}
           </span>
           <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-0.5">
             <button
@@ -740,7 +697,7 @@ export default function ZeitverteilungTab({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
-              Alle
+              {t("dayFilter.all")}
             </button>
             <button
               type="button"
@@ -751,7 +708,7 @@ export default function ZeitverteilungTab({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
-              Werktage
+              {t("dayFilter.weekdays")}
             </button>
             <button
               type="button"
@@ -762,7 +719,7 @@ export default function ZeitverteilungTab({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
-              Wochenende
+              {t("dayFilter.weekend")}
             </button>
           </div>
         </div>
@@ -776,7 +733,7 @@ export default function ZeitverteilungTab({
         {weekOptions.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 shrink-0">
-              KW
+              {t("weekFilter.label")}
             </span>
             <button
               type="button"
@@ -787,7 +744,7 @@ export default function ZeitverteilungTab({
                   : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
-              Alle
+              {t("weekFilter.all")}
             </button>
             {weekOptions.map((w) => (
               <button
@@ -810,12 +767,12 @@ export default function ZeitverteilungTab({
       {/* ── Stacked bar chart ───────────────────────────────────────────────── */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
         <h3 className="mb-3 text-sm font-semibold text-slate-700">
-          Tägliche Zeitverteilung
+          {t("chart.title")}
         </h3>
 
         {barData.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-8">
-            Keine Tage für den gewählten Filter vorhanden.
+            {t("chart.noDays")}
           </p>
         ) : (
           <>
@@ -827,7 +784,7 @@ export default function ZeitverteilungTab({
               >
                 <XAxis
                   dataKey="date"
-                  tickFormatter={formatDateShort}
+                  tickFormatter={(date: string) => formatDateShort(date, locale)}
                   tick={{ fontSize: 12, fill: "#475569", fontWeight: 500 }}
                   interval={0}
                   height={24}
@@ -899,7 +856,7 @@ export default function ZeitverteilungTab({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetaList
-          title={viewMode === "avgPerDay" ? "Geräte-Nutzung (Ø/Tag)" : "Geräte-Nutzung"}
+          title={viewMode === "avgPerDay" ? t("metaLists.devicesTitleAvg") : t("metaLists.devicesTitle")}
           items={(metaAggregates?.devices ?? []).map((item) => ({
             ...item,
             minutes: viewMode === "avgPerDay" && submittedDaysCount > 0
@@ -907,9 +864,10 @@ export default function ZeitverteilungTab({
               : item.minutes,
           }))}
           getIcon={getDeviceIcon}
+          noDataLabel={t("metaLists.noData")}
         />
         <MetaList
-          title={viewMode === "avgPerDay" ? "Sozialer Kontext (Ø/Tag)" : "Sozialer Kontext"}
+          title={viewMode === "avgPerDay" ? t("metaLists.socialTitleAvg") : t("metaLists.socialTitle")}
           items={(metaAggregates?.social ?? []).map((item) => ({
             ...item,
             minutes: viewMode === "avgPerDay" && submittedDaysCount > 0
@@ -917,9 +875,10 @@ export default function ZeitverteilungTab({
               : item.minutes,
           }))}
           getIcon={getSocialIcon}
+          noDataLabel={t("metaLists.noData")}
         />
         <MetaList
-          title={viewMode === "avgPerDay" ? "Orte & Transport (Ø/Tag)" : "Orte & Transport"}
+          title={viewMode === "avgPerDay" ? t("metaLists.locationsTitleAvg") : t("metaLists.locationsTitle")}
           items={(metaAggregates?.locations ?? []).map((item) => ({
             ...item,
             minutes: viewMode === "avgPerDay" && submittedDaysCount > 0
@@ -927,10 +886,11 @@ export default function ZeitverteilungTab({
               : item.minutes,
           }))}
           getIcon={getLocationIcon}
+          noDataLabel={t("metaLists.noData")}
         />
         <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Ø Wohlbefinden
+            {t("metaLists.wellbeingTitle")}
           </p>
           <div className="flex items-center gap-2">
             <span className="text-xl leading-none" aria-hidden="true">
@@ -941,7 +901,7 @@ export default function ZeitverteilungTab({
             </p>
           </div>
           <p className="mt-1 text-[10px] text-slate-400">
-            Zeitgewichtet nach Dauer der Einträge
+            {t("metaLists.wellbeingSubtitle")}
           </p>
         </div>
       </div>
@@ -950,7 +910,7 @@ export default function ZeitverteilungTab({
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-700">
-            Zeitverteilung nach Kategorie
+            {t("table.title")}
           </h3>
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-0.5">
@@ -963,7 +923,7 @@ export default function ZeitverteilungTab({
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 }`}
               >
-                Gesamt
+                {t("table.viewModeTotal")}
               </button>
               <button
                 type="button"
@@ -974,7 +934,7 @@ export default function ZeitverteilungTab({
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 }`}
               >
-                Ø / Tag
+                {t("table.viewModeAvgPerDay")}
               </button>
             </div>
             <button
@@ -986,16 +946,14 @@ export default function ZeitverteilungTab({
                   : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
-              {showActivityMeta
-                ? "Metavariablen ausblenden"
-                : "Metavariablen anzeigen"}
+              {showActivityMeta ? t("table.hideMeta") : t("table.showMeta")}
             </button>
           </div>
         </div>
 
         {categoryRows.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-8">
-            Noch keine eingereichten Einträge vorhanden.
+            {t("table.noEntries")}
           </p>
         ) : (
           <table className="w-full">
@@ -1007,7 +965,7 @@ export default function ZeitverteilungTab({
                     onClick={() => toggleSort("name")}
                     className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                   >
-                    Kategorie
+                    {t("table.columns.category")}
                     <span className="text-[10px]">
                       {sortColumn === "name" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
                     </span>
@@ -1019,7 +977,7 @@ export default function ZeitverteilungTab({
                     onClick={() => toggleSort("time")}
                     className="flex items-center gap-1 ml-auto hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                   >
-                    {viewMode === "total" ? "Zeit" : "Ø / Tag"}
+                    {viewMode === "total" ? t("table.columns.time") : t("table.columns.timeAvg")}
                     <span className="text-[10px]">
                       {sortColumn === "time" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
                     </span>
@@ -1031,7 +989,7 @@ export default function ZeitverteilungTab({
                     onClick={() => toggleSort("percent")}
                     className="flex items-center gap-1 ml-auto hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                   >
-                    Anteil
+                    {t("table.columns.percent")}
                     <span className="text-[10px]">
                       {sortColumn === "percent" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
                     </span>
@@ -1042,12 +1000,17 @@ export default function ZeitverteilungTab({
                   <>
                     {(["itDevice", "social", "location", "satisfaction"] as const).map(
                       (col, i) => {
-                        const labels = ["IT Gerät", "Sozial", "Ort", "Ø Gefühl"] as const;
+                        const labels = [
+                          t("table.columns.itDevice"),
+                          t("table.columns.social"),
+                          t("table.columns.location"),
+                          t("table.columns.satisfaction"),
+                        ];
                         return (
                           <th
                             key={col}
                             className="py-2.5 px-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wide whitespace-nowrap"
-                            title={col === "satisfaction" ? "Zeitgewichteter Mittelwert der ausgewählten Gefühlsstufen innerhalb der Zeile" : undefined}
+                            title={col === "satisfaction" ? t("table.satisfactionColumnTitle") : undefined}
                           >
                             <button
                               type="button"
@@ -1139,18 +1102,18 @@ export default function ZeitverteilungTab({
                             <>
                               <PairCell
                                 pair={agg.devices}
-                                leftLabel="mit IT"
-                                rightLabel="ohne IT"
+                                leftLabel={t("table.pairLabels.withIt")}
+                                rightLabel={t("table.pairLabels.withoutIt")}
                               />
                               <PairCell
                                 pair={agg.social}
-                                leftLabel="mit anderen"
-                                rightLabel="allein"
+                                leftLabel={t("table.pairLabels.withOthers")}
+                                rightLabel={t("table.pairLabels.alone")}
                               />
                               <PairCell
                                 pair={agg.location}
-                                leftLabel="zuhause"
-                                rightLabel="anderswo"
+                                leftLabel={t("table.pairLabels.atHome")}
+                                rightLabel={t("table.pairLabels.elsewhere")}
                               />
                               <SatisfactionCell label={agg.avgSatisfaction} />
                             </>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { ComparisonMetaStats, ComparisonTopic } from "./types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -61,7 +62,10 @@ function DistributionStrip({
   topic: ComparisonTopic;
   hasEnoughUsers: boolean;
 }) {
-  const { allValues, userValue, label, unit } = topic;
+  const t = useTranslations("statistiken.kursvergleich");
+  const tStatistiken = useTranslations("statistiken");
+  const unit = tStatistiken("perDayUnit");
+  const { allValues, userValue } = topic;
 
   if (!hasEnoughUsers) return null;
 
@@ -85,15 +89,15 @@ function DistributionStrip({
   const meanPercent = toPercent(meanValue);
   const userPercent = toPercent(userValue);
 
-  // Generate a friendly German description of the user's position
+  // Generates a friendly description of the user's position
   function buildPositionText(): string {
     if (userValue === 0) {
-      return "Keine eigenen Einträge in diesem Zeitraum";
+      return t("positionText.noEntries");
     }
     if (userPercentile >= 50) {
-      return `Du liegst über ${userPercentile}% der Kursgruppe`;
+      return t("positionText.above", { percentile: userPercentile });
     }
-    return `Du liegst unter ${100 - userPercentile}% der Kursgruppe`;
+    return t("positionText.below", { percentile: 100 - userPercentile });
   }
 
   return (
@@ -133,13 +137,13 @@ function DistributionStrip({
         <p className="text-xs text-slate-500">{buildPositionText()}</p>
         <div className="flex gap-4">
           <div className="text-right">
-            <p className="text-xs text-slate-400">Dein Wert</p>
+            <p className="text-xs text-slate-400">{t("yourValue")}</p>
             <p className="text-sm font-semibold text-blue-600">
               {formatHours(userValue)} {unit}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-slate-400">Ø Kurs</p>
+            <p className="text-xs text-slate-400">{t("courseAverage")}</p>
             <p className="text-sm font-semibold text-slate-600">
               {formatHours(meanValue)} {unit}
             </p>
@@ -155,22 +159,25 @@ function DistributionStrip({
 // Card wrapper for one comparison topic (Schlaf, Sport, Smartphone)
 function TopicCard({
   topic,
+  label,
   hasEnoughUsers,
   icon,
 }: {
   topic: ComparisonTopic;
+  label: string;
   hasEnoughUsers: boolean;
   icon: string;
 }) {
+  const t = useTranslations("statistiken.kursvergleich");
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-sm">
       {/* Card header */}
       <div className="flex items-center gap-2 mb-1">
         <span className="text-base">{icon}</span>
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{topic.label}</h3>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{label}</h3>
       </div>
       <p className="text-xs text-slate-400">
-        Durchschnittliche Stunden pro Tag
+        {t("topicSubtitle")}
       </p>
 
       <DistributionStrip topic={topic} hasEnoughUsers={hasEnoughUsers} />
@@ -191,6 +198,7 @@ function MetaComparisonCard({
   userValue: string;
   courseValue: string;
 }) {
+  const t = useTranslations("statistiken.kursvergleich.metaCards");
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
@@ -204,11 +212,11 @@ function MetaComparisonCard({
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-md bg-blue-50 px-2 py-1">
-          <p className="text-[10px] text-blue-600">Du</p>
+          <p className="text-[10px] text-blue-600">{t("you")}</p>
           <p className="font-semibold text-blue-700">{userValue}</p>
         </div>
         <div className="rounded-md bg-slate-100 dark:bg-slate-700 px-2 py-1">
-          <p className="text-[10px] text-slate-500 dark:text-slate-400">Kurs</p>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400">{t("course")}</p>
           <p className="font-semibold text-slate-700 dark:text-slate-200">{courseValue}</p>
         </div>
       </div>
@@ -241,6 +249,10 @@ export default function KursvergleichTab({
   onClearWeeks: () => void;
   onSetDayFilter: (mode: DayFilterMode) => void;
 }) {
+  const t = useTranslations("statistiken.kursvergleich");
+  const tStatistiken = useTranslations("statistiken");
+  // Day/week filters share copy with the Zeitverteilung tab's identical filter bar.
+  const tFilters = useTranslations("statistiken.zeitverteilung");
   const hasEnoughUsers = qualifyingUserCount >= MIN_USERS_FOR_COMPARISON;
   const selectedWeekSet = new Set(selectedWeeks);
 
@@ -251,14 +263,20 @@ export default function KursvergleichTab({
     smartphone: "📱",
   };
 
+  // Translated labels for each topic key — topic.label/unit from props are
+  // German literals kept for type completeness only, see types.ts.
+  const topicLabels: Record<string, string> = {
+    schlaf: tStatistiken("comparisonTopics.schlaf"),
+    sport: tStatistiken("comparisonTopics.sport"),
+    smartphone: tStatistiken("comparisonTopics.smartphone"),
+  };
+
   return (
     <div className="space-y-5">
       {/* Section description */}
       <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
         <p className="text-xs text-blue-700">
-          <strong>Anonym:</strong> Im Vergleich siehst du deinen blauen Punkt
-          und die gestrichelte Kurs-Durchschnittslinie. Einzelwerte anderer
-          Teilnehmender werden nicht angezeigt.
+          <strong>{t("anonymousLabel")}</strong> {t("anonymousDescription")}
         </p>
       </div>
 
@@ -266,7 +284,7 @@ export default function KursvergleichTab({
       <div className="flex flex-col gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 shrink-0">
-            Tage
+            {tFilters("dayFilter.label")}
           </span>
           <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
             <button
@@ -278,7 +296,7 @@ export default function KursvergleichTab({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
-              Alle
+              {tFilters("dayFilter.all")}
             </button>
             <button
               type="button"
@@ -289,7 +307,7 @@ export default function KursvergleichTab({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
-              Werktage
+              {tFilters("dayFilter.weekdays")}
             </button>
             <button
               type="button"
@@ -300,7 +318,7 @@ export default function KursvergleichTab({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
-              Wochenende
+              {tFilters("dayFilter.weekend")}
             </button>
           </div>
         </div>
@@ -312,7 +330,7 @@ export default function KursvergleichTab({
         {weekOptions.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 shrink-0">
-              KW
+              {tFilters("weekFilter.label")}
             </span>
             <button
               type="button"
@@ -323,7 +341,7 @@ export default function KursvergleichTab({
                   : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
-              Alle
+              {tFilters("weekFilter.all")}
             </button>
             {weekOptions.map((w) => (
               <button
@@ -347,8 +365,8 @@ export default function KursvergleichTab({
       {metaStats && (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <MetaComparisonCard
-            title="IT-Gerät"
-            subtitle="mit / ohne"
+            title={t("metaCards.itDevice.title")}
+            subtitle={t("metaCards.itDevice.subtitle")}
             emoji="💻"
             userValue={
               metaStats.itDevice.user
@@ -362,8 +380,8 @@ export default function KursvergleichTab({
             }
           />
           <MetaComparisonCard
-            title="Sozial"
-            subtitle="mit anderen / allein"
+            title={t("metaCards.social.title")}
+            subtitle={t("metaCards.social.subtitle")}
             emoji="👥"
             userValue={
               metaStats.social.user
@@ -377,8 +395,8 @@ export default function KursvergleichTab({
             }
           />
           <MetaComparisonCard
-            title="Ort"
-            subtitle="zuhause / anderswo"
+            title={t("metaCards.location.title")}
+            subtitle={t("metaCards.location.subtitle")}
             emoji="📍"
             userValue={
               metaStats.location.user
@@ -392,8 +410,8 @@ export default function KursvergleichTab({
             }
           />
           <MetaComparisonCard
-            title="Wohlbefinden"
-            subtitle="Ø zeitgewichtet"
+            title={t("metaCards.wellbeing.title")}
+            subtitle={t("metaCards.wellbeing.subtitle")}
             emoji={getSatisfactionEmoji(metaStats.wellbeing.userLabel)}
             userValue={metaStats.wellbeing.userLabel}
             courseValue={`${getSatisfactionEmoji(metaStats.wellbeing.courseLabel)} ${metaStats.wellbeing.courseLabel}`}
@@ -406,11 +424,11 @@ export default function KursvergleichTab({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
           <div className="flex items-center gap-1.5">
             <span className="h-3 w-0 border-l-2 border-dashed border-slate-300" />
-            <span>Gestrichelt: Ø Kurs</span>
+            <span>{t("legend.courseAverage")}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white shadow-sm" />
-            <span>Blau: dein Wert</span>
+            <span>{t("legend.yourValue")}</span>
           </div>
         </div>
       </div>
@@ -420,16 +438,18 @@ export default function KursvergleichTab({
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-6 text-center">
           <p className="text-2xl mb-2">👥</p>
           <p className="text-sm font-semibold text-amber-800">
-            Vergleich noch nicht verfügbar
+            {t("notEnoughUsers.title")}
           </p>
           <p className="mt-1 text-xs text-amber-700">
-            Für den Kursvergleich müssen mindestens {MIN_USERS_FOR_COMPARISON}{" "}
-            Teilnehmende jeweils 2 Tage eingereicht haben. Schau später nochmal
-            rein!
+            {t("notEnoughUsers.description", {
+              minUsers: MIN_USERS_FOR_COMPARISON,
+            })}
           </p>
           <p className="mt-2 text-xs text-amber-500">
-            Aktuell qualifiziert: {qualifyingUserCount} /{" "}
-            {MIN_USERS_FOR_COMPARISON} Personen
+            {t("notEnoughUsers.qualifying", {
+              count: qualifyingUserCount,
+              minUsers: MIN_USERS_FOR_COMPARISON,
+            })}
           </p>
         </div>
       )}
@@ -440,6 +460,7 @@ export default function KursvergleichTab({
           <TopicCard
             key={topic.key}
             topic={topic}
+            label={topicLabels[topic.key] ?? topic.label}
             hasEnoughUsers={hasEnoughUsers}
             icon={topicIcons[topic.key] ?? "📊"}
           />

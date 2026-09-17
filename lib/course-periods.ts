@@ -94,19 +94,24 @@ export function formatPeriodLabel(
 // Returns a German error message string, or null if valid.
 export function validatePeriodsNoOverlap(
   periods: Pick<CoursePeriod, "start_date" | "end_date">[],
+  locale: "de" | "en" = "de",
 ): string | null {
   const sorted = [...periods].sort((a, b) =>
     a.start_date.localeCompare(b.start_date),
   );
   const fmt = (d: string) =>
-    new Date(d).toLocaleDateString("de-DE", {
+    new Date(d).toLocaleDateString(locale === "en" ? "en-US" : "de-DE", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i].start_date <= sorted[i - 1].end_date) {
-      return `Zeiträume überschneiden sich: ${fmt(sorted[i - 1].start_date)}–${fmt(sorted[i - 1].end_date)} und ${fmt(sorted[i].start_date)}–${fmt(sorted[i].end_date)}`;
+      const rangeA = `${fmt(sorted[i - 1].start_date)}–${fmt(sorted[i - 1].end_date)}`;
+      const rangeB = `${fmt(sorted[i].start_date)}–${fmt(sorted[i].end_date)}`;
+      return locale === "en"
+        ? `Periods overlap: ${rangeA} and ${rangeB}`
+        : `Zeiträume überschneiden sich: ${rangeA} und ${rangeB}`;
     }
   }
   return null;

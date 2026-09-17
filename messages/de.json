@@ -218,5 +218,378 @@
       "editTitle": "Bearbeiten",
       "deleteTitle": "Löschen"
     }
+  },
+  "statistiken": {
+    "loading": "Wird geladen...",
+    "errors": {
+      "noCourseFound": "Kein Kurs gefunden.",
+      "courseDataLoadError": "Kursdaten konnten nicht geladen werden.",
+      "lookupDataLoadError": "Stammdaten konnten nicht geladen werden."
+    },
+    "tabs": {
+      "zeitverteilung": "Zeitverteilung",
+      "kursvergleich": "Kursvergleich"
+    },
+    "comparisonLocked": {
+      "title": "Kursvergleich ist noch nicht freigeschaltet",
+      "description": "Bitte Kursleitung/Admin:in bitten, den Kursvergleich in der Kursübersicht freizugeben."
+    },
+    "weekLabel": "KW {week}",
+    "uncategorizedLabel": "Ohne Zuordnung",
+    "fallbackLabels": {
+      "unknownDevice": "Gerät #{id}",
+      "unknownContext": "Kontext #{id}",
+      "unknownLocation": "Unbekannt",
+      "noDevice": "Ohne IT-Gerät",
+      "aloneFallback": "Allein"
+    },
+    "comparisonTopics": {
+      "schlaf": "Schlaf",
+      "sport": "Sport & Bewegung",
+      "smartphone": "Smartphone"
+    },
+    "perDayUnit": "h/Tag",
+    "zeitverteilung": {
+      "dayFilter": {
+        "label": "Tage",
+        "all": "Alle",
+        "weekdays": "Werktage",
+        "weekend": "Wochenende"
+      },
+      "weekFilter": {
+        "label": "KW",
+        "all": "Alle"
+      },
+      "chart": {
+        "title": "Tägliche Zeitverteilung",
+        "noDays": "Keine Tage für den gewählten Filter vorhanden.",
+        "notSubmitted": "Noch nicht eingereicht"
+      },
+      "metaLists": {
+        "devicesTitle": "Geräte-Nutzung",
+        "devicesTitleAvg": "Geräte-Nutzung (Ø/Tag)",
+        "socialTitle": "Sozialer Kontext",
+        "socialTitleAvg": "Sozialer Kontext (Ø/Tag)",
+        "locationsTitle": "Orte & Transport",
+        "locationsTitleAvg": "Orte & Transport (Ø/Tag)",
+        "noData": "Keine Daten",
+        "wellbeingTitle": "Ø Wohlbefinden",
+        "wellbeingSubtitle": "Zeitgewichtet nach Dauer der Einträge"
+      },
+      "table": {
+        "title": "Zeitverteilung nach Kategorie",
+        "noEntries": "Noch keine eingereichten Einträge vorhanden.",
+        "viewModeTotal": "Gesamt",
+        "viewModeAvgPerDay": "Ø / Tag",
+        "showMeta": "Metavariablen anzeigen",
+        "hideMeta": "Metavariablen ausblenden",
+        "columns": {
+          "category": "Kategorie",
+          "time": "Zeit",
+          "timeAvg": "Ø / Tag",
+          "percent": "Anteil",
+          "itDevice": "IT Gerät",
+          "social": "Sozial",
+          "location": "Ort",
+          "satisfaction": "Ø Gefühl"
+        },
+        "satisfactionColumnTitle": "Zeitgewichteter Mittelwert der ausgewählten Gefühlsstufen innerhalb der Zeile",
+        "pairLabels": {
+          "withIt": "mit IT",
+          "withoutIt": "ohne IT",
+          "withOthers": "mit anderen",
+          "alone": "allein",
+          "atHome": "zuhause",
+          "elsewhere": "anderswo"
+        }
+      }
+    },
+    "kursvergleich": {
+      "anonymousLabel": "Anonym:",
+      "anonymousDescription": "Im Vergleich siehst du deinen blauen Punkt und die gestrichelte Kurs-Durchschnittslinie. Einzelwerte anderer Teilnehmender werden nicht angezeigt.",
+      "positionText": {
+        "noEntries": "Keine eigenen Einträge in diesem Zeitraum",
+        "above": "Du liegst über {percentile}% der Kursgruppe",
+        "below": "Du liegst unter {percentile}% der Kursgruppe"
+      },
+      "yourValue": "Dein Wert",
+      "courseAverage": "Ø Kurs",
+      "topicSubtitle": "Durchschnittliche Stunden pro Tag",
+      "metaCards": {
+        "itDevice": { "title": "IT-Gerät", "subtitle": "mit / ohne" },
+        "social": { "title": "Sozial", "subtitle": "mit anderen / allein" },
+        "location": { "title": "Ort", "subtitle": "zuhause / anderswo" },
+        "wellbeing": { "title": "Wohlbefinden", "subtitle": "Ø zeitgewichtet" },
+        "you": "Du",
+        "course": "Kurs"
+      },
+      "legend": {
+        "courseAverage": "Gestrichelt: Ø Kurs",
+        "yourValue": "Blau: dein Wert"
+      },
+      "notEnoughUsers": {
+        "title": "Vergleich noch nicht verfügbar",
+        "description": "Für den Kursvergleich müssen mindestens {minUsers} Teilnehmende jeweils 2 Tage eingereicht haben. Schau später nochmal rein!",
+        "qualifying": "Aktuell qualifiziert: {count} / {minUsers} Personen"
+      }
+    }
+  },
+  "common": {
+    "confirmButton": "Bestätigen",
+    "cancelButton": "Abbrechen"
+  },
+  "kursuebersicht": {
+    "subTabs": { "alleKurse": "Alle Kurse", "neuerKurs": "Neuer Kurs" },
+    "loading": "Wird geladen…",
+    "errors": {
+      "coursesLoadError": "Kurse konnten nicht geladen werden.",
+      "fillAllFields": "Bitte alle Felder ausfüllen.",
+      "periodDatesRequired": "Bitte für jeden Zeitraum Start- und Enddatum angeben.",
+      "periodEndBeforeStart": "Das Enddatum muss nach dem Startdatum liegen.",
+      "courseCreateError": "Kurs konnte nicht erstellt werden: {message}",
+      "periodsSaveError": "Zeiträume konnten nicht gespeichert werden: {message}",
+      "noSubmittedUserData": "Keine abgegebenen Nutzerdaten für den PDF-Export gefunden."
+    },
+    "newCourseForm": {
+      "nameLabel": "Kursname",
+      "namePlaceholder": "z. B. Sommersemester 2026",
+      "periodsLabel": "Zeiträume",
+      "addPeriodButton": "Zeitraum hinzufügen",
+      "periodStartLabel": "Zeitraum {index} – Start",
+      "startDateLabel": "Startdatum",
+      "periodEndLabel": "Ende",
+      "endDateLabel": "Enddatum",
+      "removePeriodTitle": "Zeitraum entfernen",
+      "accessCodeLabel": "Zugangscode",
+      "accessCodePlaceholder": "z. B. SS2026",
+      "createSuccess": "Kurs wurde erfolgreich erstellt.",
+      "creatingButton": "Wird erstellt…",
+      "createButton": "Kurs erstellen"
+    },
+    "breadcrumb": { "allCourses": "Alle Kurse" },
+    "courseList": {
+      "noCourses": "Noch keine Kurse vorhanden.",
+      "participantsLabel": "{count, plural, one {# Teilnehmer} other {# Teilnehmer}}",
+      "anonymizedBadge": "Anonymisiert",
+      "comparisonEnabledBadge": "Kursvergleich frei",
+      "comparisonDisabledBadge": "Kursvergleich gesperrt",
+      "accessCodeLabel": "Zugangscode:",
+      "saveButton": "Speichern",
+      "cancelButton": "Abbrechen",
+      "changeButton": "Ändern",
+      "endCourseButton": "Kurs beenden",
+      "endCourseConfirm": {
+        "title": "Kurs beenden",
+        "message": "Soll der Kurs „{name}\" wirklich beendet werden? Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirmLabel": "Beenden"
+      }
+    },
+    "courseDetail": {
+      "backToOverviewButton": "Zur Kursuebersicht",
+      "exportButton": "Datenexport",
+      "comparisonEnableButton": "Kursvergleich freigeben",
+      "comparisonDisableButton": "Kursvergleich sperren",
+      "anonymizeButton": "Kurs anonymisieren",
+      "anonymizingButton": "Anonymisiere…",
+      "anonymizeConfirm": {
+        "title": "Kurs anonymisieren",
+        "message": "Alle Teilnehmer erhalten ein Alias (TN-0001, TN-0002, …). Realnamen und E-Mail-Adressen werden in der Admin-Ansicht durch Aliases ersetzt. Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirmLabel": "Anonymisieren"
+      },
+      "noParticipants": "Keine Teilnehmer in diesem Kurs.",
+      "table": {
+        "participantColumn": "Teilnehmer",
+        "progressColumn": "Fortschritt",
+        "actionsColumn": "Aktionen",
+        "daysUnit": "Tage",
+        "includeButton": "Einschliessen",
+        "excludeButton": "Ausschliessen",
+        "includeConfirm": {
+          "title": "Ausschluss aufheben",
+          "message": "Die Daten von {name} werden wieder in den Statistiken berücksichtigt.",
+          "confirmLabel": "Aufheben"
+        },
+        "excludeConfirm": {
+          "title": "Aus Statistiken ausschliessen",
+          "message": "Die Daten von {name} werden aus allen Statistiken entfernt. Der Teilnehmer wird nicht informiert.",
+          "confirmLabel": "Ausschliessen"
+        },
+        "removeButton": "Entfernen",
+        "removeConfirm": {
+          "title": "Teilnehmer entfernen",
+          "message": "Soll {name} wirklich aus dem Kurs entfernt werden? Die Zeiteinträge bleiben erhalten.",
+          "confirmLabel": "Entfernen"
+        }
+      }
+    },
+    "exportModal": {
+      "title": "Datenexport",
+      "subtitle": "Waehle Exporttyp und Dateiformat für diesen Kurs.",
+      "closeAriaLabel": "Exportdialog schliessen",
+      "exportForLabel": "Export für",
+      "adminOption": "Admin",
+      "userOption": "Benutzer",
+      "contentLabel": "Inhalt",
+      "aggregatedOption": "Aggregiert",
+      "rawOption": "Rohdaten",
+      "formatLabel": "Format",
+      "csvButton": "CSV",
+      "excelButton": "Excel",
+      "exportingLabel": "Exportiere...",
+      "userPdfDescription": "Erstellt ein PDF mit einer eigenen Auswertungsseite pro Teilnehmer (nur abgegebene Tage): Zeitverteilung, Top-Aktivitaeten und Vergleich mit dem Kursschnitt.",
+      "creatingPdfButton": "Erstelle PDF...",
+      "createPdfButton": "PDF erstellen"
+    },
+    "userDetail": {
+      "backToCourseButton": "Zurueck zum Kurs",
+      "backToOverviewButton": "Zur Kursuebersicht",
+      "dayOverviewTab": "Tagesübersicht",
+      "timeDistributionTab": "Zeitverteilung"
+    },
+    "dayList": {
+      "noDaysYet": "Dieser Nutzer hat noch keine Tage erfasst.",
+      "submittedBadge": "Abgeschlossen",
+      "inProgressBadge": "In Bearbeitung",
+      "loadingEntries": "Lädt…",
+      "noEntriesForDay": "Keine Einträge für diesen Tag.",
+      "columns": {
+        "time": "Zeit",
+        "mainActivity": "Haupttätigkeit",
+        "secondaryActivity": "Nebentätigkeit",
+        "location": "Ort / Transport",
+        "wellbeing": "Wohlbefinden"
+      }
+    },
+    "pdfExport": {
+      "userEvaluationTitle": "Benutzer-Auswertung",
+      "courseLabel": "Kurs: {name}",
+      "participantLabel": "Teilnehmer: {name}",
+      "createdAtLabel": "Erstellt am: {date}",
+      "submittedDaysLabel": "Abgegebene Tage: {count}",
+      "totalHoursLabel": "Gesamtstunden: {hours}",
+      "comparisonChartTitle": "Vergleich mit Kursschnitt",
+      "courseAverageLegend": "Kursschnitt",
+      "categoryTableHeaders": ["Kategorie", "Stunden", "Anteil", "Kursschnitt (h)", "Differenz"],
+      "noCategoriesRecorded": "Keine erfassten Kategorien",
+      "top5ActivitiesTitle": "Top 5 Aktivitaeten",
+      "activityTableHeaders": ["Kategorie", "Aktivitaet", "Stunden", "Anteil"],
+      "unknownCategory": "Unbekannt",
+      "noActivitiesRecorded": "Keine Aktivitaeten",
+      "deviceUsageTitle": "Geräte-Nutzung",
+      "itUsageTableHeaders": ["IT-Nutzung", "Stunden", "Anteil"],
+      "withIt": "Mit IT-Nutzung",
+      "withoutIt": "Ohne IT-Nutzung",
+      "devicesWithinItTitle": "Geräte innerhalb IT-Nutzung",
+      "deviceTableHeaders": ["Geraet", "Stunden"],
+      "noDetailedDeviceData": "Keine detaillierten Gerätedaten",
+      "unspecifiedDevice": "IT-Gerät (nicht spezifiziert)",
+      "deviceFallback": "Gerät {id}",
+      "categoryFallback": "Kategorie {id}",
+      "activityFallback": "Aktivitaet {id}",
+      "filenameSuffix": "Benutzerauswertungen"
+    },
+    "csvExport": {
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "daysRecorded": "Tage erfasst",
+      "categoryHoursColumn": "{category} (h)",
+      "date": "Datum",
+      "start": "Start",
+      "end": "Ende",
+      "durationMin": "Dauer (min)",
+      "durationH": "Dauer (h)",
+      "category": "Kategorie",
+      "activity": "Aktivitaet",
+      "secondaryActivity": "Nebenaktivitaet",
+      "digitalMediaUsed": "Digitale Medien genutzt",
+      "yes": "Ja",
+      "no": "Nein",
+      "mediaTypes": "Medienarten",
+      "locationTransport": "Ort / Transport",
+      "socialContext": "Sozialer Kontext",
+      "satisfaction": "Zufriedenheit",
+      "sheetName": "Statistiken",
+      "modeAggregated": "Aggregiert",
+      "modeRaw": "Roh"
+    }
+  },
+  "nutzeruebersicht": {
+    "loading": "Wird geladen…",
+    "loadError": "Nutzerdaten konnten nicht geladen werden.",
+    "kpis": {
+      "activeUsers": "Aktive Nutzer",
+      "completedDays": "Abgeschlossene Tage",
+      "completedDaysSubtitle": "Gesamt aller Nutzer",
+      "avgCompletionRate": "Ø Abschlussquote",
+      "avgCompletionRateSubtitle": "Ø aller gestarteten Nutzer"
+    },
+    "searchPlaceholder": "Nutzer suchen…",
+    "noUserFound": "Kein Nutzer gefunden.",
+    "noActiveUsers": "Keine aktiven Nutzer vorhanden.",
+    "courseLabel": "Kurs",
+    "progressLabel": "Fortschritt",
+    "progressDaysLabel": "{submitted} / {total} Tage",
+    "daysUnit": "Tage",
+    "noCoursePlaceholder": "–",
+    "includeButton": "Einschliessen",
+    "excludeButton": "Ausschliessen",
+    "table": {
+      "user": "Nutzer",
+      "course": "Kurs",
+      "progress": "Fortschritt",
+      "actions": "Aktionen"
+    },
+    "includeConfirm": {
+      "title": "Ausschluss aufheben",
+      "message": "Die Daten von {name} werden wieder in allen Statistiken berücksichtigt.",
+      "confirmLabel": "Aufheben"
+    },
+    "excludeConfirm": {
+      "title": "Nutzer ausschliessen",
+      "message": "Die Daten von {name} werden aus allen Statistiken entfernt. Der Nutzer wird darüber nicht informiert.",
+      "confirmLabel": "Ausschliessen"
+    }
+  },
+  "adminStatistiken": {
+    "loading": "Statistiken werden geladen…",
+    "loadError": "Statistiken konnten nicht geladen werden.",
+    "kpis": {
+      "totalUsers": "Gesamtnutzer",
+      "courses": "Kurse",
+      "coursesSubtitle": "{active} aktiv · {closed} abgeschlossen",
+      "newEntries7d": "Neue Einträge (7 Tage)",
+      "totalEntries": "Einträge gesamt"
+    },
+    "activeUsersTrend": {
+      "title": "Aktive Nutzer — letzte 14 Tage",
+      "noActivity": "Keine Aktivität in den letzten 14 Tagen.",
+      "tooltipActiveUsers": "{count} aktive Nutzer"
+    },
+    "courseProgress": {
+      "title": "Kursfortschritt",
+      "noCourseData": "Keine Kursdaten vorhanden.",
+      "legendOpen": "Offen",
+      "legendInProgress": "Laufend",
+      "legendDone": "Abgeschlossen"
+    },
+    "topActivities": {
+      "title": "Top 7 Haupttätigkeiten",
+      "noEntries": "Noch keine Einträge vorhanden.",
+      "tooltipEntries": "{count} Einträge",
+      "tooltipCount": "Anzahl",
+      "fallbackActivity": "Aktivität #{id}"
+    },
+    "categoryDistribution": {
+      "title": "Aktivitätskategorien — Zeitverteilung",
+      "noEntries": "Noch keine Einträge vorhanden.",
+      "fallbackCategory": "Kategorie #{id}"
+    },
+    "wellbeing": {
+      "title": "Wohlbefinden-Verteilung",
+      "noEntries": "Noch keine Einträge vorhanden."
+    }
+  },
+  "adminUserStatsView": {
+    "noData": "Dieser Nutzer hat noch keine Daten erfasst."
   }
 }

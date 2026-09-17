@@ -15,7 +15,10 @@ import {
   CartesianGrid,
   LabelList,
 } from "recharts";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { getLocalizedName } from "@/lib/i18n/localized-name";
 import { totalPeriodDays } from "@/lib/course-periods";
 import { CATEGORY_COLORS } from "@/app/[locale]/(protected)/zeiterfassung/types";
 
@@ -67,12 +70,15 @@ const CHART_COLORS = CATEGORY_COLORS;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatDateShort(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString("de-DE", {
-    weekday: "short",
-    day: "numeric",
-    month: "numeric",
-  });
+function formatDateShort(isoDate: string, locale: string): string {
+  return new Date(isoDate).toLocaleDateString(
+    locale === "en" ? "en-US" : "de-DE",
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "numeric",
+    },
+  );
 }
 
 // ISO date string for N days ago (midnight UTC)
@@ -134,6 +140,7 @@ function getSatisfactionColor(index: number, total: number): string {
 function buildTrendData(
   recentEntries: { day_id: number; created_at: string }[],
   dayById: Record<number, { profiles_id: string }>,
+  locale: string,
 ): TrendPoint[] {
   const dates = lastNDates(14);
   // Map: dateKey → Set<profiles_id>
@@ -148,7 +155,7 @@ function buildTrendData(
   }
 
   return dates.map((date) => ({
-    date: formatDateShort(date),
+    date: formatDateShort(date, locale),
     users: usersByDate[date].size,
   }));
 }
@@ -185,6 +192,7 @@ function buildTopActivities(
   entries: { primary_activity_id: number | null }[],
   activityById: Record<number, string>,
   activityToCategory: Record<number, number>,
+  t: ReturnType<typeof useTranslations<"adminStatistiken">>,
 ): ActivityData[] {
   const counts: Record<number, number> = {};
   for (const e of entries) {
@@ -197,7 +205,10 @@ function buildTopActivities(
     .sort((a, b) => b[1] - a[1])
     .slice(0, 7)
     .map(([id, count]) => ({
-      name: truncate(activityById[Number(id)] ?? `#${id}`, 28),
+      name: truncate(
+        activityById[Number(id)] ?? t("topActivities.fallbackActivity", { id }),
+        28,
+      ),
       count,
       label:
         total > 0
@@ -215,6 +226,7 @@ function buildCategoryDistribution(
   }[],
   activityToCategory: Record<number, number>, // activity_id → category_id
   categoryById: Record<number, string>,
+  t: ReturnType<typeof useTranslations<"adminStatistiken">>,
 ): CategoryData[] {
   const minutesByCategory: Record<number, number> = {};
   for (const e of entries) {
@@ -231,7 +243,7 @@ function buildCategoryDistribution(
     .sort((a, b) => b[1] - a[1])
     .map(([id, minutes]) => ({
       categoryId: Number(id),
-      name: categoryById[Number(id)] ?? `#${id}`,
+      name: categoryById[Number(id)] ?? t("categoryDistribution.fallbackCategory", { id }),
       minutes,
       color: getCategoryColorById(Number(id)),
     }));
@@ -265,6 +277,7 @@ function buildSatisfactionData(
 // ─── Custom tooltips ──────────────────────────────────────────────────────────
 
 function TrendTooltip({ active, payload, label }: any) {
+  const t = useTranslations("adminStatistiken");
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg text-xs dark:border-slate-700 dark:bg-slate-800">
@@ -272,7 +285,7 @@ function TrendTooltip({ active, payload, label }: any) {
         {label}
       </p>
       <p className="mt-1 text-blue-600 dark:text-blue-400">
-        {payload[0].value} aktive Nutzer
+        {t("activeUsersTrend.tooltipActiveUsers", { count: payload[0].value })}
       </p>
     </div>
   );
@@ -330,6 +343,8 @@ function ChartCard({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function StatistikenTab() {
+  const t = useTranslations("adminStatistiken");
+  const locale = useLocale() as Locale;
   const supabase = getSupabaseBrowserClient();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -404,14 +419,16 @@ export default function StatistikenTab() {
           "day_id, primary_activity_id, satisfaction_id, start_time, end_time",
         )
         .limit(100000),
-      supabase.from("activity").select("activity_id, name, subcategory_id"),
+      supabase
+        .from("activity")
+        .select("activity_id, name, name_en, subcategory_id"),
       supabase.from("subcategory").select("subcategory_id, category_id"),
-      supabase.from("category").select("category_id, name"),
-      supabase.from("satisfaction").select("satisfaction_id, name"),
+      supabase.from("category").select("category_id, name, name_en"),
+      supabase.from("satisfaction").select("satisfaction_id, name, name_en"),
     ]);
 
     if (coursesRes.error || allDaysRes.error) {
-      setError("Statistiken konnten nicht geladen werden.");
+      setError(t("loadError"));
       setIsLoading(false);
       return;
     }
@@ -477,7 +494,8 @@ export default function StatistikenTab() {
     }
 
     const activityById: Record<number, string> = {};
-    for (const a of activities) activityById[a.activity_id] = a.name;
+    for (const a of activities)
+      activityById[a.activity_id] = getLocalizedName(a, locale);
 
     // activity_id → category_id (via subcategory)
     const subcatToCategory: Record<number, number> = {};
@@ -491,7 +509,8 @@ export default function StatistikenTab() {
     }
 
     const categoryById: Record<number, string> = {};
-    for (const c of categories) categoryById[c.category_id] = c.name;
+    for (const c of categories)
+      categoryById[c.category_id] = getLocalizedName(c, locale);
 
     // ── KPIs ──────────────────────────────────────────────────────────────────
 
@@ -505,21 +524,28 @@ export default function StatistikenTab() {
 
     // ── Charts ────────────────────────────────────────────────────────────────
 
-    setTrendData(buildTrendData(recentEntries, dayById));
+    setTrendData(buildTrendData(recentEntries, dayById, locale));
     setCourseProgress(
       buildCourseProgress(courses, userCountByCourse, filteredDays),
     );
     setTopActivities(
-      buildTopActivities(filteredEntries, activityById, activityToCategory),
+      buildTopActivities(filteredEntries, activityById, activityToCategory, t),
     );
     setCategoryData(
       buildCategoryDistribution(
         filteredEntries,
         activityToCategory,
         categoryById,
+        t,
       ),
     );
-    setSatisfactionData(buildSatisfactionData(filteredEntries, satisfactions));
+    const localizedSatisfactions = satisfactions.map((s) => ({
+      ...s,
+      name: getLocalizedName(s, locale),
+    }));
+    setSatisfactionData(
+      buildSatisfactionData(filteredEntries, localizedSatisfactions),
+    );
 
     setIsLoading(false);
   }
@@ -529,7 +555,7 @@ export default function StatistikenTab() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <p className="text-sm text-slate-500">Statistiken werden geladen…</p>
+        <p className="text-sm text-slate-500">{t("loading")}</p>
       </div>
     );
   }
@@ -549,7 +575,7 @@ export default function StatistikenTab() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              Gesamtnutzer
+              {t("kpis.totalUsers")}
             </p>
             <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
               {kpis.totalUsers}
@@ -558,19 +584,22 @@ export default function StatistikenTab() {
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              Kurse
+              {t("kpis.courses")}
             </p>
             <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
               {kpis.activeCourses + kpis.closedCourses}
             </p>
             <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-              {kpis.activeCourses} aktiv · {kpis.closedCourses} abgeschlossen
+              {t("kpis.coursesSubtitle", {
+                active: kpis.activeCourses,
+                closed: kpis.closedCourses,
+              })}
             </p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              Neue Einträge (7 Tage)
+              {t("kpis.newEntries7d")}
             </p>
             <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
               {kpis.newEntriesLast7Days}
@@ -579,10 +608,12 @@ export default function StatistikenTab() {
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              Einträge gesamt
+              {t("kpis.totalEntries")}
             </p>
             <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
-              {kpis.totalEntries.toLocaleString("de-DE")}
+              {kpis.totalEntries.toLocaleString(
+                locale === "en" ? "en-US" : "de-DE",
+              )}
             </p>
           </div>
         </div>
@@ -591,10 +622,10 @@ export default function StatistikenTab() {
       {/* ── Row 2: Trend + Course progress ─────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Aktive Nutzer Trend */}
-        <ChartCard title="Aktive Nutzer — letzte 14 Tage">
+        <ChartCard title={t("activeUsersTrend.title")}>
           {trendData.every((d) => d.users === 0) ? (
             <p className="py-10 text-center text-sm text-slate-400">
-              Keine Aktivität in den letzten 14 Tagen.
+              {t("activeUsersTrend.noActivity")}
             </p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
@@ -635,10 +666,10 @@ export default function StatistikenTab() {
         </ChartCard>
 
         {/* Kursfortschritt */}
-        <ChartCard title="Kursfortschritt">
+        <ChartCard title={t("courseProgress.title")}>
           {courseProgress.length === 0 ? (
             <p className="py-10 text-center text-sm text-slate-400">
-              Keine Kursdaten vorhanden.
+              {t("courseProgress.noCourseData")}
             </p>
           ) : (
             <ResponsiveContainer
@@ -679,10 +710,10 @@ export default function StatistikenTab() {
                   wrapperStyle={{ fontSize: 11 }}
                   formatter={(value) =>
                     value === "open"
-                      ? "Offen"
+                      ? t("courseProgress.legendOpen")
                       : value === "inProgress"
-                        ? "Laufend"
-                        : "Abgeschlossen"
+                        ? t("courseProgress.legendInProgress")
+                        : t("courseProgress.legendDone")
                   }
                 />
                 <Bar
@@ -714,10 +745,10 @@ export default function StatistikenTab() {
       {/* ── Row 3: Top activities + Category donut ──────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Top 7 Aktivitäten */}
-        <ChartCard title="Top 7 Haupttätigkeiten">
+        <ChartCard title={t("topActivities.title")}>
           {topActivities.length === 0 ? (
             <p className="py-10 text-center text-sm text-slate-400">
-              Noch keine Einträge vorhanden.
+              {t("topActivities.noEntries")}
             </p>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
@@ -746,7 +777,10 @@ export default function StatistikenTab() {
                   tickLine={false}
                 />
                 <Tooltip
-                  formatter={(value) => [`${value} Einträge`, "Anzahl"]}
+                  formatter={(value) => [
+                    t("topActivities.tooltipEntries", { count: value as number }),
+                    t("topActivities.tooltipCount"),
+                  ]}
                   contentStyle={{
                     fontSize: 12,
                     borderRadius: 8,
@@ -772,10 +806,10 @@ export default function StatistikenTab() {
         </ChartCard>
 
         {/* Aktivitätskategorien (donut) */}
-        <ChartCard title="Aktivitätskategorien — Zeitverteilung">
+        <ChartCard title={t("categoryDistribution.title")}>
           {categoryData.length === 0 ? (
             <p className="py-10 text-center text-sm text-slate-400">
-              Noch keine Einträge vorhanden.
+              {t("categoryDistribution.noEntries")}
             </p>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
@@ -807,10 +841,10 @@ export default function StatistikenTab() {
       </div>
 
       {/* ── Row 4: Wohlbefinden ─────────────────────────────────────────────── */}
-      <ChartCard title="Wohlbefinden-Verteilung">
+      <ChartCard title={t("wellbeing.title")}>
         {satisfactionData.length === 0 ? (
           <p className="py-10 text-center text-sm text-slate-400">
-            Noch keine Einträge vorhanden.
+            {t("wellbeing.noEntries")}
           </p>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
@@ -836,7 +870,10 @@ export default function StatistikenTab() {
                 tickLine={false}
               />
               <Tooltip
-                formatter={(value) => [`${value} Einträge`, "Anzahl"]}
+                formatter={(value) => [
+                  t("topActivities.tooltipEntries", { count: value as number }),
+                  t("topActivities.tooltipCount"),
+                ]}
                 contentStyle={{
                   fontSize: 12,
                   borderRadius: 8,
