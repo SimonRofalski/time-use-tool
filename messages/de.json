@@ -118,5 +118,105 @@
       "daysLoadError": "Tage konnten nicht geladen werden.",
       "entriesLoadError": "Einträge konnten nicht geladen werden."
     }
+  },
+  "zeiterfassung": {
+    "gridLoading": "Raster wird geladen...",
+    "questionnaireLoading": "Fragebogen wird geladen...",
+    "noCourseFound": "Kein Kurs gefunden.",
+    "entriesLoadError": "Einträge konnten nicht geladen werden.",
+    "deleteError": "Einträge konnten nicht gelöscht werden.",
+    "saveError": "Eintrag konnte nicht gespeichert werden: {message}",
+    "unknownError": "unbekannter Fehler",
+    "dayCreateError": "Tageseintrag konnte nicht erstellt werden: {message}",
+    "completionBar": {
+      "previousLabel": "Letzter",
+      "nextLabel": "Nächster",
+      "noPreviousDay": "Kein früherer Tag",
+      "noNextDay": "Kein späterer Tag"
+    },
+    "idlePlaceholder": {
+      "title": "Zeitslot auswählen",
+      "line1": "Klicke auf einen Slot – oder halte und ziehe über mehrere aufeinanderfolgende Slots, um eine Zeitspanne auf einmal zu markieren.",
+      "line2": "Danach wählst du Kategorie und Aktivität aus."
+    },
+    "gridToggle": {
+      "label": "Zeitraster",
+      "expand": "▼ Aufklappen",
+      "collapse": "▲ Einklappen"
+    },
+    "abandonDialog": {
+      "title": "Eingabe abbrechen?",
+      "description": "Du hast bereits Angaben gemacht. Wenn du jetzt wechselst, gehen deine bisherigen Eingaben verloren.",
+      "continueButton": "Weiter eingeben",
+      "discardButton": "Ja, verwerfen"
+    }
+  },
+  "activitySelector": {
+    "questions": {
+      "primaryActivity": "Welche Haupttätigkeit hast du ausgeführt?",
+      "secondaryActivity": "Hast du gleichzeitig eine Nebentätigkeit ausgeführt?",
+      "digitalMedia": "Hast du ein Gerät genutzt? (Smartphone, Tablet, PC…)",
+      "digitalMediaType": "Welche Geräte hast du genutzt?",
+      "locationTransport": "Wo warst du während dieser Zeit?",
+      "socialContext": "War jemand anders mit dabei?",
+      "satisfaction": "Wie hast du dich gefühlt?"
+    },
+    "stepLabels": {
+      "primaryActivity": "Haupttätigkeit",
+      "secondaryActivity": "Nebentätigkeit",
+      "digitalMedia": "Gerät?",
+      "digitalMediaType": "Geräteart",
+      "locationTransport": "Ort",
+      "socialContext": "Sozial",
+      "satisfaction": "Stimmung"
+    },
+    "slotsRangeLabel": "{start} – {end} · {count, plural, one {# Feld} other {# Felder}}",
+    "backButton": "Zurück",
+    "continueButton": "Weiter",
+    "activityList": {
+      "categoriesBackLabel": "Kategorien",
+      "noActivitiesFound": "Keine Tätigkeiten gefunden.",
+      "matchCount": "{count, plural, one {# Treffer} other {# Treffer}}",
+      "primarySearchPlaceholder": "Haupttätigkeit oder Stichwort suchen...",
+      "secondarySearchPlaceholder": "Nebentätigkeit oder Stichwort suchen...",
+      "noSecondaryActivityButton": "Keine Nebentätigkeit → Weiter"
+    },
+    "digitalMedia": {
+      "yes": "Ja",
+      "no": "Nein"
+    },
+    "digitalMediaTypeStep": {
+      "validationError": "Bitte wähle mindestens eine Geräteart aus."
+    },
+    "locationCategories": {
+      "orte": "Orte",
+      "privateVerkehrsmittel": "Private Verkehrsmittel",
+      "oeffentlicherVerkehr": "Öffentlicher Verkehr",
+      "sonstiges": "Sonstiges"
+    },
+    "socialContextStep": {
+      "validationError": "Bitte wähle mindestens einen Sozialkontext aus."
+    },
+    "overview": {
+      "timeLabel": "Zeit",
+      "noTimeSlots": "Keine Zeitslots",
+      "categoryLabel": "Kategorie",
+      "mainCategory": "Hauptkategorie: {name}",
+      "selectedCategory": "Gewählte Kategorie: {name}",
+      "mainActivity": "Haupttätigkeit: {name}",
+      "secondaryCategory": "Nebenkategorie: {name}",
+      "secondaryActivity": "Nebentätigkeit: {name}",
+      "nothingSelected": "Noch nichts ausgewählt",
+      "contextLabel": "Kontext",
+      "locationTransport": "Ort/Transport: {name}",
+      "social": "Sozial: {name}",
+      "mediaLabel": "Medien",
+      "moodLabel": "Stimmung",
+      "timeOrderedListing": "Zeitgeführte Auflistung",
+      "noEntry": "Kein Eintrag",
+      "addEntryTitle": "Eintrag hinzufügen",
+      "editTitle": "Bearbeiten",
+      "deleteTitle": "Löschen"
+    }
   }
 }
