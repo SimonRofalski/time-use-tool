@@ -1,6 +1,27 @@
 "use client";
 
-import type { ComparisonMetaStats, ComparisonTopic } from "./types";
+import type { ReactNode } from "react";
+import {
+  BedDouble,
+  Bike,
+  Briefcase,
+  Circle,
+  GraduationCap,
+  HandHeart,
+  Home,
+  Palette,
+  Route,
+  Tv,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import type {
+  CategoryComparison,
+  ComparisonMetric,
+  ComparisonTopic,
+} from "./types";
+import { CATEGORY_COLORS } from "@/app/(protected)/zeiterfassung/types";
+import { satisfactionLevelForAverage } from "./satisfaction";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -8,209 +29,255 @@ import type { ComparisonMetaStats, ComparisonTopic } from "./types";
 const MIN_USERS_FOR_COMPARISON = 3;
 type DayFilterMode = "alle" | "werktage" | "wochenende";
 
+const USER_BLUE = "#3B82F6"; // blue-500 — "du" in the focus and context cards
+
+const TOPIC_EMOJI: Record<string, string> = {
+  schlaf: "😴",
+  sport: "🏃",
+  smartphone: "📱",
+};
+
+const CONTEXT_EMOJI: Record<string, string> = {
+  itDevice: "💻",
+  social: "👥",
+  location: "📍",
+};
+
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
-// Rounds a number to one decimal place for display
-function formatHours(value: number): string {
-  return value.toFixed(1);
-}
-
-// Calculates what percentile the user is in (0–100)
-// e.g. if 7 out of 10 values are below the user's value → 70th percentile
-function calculatePercentile(allValues: number[], userValue: number): number {
-  const below = allValues.filter((v) => v < userValue).length;
-  return Math.round((below / allValues.length) * 100);
-}
-
-// Computes the arithmetic mean of an array of numbers
 function calculateMean(values: number[]): number {
   if (values.length === 0) return 0;
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-function parseSatisfactionLabel(
-  label: string,
-): { value: number; max: number } | null {
-  const match = label.match(/^([\d.]+)\s*\/\s*([\d.]+)/);
-  if (!match) return null;
-  const value = Number(match[1]);
-  const max = Number(match[2]);
-  if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) return null;
-  return { value, max };
+// 0–100: share of course values strictly below the user's value
+function calculatePercentile(allValues: number[], userValue: number): number {
+  if (allValues.length === 0) return 0;
+  const below = allValues.filter((v) => v < userValue).length;
+  return Math.round((below / allValues.length) * 100);
 }
 
-function getSatisfactionEmoji(label: string): string {
-  const parsed = parseSatisfactionLabel(label);
-  if (!parsed) return "😐";
-  const ratio = parsed.value / parsed.max;
-  if (ratio >= 0.8) return "😄";
-  if (ratio >= 0.6) return "🙂";
-  if (ratio >= 0.4) return "😐";
-  if (ratio >= 0.2) return "😟";
-  return "😢";
+function getCategoryColorById(categoryId: number): string {
+  if (categoryId <= 0) return "#94A3B8";
+  return CATEGORY_COLORS[(categoryId - 1) % CATEGORY_COLORS.length];
 }
 
-// ─── DistributionStrip ────────────────────────────────────────────────────────
+function normalize(value: string): string {
+  return value
+    .toLowerCase()
+    .replaceAll("ä", "ae")
+    .replaceAll("ö", "oe")
+    .replaceAll("ü", "ue")
+    .replaceAll("ß", "ss");
+}
 
-// Renders a horizontal strip with a dashed course-average line
-// and the current user's highlighted point.
-function DistributionStrip({
-  topic,
-  hasEnoughUsers,
+// Icon per category, matched on the category name (falls back to a dot)
+function getCategoryIcon(name: string): LucideIcon {
+  const n = normalize(name);
+  if (n.includes("pflege") || n.includes("schlaf")) return BedDouble;
+  if (n.includes("erwerb")) return Briefcase;
+  if (n.includes("studium") || n.includes("ausbildung")) return GraduationCap;
+  if (n.includes("haushalt") || n.includes("familie")) return Home;
+  if (n.includes("freiwillig") || n.includes("treffen")) return HandHeart;
+  if (n.includes("sozial") || n.includes("unterhaltung")) return Users;
+  if (n.includes("sport") || n.includes("freien")) return Bike;
+  if (n.includes("hobby")) return Palette;
+  if (n.includes("medien")) return Tv;
+  if (n.includes("wege") || n.includes("transport")) return Route;
+  return Circle;
+}
+
+
+type Unit = ComparisonMetric["unit"];
+
+function formatValue(value: number, unit: Unit): string {
+  if (unit === "%") return `${Math.round(value)} %`;
+  if (unit === "Punkte") return value.toFixed(1);
+  return `${value.toFixed(1)} h`;
+}
+
+// "+2.4 h/Tag ggü. Kurs" · "+27 %-Pkt. ggü. Kurs" · "im Kursschnitt"
+function describeDifference(
+  userValue: number,
+  meanValue: number,
+  unit: Unit,
+  short = false,
+): string {
+  const diff = userValue - meanValue;
+  const threshold = unit === "%" ? 3 : unit === "Punkte" ? 0.15 : 0.25;
+  if (Math.abs(diff) < threshold) return "im Kursschnitt";
+  const sign = diff > 0 ? "+" : "−";
+  const abs = Math.abs(diff);
+  const suffix = short ? "" : " ggü. Kurs";
+  if (unit === "%") return `${sign}${Math.round(abs)} %-Pkt.${suffix}`;
+  if (unit === "Punkte") return `${sign}${abs.toFixed(1)} Pkt.${suffix}`;
+  return `${sign}${abs.toFixed(1)} h/Tag${suffix}`;
+}
+
+function verdictText(
+  row: { userValue: number; allValues: number[]; unit: Unit },
+  short = false,
+): string {
+  if (row.userValue <= 0) return "keine eigenen Daten";
+  const meanValue = calculateMean(row.allValues);
+  const diff = describeDifference(row.userValue, meanValue, row.unit, short);
+  if (row.allValues.length === 0) return diff;
+  const p = calculatePercentile(row.allValues, row.userValue);
+  const above = row.allValues.some((v) => v > row.userValue);
+  const position =
+    !above
+      ? "höchster Wert der Gruppe"
+      : p === 0
+        ? "tiefster Wert der Gruppe"
+        : `über ${p}% der Gruppe`;
+  return `${diff} · ${position}`;
+}
+
+// ─── Shared bar pair ──────────────────────────────────────────────────────────
+
+// Two thin bars: you (colour) above the course mean (grey), values at the right
+function BarPair({
+  userValue,
+  meanValue,
+  scaleMax,
+  unit,
+  color,
+  showLabels = false,
 }: {
-  topic: ComparisonTopic;
-  hasEnoughUsers: boolean;
+  userValue: number;
+  meanValue: number;
+  scaleMax: number;
+  unit: Unit;
+  color: string;
+  showLabels?: boolean;
 }) {
-  const { allValues, userValue, label, unit } = topic;
+  const pct = (v: number) =>
+    Math.min(
+      100,
+      Math.max(scaleMax > 0 ? (v / scaleMax) * 100 : 0, v > 0 ? 1.5 : 0),
+    );
 
-  if (!hasEnoughUsers) return null;
-
-  // Determine the axis range: min/max with a 10% padding on each side
-  const rawMin = Math.min(...allValues);
-  const rawMax = Math.max(...allValues);
-  const range = rawMax - rawMin || 1; // avoid division by zero if all values identical
-  const axisMin = Math.max(0, rawMin - range * 0.15);
-  const axisMax = rawMax + range * 0.15;
-  const axisRange = axisMax - axisMin;
-
-  // Maps a value to a percentage position along the strip (0–100%)
-  function toPercent(value: number): number {
-    const raw = ((value - axisMin) / axisRange) * 100;
-    // Keep markers visible even when a value sits exactly on the edge.
-    return Math.max(2, Math.min(98, raw));
-  }
-
-  const meanValue = calculateMean(allValues);
-  const userPercentile = calculatePercentile(allValues, userValue);
-  const meanPercent = toPercent(meanValue);
-  const userPercent = toPercent(userValue);
-
-  // Generate a friendly German description of the user's position
-  function buildPositionText(): string {
-    if (userValue === 0) {
-      return "Keine eigenen Einträge in diesem Zeitraum";
-    }
-    if (userPercentile >= 50) {
-      return `Du liegst über ${userPercentile}% der Kursgruppe`;
-    }
-    return `Du liegst unter ${100 - userPercentile}% der Kursgruppe`;
-  }
-
-  return (
-    <div>
-      {/* Strip chart */}
-      <div className="relative h-12 mt-3 mb-1">
-        {/* Background track */}
-        <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-100 rounded-full -translate-y-1/2" />
-
-        {/* Course average line */}
+  const line = (label: string, value: number, fill: string, strong: boolean) => (
+    <div className="flex items-center gap-2">
+      {showLabels && (
+        <span className="w-10 shrink-0 text-[10px] uppercase tracking-wide text-slate-400">
+          {label}
+        </span>
+      )}
+      <div className="h-2 flex-1 rounded-full bg-slate-100 dark:bg-slate-700">
         <div
-          className="absolute top-0 bottom-0 flex flex-col items-center"
-          style={{ left: `${meanPercent}%` }}
-        >
-          <div className="w-px h-full border-l-2 border-dashed border-slate-300" />
-        </div>
-
-        {/* User's own dot — highlighted on top */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-blue-500 ring-2 ring-white shadow-md z-10"
-          style={{ left: `${userPercent}%` }}
+          className="h-2 rounded-full transition-all"
+          style={{ width: `${pct(value)}%`, backgroundColor: fill }}
         />
       </div>
-
-      {/* Axis labels: min and max */}
-      <div className="flex justify-between text-xs text-slate-400 mt-1">
-        <span>
-          {formatHours(axisMin)} {unit}
-        </span>
-        <span>
-          {formatHours(axisMax)} {unit}
-        </span>
-      </div>
-
-      {/* Descriptive text + stats row */}
-      <div className="mt-3 flex items-center justify-between">
-        <p className="text-xs text-slate-500">{buildPositionText()}</p>
-        <div className="flex gap-4">
-          <div className="text-right">
-            <p className="text-xs text-slate-400">Dein Wert</p>
-            <p className="text-sm font-semibold text-blue-600">
-              {formatHours(userValue)} {unit}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-slate-400">Ø Kurs</p>
-            <p className="text-sm font-semibold text-slate-600">
-              {formatHours(meanValue)} {unit}
-            </p>
-          </div>
-        </div>
-      </div>
+      <span
+        className={`w-12 shrink-0 text-right text-xs ${
+          strong
+            ? "font-semibold text-slate-700 dark:text-slate-100"
+            : "text-slate-500 dark:text-slate-400"
+        }`}
+      >
+        {formatValue(value, unit)}
+      </span>
     </div>
   );
-}
 
-// ─── TopicCard ────────────────────────────────────────────────────────────────
-
-// Card wrapper for one comparison topic (Schlaf, Sport, Smartphone)
-function TopicCard({
-  topic,
-  hasEnoughUsers,
-  icon,
-}: {
-  topic: ComparisonTopic;
-  hasEnoughUsers: boolean;
-  icon: string;
-}) {
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 shadow-sm">
-      {/* Card header */}
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-base">{icon}</span>
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{topic.label}</h3>
-      </div>
-      <p className="text-xs text-slate-400">
-        Durchschnittliche Stunden pro Tag
-      </p>
-
-      <DistributionStrip topic={topic} hasEnoughUsers={hasEnoughUsers} />
+    <div className="space-y-1">
+      {line("Du", userValue, color, true)}
+      {line("Kurs", meanValue, "#94A3B8", false)}
     </div>
   );
 }
 
-function MetaComparisonCard({
-  title,
-  subtitle,
-  emoji,
-  userValue,
-  courseValue,
-}: {
+// ─── Metric card (focus + context) ───────────────────────────────────────────
+
+type MetricCardData = {
+  key: string;
+  emoji: string;
   title: string;
   subtitle: string;
-  emoji: string;
-  userValue: string;
-  courseValue: string;
-}) {
+  unit: Unit;
+  scaleMax?: number;
+  allValues: number[];
+  userValue: number;
+};
+
+function MetricCard({ metric }: { metric: MetricCardData }) {
+  const meanValue = calculateMean(metric.allValues);
+  const scaleMax =
+    metric.scaleMax ?? Math.max(0.1, metric.userValue, meanValue) * 1.15;
+
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-        {title}
-      </p>
-      <div className="mt-1 flex items-center gap-1.5">
-        <span className="text-base" aria-hidden="true">
-          {emoji}
+    <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="flex items-center gap-2.5">
+        <span className="text-2xl leading-none" aria-hidden="true">
+          {metric.emoji}
         </span>
-        <span className="text-xs text-slate-500">{subtitle}</span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+            {metric.title}
+          </p>
+          <p className="truncate text-[11px] text-slate-400 dark:text-slate-500">
+            {metric.subtitle}
+          </p>
+        </div>
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-        <div className="rounded-md bg-blue-50 px-2 py-1">
-          <p className="text-[10px] text-blue-600">Du</p>
-          <p className="font-semibold text-blue-700">{userValue}</p>
+      <div className="mt-3">
+        <BarPair
+          userValue={metric.userValue}
+          meanValue={meanValue}
+          scaleMax={scaleMax}
+          unit={metric.unit}
+          color={USER_BLUE}
+          showLabels
+        />
+      </div>
+      <p className="mt-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+        {verdictText(metric)}
+      </p>
+    </div>
+  );
+}
+
+// ─── Category row (compact, with icon) ───────────────────────────────────────
+
+function CategoryRow({
+  category,
+  scaleMax,
+}: {
+  category: CategoryComparison;
+  scaleMax: number;
+}) {
+  const color = getCategoryColorById(category.categoryId);
+  const Icon = getCategoryIcon(category.name);
+  const meanValue = calculateMean(category.allValues);
+
+  return (
+    <div className="flex items-start gap-2.5">
+      <span
+        className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+        style={{ backgroundColor: `${color}1F`, color }}
+        aria-hidden="true"
+      >
+        <Icon size={16} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 flex items-baseline justify-between gap-2">
+          <span className="truncate text-xs font-medium text-slate-700 dark:text-slate-200">
+            {category.name}
+          </span>
+          <span className="shrink-0 text-[11px] text-slate-500 dark:text-slate-400">
+            {verdictText({ ...category, unit: "h/Tag" }, true)}
+          </span>
         </div>
-        <div className="rounded-md bg-slate-100 dark:bg-slate-700 px-2 py-1">
-          <p className="text-[10px] text-slate-500 dark:text-slate-400">Kurs</p>
-          <p className="font-semibold text-slate-700 dark:text-slate-200">{courseValue}</p>
-        </div>
+        <BarPair
+          userValue={category.userValue}
+          meanValue={meanValue}
+          scaleMax={scaleMax}
+          unit="h/Tag"
+          color={color}
+        />
       </div>
     </div>
   );
@@ -220,7 +287,8 @@ function MetaComparisonCard({
 
 export default function KursvergleichTab({
   topics,
-  metaStats,
+  categoryComparison,
+  contextMetrics,
   qualifyingUserCount,
   selectedWeeks,
   weekOptions,
@@ -228,10 +296,14 @@ export default function KursvergleichTab({
   onToggleWeek,
   onClearWeeks,
   onSetDayFilter,
+  actions,
 }: {
-  // The three comparison topics with all participant values
+  // Focus topics (Schlaf, Sport, Smartphone) with all participant values
   topics: ComparisonTopic[];
-  metaStats: ComparisonMetaStats | null;
+  // Per-category Ø h/Tag comparison (empty when not enough users)
+  categoryComparison: CategoryComparison[];
+  // Context metrics (IT-Gerät, Sozial, Ort, Wohlbefinden) with per-participant values
+  contextMetrics: ComparisonMetric[];
   // How many users in the course meet the ≥2 submitted days threshold
   qualifyingUserCount: number;
   selectedWeeks: string[];
@@ -240,28 +312,70 @@ export default function KursvergleichTab({
   onToggleWeek: (weekKey: string) => void;
   onClearWeeks: () => void;
   onSetDayFilter: (mode: DayFilterMode) => void;
+  // Optional controls rendered at the right end of the filter bar (e.g. PDF export)
+  actions?: ReactNode;
 }) {
   const hasEnoughUsers = qualifyingUserCount >= MIN_USERS_FOR_COMPARISON;
   const selectedWeekSet = new Set(selectedWeeks);
 
-  // Icon mapping for each topic key
-  const topicIcons: Record<string, string> = {
-    schlaf: "😴",
-    sport: "🏃",
-    smartphone: "📱",
-  };
+  const focusCards: MetricCardData[] = topics.map((t) => ({
+    key: t.key,
+    emoji: TOPIC_EMOJI[t.key] ?? "📊",
+    title: t.label,
+    subtitle: "Ø Stunden pro abgegebenem Tag",
+    unit: "h/Tag",
+    allValues: t.allValues,
+    userValue: t.userValue,
+  }));
+
+  const contextCards: MetricCardData[] = contextMetrics.map((m) => {
+    if (m.key === "wellbeing") {
+      // Emoji and word come from the same five levels as in the Zeiterfassung
+      const max = m.scaleMax ?? 5;
+      const level = satisfactionLevelForAverage(m.userValue, max);
+      const courseLevel = satisfactionLevelForAverage(
+        calculateMean(m.allValues),
+        max,
+      );
+      return {
+        key: m.key,
+        emoji: level?.emoji ?? "😐",
+        title: m.label,
+        subtitle: level
+          ? `du: ${level.label} · Kurs: ${courseLevel?.label ?? "–"} · Skala 1–${max}`
+          : (m.description ?? ""),
+        unit: m.unit,
+        scaleMax: m.scaleMax,
+        allValues: m.allValues,
+        userValue: m.userValue,
+      };
+    }
+    return {
+      key: m.key,
+      emoji: CONTEXT_EMOJI[m.key] ?? "📊",
+      title: m.label,
+      subtitle: m.description ?? "",
+      unit: m.unit,
+      scaleMax: m.scaleMax,
+      allValues: m.allValues,
+      userValue: m.userValue,
+    };
+  });
+
+  const sortedCategories = [...categoryComparison].sort(
+    (a, b) => b.userValue - a.userValue,
+  );
+  // Categories share one scale so bar lengths are comparable across life areas
+  const categoryScaleMax = Math.max(
+    1,
+    ...sortedCategories.flatMap((c) => [
+      c.userValue,
+      calculateMean(c.allValues),
+    ]),
+  );
 
   return (
-    <div className="space-y-5">
-      {/* Section description */}
-      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
-        <p className="text-xs text-blue-700">
-          <strong>Anonym:</strong> Im Vergleich siehst du deinen blauen Punkt
-          und die gestrichelte Kurs-Durchschnittslinie. Einzelwerte anderer
-          Teilnehmender werden nicht angezeigt.
-        </p>
-      </div>
-
+    <div className="space-y-4">
       {/* Global filters (same structure as Zeitverteilung) */}
       <div className="flex flex-col gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
         <div className="flex items-center gap-2">
@@ -341,79 +455,18 @@ export default function KursvergleichTab({
             ))}
           </div>
         )}
+
+        {actions && <div className="sm:ml-auto">{actions}</div>}
       </div>
 
-      {/* Compact meta cards comparable to Zeitverteilung priorities */}
-      {metaStats && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <MetaComparisonCard
-            title="IT-Gerät"
-            subtitle="mit / ohne"
-            emoji="💻"
-            userValue={
-              metaStats.itDevice.user
-                ? `${metaStats.itDevice.user.leftPercent}% / ${metaStats.itDevice.user.rightPercent}%`
-                : "-"
-            }
-            courseValue={
-              metaStats.itDevice.course
-                ? `${metaStats.itDevice.course.leftPercent}% / ${metaStats.itDevice.course.rightPercent}%`
-                : "-"
-            }
-          />
-          <MetaComparisonCard
-            title="Sozial"
-            subtitle="mit anderen / allein"
-            emoji="👥"
-            userValue={
-              metaStats.social.user
-                ? `${metaStats.social.user.leftPercent}% / ${metaStats.social.user.rightPercent}%`
-                : "-"
-            }
-            courseValue={
-              metaStats.social.course
-                ? `${metaStats.social.course.leftPercent}% / ${metaStats.social.course.rightPercent}%`
-                : "-"
-            }
-          />
-          <MetaComparisonCard
-            title="Ort"
-            subtitle="zuhause / anderswo"
-            emoji="📍"
-            userValue={
-              metaStats.location.user
-                ? `${metaStats.location.user.leftPercent}% / ${metaStats.location.user.rightPercent}%`
-                : "-"
-            }
-            courseValue={
-              metaStats.location.course
-                ? `${metaStats.location.course.leftPercent}% / ${metaStats.location.course.rightPercent}%`
-                : "-"
-            }
-          />
-          <MetaComparisonCard
-            title="Wohlbefinden"
-            subtitle="Ø zeitgewichtet"
-            emoji={getSatisfactionEmoji(metaStats.wellbeing.userLabel)}
-            userValue={metaStats.wellbeing.userLabel}
-            courseValue={`${getSatisfactionEmoji(metaStats.wellbeing.courseLabel)} ${metaStats.wellbeing.courseLabel}`}
-          />
-        </div>
-      )}
-
-      {/* One shared legend for all comparison charts */}
-      <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 shadow-sm">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <span className="h-3 w-0 border-l-2 border-dashed border-slate-300" />
-            <span>Gestrichelt: Ø Kurs</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white shadow-sm" />
-            <span>Blau: dein Wert</span>
-          </div>
-        </div>
-      </div>
+      {/* Reading aid — one line */}
+      <p className="px-1 text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="mr-1.5 inline-block h-2 w-5 rounded-full bg-blue-500 align-middle" />
+        du
+        <span className="ml-3 mr-1.5 inline-block h-2 w-5 rounded-full bg-slate-400 align-middle" />
+        Ø Kurs · «über X % der Gruppe» = so viele Teilnehmende liegen unter
+        deinem Wert · anonym, keine Einzelwerte anderer Personen
+      </p>
 
       {/* Not enough users disclaimer */}
       {!hasEnoughUsers && (
@@ -434,17 +487,50 @@ export default function KursvergleichTab({
         </div>
       )}
 
-      {/* Topic cards — always rendered but DistributionStrip hides when not enough users */}
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-        {topics.map((topic) => (
-          <TopicCard
-            key={topic.key}
-            topic={topic}
-            hasEnoughUsers={hasEnoughUsers}
-            icon={topicIcons[topic.key] ?? "📊"}
-          />
-        ))}
-      </div>
+      {hasEnoughUsers && (
+        <>
+          {/* 1. Focus topics — three compact cards */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {focusCards.map((m) => (
+              <MetricCard key={m.key} metric={m} />
+            ))}
+          </div>
+
+          {/* 2. Context — four compact cards */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {contextCards.map((m) => (
+              <MetricCard key={m.key} metric={m} />
+            ))}
+          </div>
+
+          {/* 3. Per-category comparison — two columns on wide screens */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Zeitverteilung im Kursvergleich
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Ø Stunden pro abgegebenem Tag je Lebensbereich
+              </p>
+            </div>
+            {sortedCategories.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">
+                Noch keine vergleichbaren Daten.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-x-8 gap-y-3.5 lg:grid-cols-2">
+                {sortedCategories.map((c) => (
+                  <CategoryRow
+                    key={c.categoryId}
+                    category={c}
+                    scaleMax={categoryScaleMax}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

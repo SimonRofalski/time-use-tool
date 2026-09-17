@@ -1,21 +1,36 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Download, Plus, X } from "lucide-react";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  Download,
+  Plus,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import * as XLSX from "xlsx";
-import { CATEGORY_COLORS } from "@/app/(protected)/zeiterfassung/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import ConfirmModal from "./ConfirmModal";
-import UserStatsView from "./UserStatsView";
 import {
   type CoursePeriod,
+  getPeriodDates,
+  getSinglePeriodDates,
   totalPeriodDays,
   periodsDurationLabel,
   formatPeriodLabel,
   validatePeriodsNoOverlap,
 } from "@/lib/course-periods";
+
+// ─── Datenschutz (Ergebnis der Ethikprüfung) ──────────────────────────────────
+// Admins dürfen die Zuordnung von Zeitnutzungsdaten zu Personen nicht einsehen.
+// Pro Person ist deshalb ausschliesslich sichtbar: Name/E-Mail (bzw. Alias) und
+// pro Kurstag ein true/false ("abgeschlossen"). Keine Zeiteinträge, keine
+// Tätigkeiten, keine persönliche Zeitverteilung. Exporte werden serverseitig
+// de-identifiziert erzeugt (siehe lib/admin/course-export.ts).
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,21 +66,13 @@ type EnrolledUser = {
   courseTotalDays: number;
 };
 
-type DayRow = {
-  day_id: number;
-  date: string;
-  is_submitted: boolean;
+// One course day for a participant — only the completion flag, nothing else
+type DayStatusRow = {
+  date: string; // "YYYY-MM-DD"
+  isSubmitted: boolean;
 };
 
-type EntryRow = {
-  entry_id: number;
-  start_time: string;
-  end_time: string;
-  primaryActivity: string | null;
-  secondaryActivity: string | null;
-  locationTransport: string | null;
-  satisfaction: string | null;
-};
+type ExportRow = Record<string, string | number>;
 
 // Drill-down navigation state for the "Alle Kurse" sub-tab
 type DrillView =
@@ -129,20 +136,6 @@ function userDisplayName(user: EnrolledUser, isAnonymized: boolean): string {
   return user.email;
 }
 
-function getCategoryColorById(categoryId: number): string {
-  if (categoryId <= 0) return "#94A3B8";
-  return CATEGORY_COLORS[(categoryId - 1) % CATEGORY_COLORS.length];
-}
-
-function hexToRgbTuple(hex: string): [number, number, number] {
-  const clean = hex.replace("#", "");
-  if (clean.length !== 6) return [99, 102, 241];
-  const r = Number.parseInt(clean.slice(0, 2), 16);
-  const g = Number.parseInt(clean.slice(2, 4), 16);
-  const b = Number.parseInt(clean.slice(4, 6), 16);
-  return [r, g, b];
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function KursuebersichtTab() {
@@ -170,17 +163,9 @@ export default function KursuebersichtTab() {
   const [courseUsers, setCourseUsers] = useState<EnrolledUser[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
-  // ── User detail (days + expandable entries) ─────────────────────────────────
-  const [userDays, setUserDays] = useState<DayRow[]>([]);
+  // ── User detail (per-day completion status only) ────────────────────────────
+  const [userDays, setUserDays] = useState<DayStatusRow[]>([]);
   const [isLoadingDays, setIsLoadingDays] = useState(false);
-  const [expandedDayIds, setExpandedDayIds] = useState<Set<number>>(new Set());
-  const [dayEntries, setDayEntries] = useState<Record<number, EntryRow[]>>({});
-  const [loadingEntryDayIds, setLoadingEntryDayIds] = useState<Set<number>>(
-    new Set(),
-  );
-  const [userDetailView, setUserDetailView] = useState<"tage" | "statistiken">(
-    "tage",
-  );
 
   // ── Modals & inline edits ───────────────────────────────────────────────────
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(
@@ -193,12 +178,10 @@ export default function KursuebersichtTab() {
   const [isAnonymizing, setIsAnonymizing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportTarget, setExportTarget] = useState<"admin" | "benutzer">(
-    "admin",
-  );
   const [exportGranularity, setExportGranularity] = useState<
     "aggregiert" | "roh"
   >("aggregiert");
+  const [exportError, setExportError] = useState("");
 
   useEffect(() => {
     if (subTab === "alle" && view.type === "list") {
@@ -272,16 +255,21 @@ export default function KursuebersichtTab() {
       return;
     }
 
-    const [profilesRes, submittedDaysRes] = await Promise.all([
+    const [profilesRes, submittedDays] = await Promise.all([
       supabase
         .from("profiles")
         .select("id, email, first_name, last_name")
         .in("id", userIds),
-      supabase
-        .from("day")
-        .select("profiles_id")
-        .eq("course_id", courseId)
-        .eq("is_submitted", true),
+      // Paged: large courses exceed the 1000-row cap
+      fetchAllRows<{ profiles_id: string }>((from, to) =>
+        supabase
+          .from("day")
+          .select("profiles_id")
+          .eq("course_id", courseId)
+          .eq("is_submitted", true)
+          .order("day_id")
+          .range(from, to),
+      ),
     ]);
 
     const profileById: Record<
@@ -297,7 +285,7 @@ export default function KursuebersichtTab() {
     }
 
     const submittedByUser: Record<string, number> = {};
-    for (const d of submittedDaysRes.data ?? []) {
+    for (const d of submittedDays) {
       submittedByUser[d.profiles_id] =
         (submittedByUser[d.profiles_id] ?? 0) + 1;
     }
@@ -333,142 +321,48 @@ export default function KursuebersichtTab() {
   async function loadUserDays(userId: string, courseId: number) {
     setIsLoadingDays(true);
     setUserDays([]);
-    setExpandedDayIds(new Set());
-    setDayEntries({});
 
-    const { data: days } = await supabase
-      .from("day")
-      .select("day_id, date, is_submitted")
-      .eq("profiles_id", userId)
-      .eq("course_id", courseId)
-      .order("date");
-
-    setUserDays(days ?? []);
-    setIsLoadingDays(false);
-  }
-
-  async function loadDayEntries(dayId: number) {
-    if (dayEntries[dayId] !== undefined) return; // already loaded
-
-    setLoadingEntryDayIds((prev) => new Set([...prev, dayId]));
-
-    const { data: rawEntries } = await supabase
-      .from("time_entry")
-      .select(
-        "entry_id, start_time, end_time, primary_activity_id, secondary_activity_id, location_transport_id, satisfaction_id",
-      )
-      .eq("day_id", dayId)
-      .order("start_time");
-
-    if (!rawEntries || rawEntries.length === 0) {
-      setDayEntries((prev) => ({ ...prev, [dayId]: [] }));
-      setLoadingEntryDayIds((prev) => {
-        const s = new Set(prev);
-        s.delete(dayId);
-        return s;
-      });
-      return;
-    }
-
-    const activityIds = [
-      ...new Set(
-        [
-          ...rawEntries.map((e) => e.primary_activity_id),
-          ...rawEntries.map((e) => e.secondary_activity_id),
-        ].filter((id): id is number => id != null),
-      ),
-    ];
-    const locationIds = [
-      ...new Set(
-        rawEntries
-          .map((e) => e.location_transport_id)
-          .filter((id): id is number => id != null),
-      ),
-    ];
-    const satisfactionIds = [
-      ...new Set(
-        rawEntries
-          .map((e) => e.satisfaction_id)
-          .filter((id): id is number => id != null),
-      ),
-    ];
-
-    const [activitiesRes, locationsRes, satisfactionsRes] = await Promise.all([
-      activityIds.length > 0
-        ? supabase
-            .from("activity")
-            .select("activity_id, name")
-            .in("activity_id", activityIds)
-        : Promise.resolve({
-            data: [] as { activity_id: number; name: string }[],
-          }),
-      locationIds.length > 0
-        ? supabase
-            .from("location_transport")
-            .select("location_transport_id, name")
-            .in("location_transport_id", locationIds)
-        : Promise.resolve({
-            data: [] as { location_transport_id: number; name: string }[],
-          }),
-      satisfactionIds.length > 0
-        ? supabase
-            .from("satisfaction")
-            .select("satisfaction_id, name")
-            .in("satisfaction_id", satisfactionIds)
-        : Promise.resolve({
-            data: [] as { satisfaction_id: number; name: string }[],
-          }),
+    // Only `date` + `is_submitted` are read — never time entries.
+    const [{ data: periods }, { data: days }] = await Promise.all([
+      supabase
+        .from("course_period")
+        .select("start_date, end_date")
+        .eq("course_id", courseId),
+      supabase
+        .from("day")
+        .select("date, is_submitted")
+        .eq("profiles_id", userId)
+        .eq("course_id", courseId),
     ]);
 
-    const activityMap: Record<number, string> = {};
-    for (const a of activitiesRes.data ?? [])
-      activityMap[a.activity_id] = a.name;
-    const locationMap: Record<number, string> = {};
-    for (const l of locationsRes.data ?? [])
-      locationMap[l.location_transport_id] = l.name;
-    const satisfactionMap: Record<number, string> = {};
-    for (const s of satisfactionsRes.data ?? [])
-      satisfactionMap[s.satisfaction_id] = s.name;
+    let courseDates =
+      periods && periods.length > 0 ? getPeriodDates(periods) : [];
+    if (courseDates.length === 0) {
+      // Legacy course without period rows: fall back to start/end span
+      const { data: course } = await supabase
+        .from("course")
+        .select("start_date, end_date")
+        .eq("course_id", courseId)
+        .maybeSingle();
+      if (course?.start_date && course?.end_date) {
+        courseDates = getSinglePeriodDates(
+          String(course.start_date).slice(0, 10),
+          String(course.end_date).slice(0, 10),
+        );
+      }
+    }
 
-    const entries: EntryRow[] = rawEntries.map((e) => ({
-      entry_id: e.entry_id,
-      start_time: e.start_time,
-      end_time: e.end_time,
-      primaryActivity:
-        e.primary_activity_id != null
-          ? (activityMap[e.primary_activity_id] ?? null)
-          : null,
-      secondaryActivity:
-        e.secondary_activity_id != null
-          ? (activityMap[e.secondary_activity_id] ?? null)
-          : null,
-      locationTransport:
-        e.location_transport_id != null
-          ? (locationMap[e.location_transport_id] ?? null)
-          : null,
-      satisfaction:
-        e.satisfaction_id != null
-          ? (satisfactionMap[e.satisfaction_id] ?? null)
-          : null,
-    }));
+    const submittedDates = new Set<string>();
+    for (const d of days ?? []) {
+      if (d.is_submitted) submittedDates.add(String(d.date).slice(0, 10));
+    }
 
-    setDayEntries((prev) => ({ ...prev, [dayId]: entries }));
-    setLoadingEntryDayIds((prev) => {
-      const s = new Set(prev);
-      s.delete(dayId);
-      return s;
-    });
-  }
-
-  function toggleDayExpanded(dayId: number) {
-    const isExpanding = !expandedDayIds.has(dayId);
-    setExpandedDayIds((prev) => {
-      const s = new Set(prev);
-      if (s.has(dayId)) s.delete(dayId);
-      else s.add(dayId);
-      return s;
-    });
-    if (isExpanding) void loadDayEntries(dayId);
+    // Course days ∪ submitted days (in case a submitted day lies outside the periods)
+    const allDates = [...new Set([...courseDates, ...submittedDates])].sort();
+    setUserDays(
+      allDates.map((date) => ({ date, isSubmitted: submittedDates.has(date) })),
+    );
+    setIsLoadingDays(false);
   }
 
   // ── Action handlers ───────────────────────────────────────────────────────────
@@ -534,240 +428,40 @@ export default function KursuebersichtTab() {
   async function handleExportCourse(
     format: "csv" | "xlsx",
     granularity: "aggregiert" | "roh",
-  ) {
-    if (view.type !== "course") return;
+  ): Promise<boolean> {
+    if (view.type !== "course") return false;
     setIsExporting(true);
+    setExportError("");
 
-    const { courseId, courseName } = view;
+    const { courseId } = view;
 
     try {
-      // Load all categories
-      const { data: categories } = await supabase
-        .from("category")
-        .select("category_id, name")
-        .order("category_id");
-
-      // Load activity → category mapping
-      const { data: activities } = await supabase
-        .from("activity")
-        .select("activity_id, name, subcategory:subcategory_id(category_id)");
-
-      const [
-        locationsRes,
-        socialContextsRes,
-        digitalMediaTypesRes,
-        satisfactionsRes,
-      ] = await Promise.all([
-        supabase
-          .from("location_transport")
-          .select("location_transport_id, name"),
-        supabase.from("social_context").select("social_context_id, name"),
-        supabase
-          .from("digital_media_type")
-          .select("digital_media_type_id, name"),
-        supabase.from("satisfaction").select("satisfaction_id, name"),
-      ]);
-
-      const activityToCategoryId: Record<number, number> = {};
-      const activityNameById: Record<number, string> = {};
-      for (const a of activities ?? []) {
-        const catId =
-          a.subcategory &&
-          typeof a.subcategory === "object" &&
-          "category_id" in a.subcategory
-            ? (a.subcategory as { category_id: number }).category_id
-            : null;
-        if (catId != null) activityToCategoryId[a.activity_id] = catId;
-        activityNameById[a.activity_id] = a.name;
-      }
-
-      const locationNameById: Record<number, string> = {};
-      for (const l of locationsRes.data ?? []) {
-        locationNameById[l.location_transport_id] = l.name;
-      }
-      const socialContextNameById: Record<number, string> = {};
-      for (const s of socialContextsRes.data ?? []) {
-        socialContextNameById[s.social_context_id] = s.name;
-      }
-      const digitalMediaTypeNameById: Record<number, string> = {};
-      for (const m of digitalMediaTypesRes.data ?? []) {
-        digitalMediaTypeNameById[m.digital_media_type_id] = m.name;
-      }
-      const satisfactionNameById: Record<number, string> = {};
-      for (const s of satisfactionsRes.data ?? []) {
-        satisfactionNameById[s.satisfaction_id] = s.name;
-      }
-
-      const categoryNameById: Record<number, string> = {};
-      for (const c of categories ?? [])
-        categoryNameById[c.category_id] = c.name;
-      const categoryIds = (categories ?? []).map((c) => c.category_id);
-
-      // Load all days for this course
-      const { data: allDays } = await supabase
-        .from("day")
-        .select("day_id, profiles_id, is_submitted, date")
-        .eq("course_id", courseId);
-
-      const dayIds = (allDays ?? []).map((d) => d.day_id);
-      const dayProfileMap: Record<number, string> = {};
-      const dayDateMap: Record<number, string> = {};
-      const submittedDayIds = new Set<number>();
-      for (const d of allDays ?? []) {
-        dayProfileMap[d.day_id] = d.profiles_id;
-        dayDateMap[d.day_id] = d.date;
-        if (d.is_submitted) submittedDayIds.add(d.day_id);
-      }
-
-      // Load time entries
-      let entries: {
-        entry_id: number;
-        day_id: number;
-        primary_activity_id: number | null;
-        secondary_activity_id: number | null;
-        location_transport_id: number | null;
-        satisfaction_id: number | null;
-        digital_media_used: boolean | null;
-        start_time: string;
-        end_time: string;
-        time_entry_digital_media_type?: {
-          digital_media_type_id: number | null;
-        }[];
-        time_entry_social_context?: { social_context_id: number | null }[];
-      }[] = [];
-      if (dayIds.length > 0) {
-        const { data: entryData } = await supabase
-          .from("time_entry")
-          .select(
-            "entry_id, day_id, start_time, end_time, primary_activity_id, secondary_activity_id, location_transport_id, satisfaction_id, digital_media_used, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
-          )
-          .in("day_id", dayIds)
-          .order("start_time", { ascending: true });
-        entries = entryData ?? [];
-      }
-
-      const sanitize = (v: string | number | null | undefined) =>
-        String(v ?? "").replaceAll(";", ",");
-      const minutesFromTimes = (start: string, end: string) => {
-        const [sh, sm] = start.split(":").map(Number);
-        const [eh, em] = end.split(":").map(Number);
-        const startMin = sh * 60 + sm;
-        const endMin =
-          eh === 0 && em === 0 && startMin > 0 ? 1440 : eh * 60 + em;
-        const mins = endMin - startMin;
-        return mins > 0 ? mins : 0;
+      // Rows are built server-side without any person reference
+      // (no names, e-mails, IDs, aliases or dates; shuffled order).
+      const res = await fetch(
+        `/api/admin/course-export?courseId=${courseId}&mode=${granularity}`,
+        { cache: "no-store" },
+      );
+      const payload = (await res.json()) as {
+        error?: string;
+        courseName?: string;
+        rows?: ExportRow[];
       };
 
-      let rows: Record<string, string | number>[] = [];
-
-      if (granularity === "aggregiert") {
-        // Aggregate minutes per user per category (submitted days only)
-        const minutesByUserCategory: Record<
-          string,
-          Record<number, number>
-        > = {};
-        for (const e of entries) {
-          if (!submittedDayIds.has(e.day_id)) continue;
-          const profileId = dayProfileMap[e.day_id];
-          if (!profileId || e.primary_activity_id == null) continue;
-          const catId = activityToCategoryId[e.primary_activity_id];
-          if (catId == null) continue;
-          const mins = minutesFromTimes(e.start_time, e.end_time);
-          if (mins <= 0) continue;
-          if (!minutesByUserCategory[profileId])
-            minutesByUserCategory[profileId] = {};
-          minutesByUserCategory[profileId][catId] =
-            (minutesByUserCategory[profileId][catId] ?? 0) + mins;
-        }
-
-        // Submitted days per user
-        const submittedDaysByUser: Record<string, number> = {};
-        for (const d of allDays ?? []) {
-          if (d.is_submitted) {
-            submittedDaysByUser[d.profiles_id] =
-              (submittedDaysByUser[d.profiles_id] ?? 0) + 1;
-          }
-        }
-
-        rows = courseUsers.map((u) => {
-          const row: Record<string, string | number> = {
-            Vorname: u.firstName ?? "",
-            Nachname: u.lastName ?? "",
-            "Tage erfasst": submittedDaysByUser[u.userId] ?? 0,
-          };
-          for (const catId of categoryIds) {
-            const mins = minutesByUserCategory[u.userId]?.[catId] ?? 0;
-            row[`${categoryNameById[catId]} (h)`] =
-              Math.round((mins / 60) * 10) / 10;
-          }
-          return row;
-        });
-      } else {
-        // Raw export: one row per submitted time entry
-        const userById: Record<
-          string,
-          { firstName: string | null; lastName: string | null }
-        > = {};
-        for (const u of courseUsers) {
-          userById[u.userId] = { firstName: u.firstName, lastName: u.lastName };
-        }
-
-        rows = entries
-          .filter((e) => submittedDayIds.has(e.day_id))
-          .map((e) => {
-            const userId = dayProfileMap[e.day_id] ?? "";
-            const user = userById[userId];
-            const minutes = minutesFromTimes(e.start_time, e.end_time);
-            const categoryId =
-              e.primary_activity_id != null
-                ? activityToCategoryId[e.primary_activity_id]
-                : undefined;
-            return {
-              Vorname: user?.firstName ?? "",
-              Nachname: user?.lastName ?? "",
-              Datum: dayDateMap[e.day_id]
-                ? formatDate(dayDateMap[e.day_id])
-                : "",
-              Start: e.start_time,
-              Ende: e.end_time,
-              "Dauer (min)": minutes,
-              "Dauer (h)": Math.round((minutes / 60) * 100) / 100,
-              Kategorie:
-                categoryId != null ? (categoryNameById[categoryId] ?? "") : "",
-              Aktivitaet:
-                e.primary_activity_id != null
-                  ? (activityNameById[e.primary_activity_id] ?? "")
-                  : "",
-              Nebenaktivitaet:
-                e.secondary_activity_id != null
-                  ? (activityNameById[e.secondary_activity_id] ?? "")
-                  : "",
-              "Digitale Medien genutzt": e.digital_media_used ? "Ja" : "Nein",
-              Medienarten: (e.time_entry_digital_media_type ?? [])
-                .map((m) => m.digital_media_type_id)
-                .filter((id): id is number => typeof id === "number")
-                .map((id) => digitalMediaTypeNameById[id] ?? `#${id}`)
-                .join(", "),
-              "Ort / Transport":
-                e.location_transport_id != null
-                  ? (locationNameById[e.location_transport_id] ?? "")
-                  : "",
-              "Sozialer Kontext": (e.time_entry_social_context ?? [])
-                .map((s) => s.social_context_id)
-                .filter((id): id is number => typeof id === "number")
-                .map((id) => socialContextNameById[id] ?? `#${id}`)
-                .join(", "),
-              Zufriedenheit:
-                e.satisfaction_id != null
-                  ? (satisfactionNameById[e.satisfaction_id] ?? "")
-                  : "",
-            };
-          });
+      if (!res.ok || !payload.rows) {
+        setExportError(payload.error ?? "Export konnte nicht erstellt werden.");
+        return false;
       }
 
+      const rows = payload.rows;
       const headers = Object.keys(rows[0] ?? {});
-      const safeCourseName = courseName.replace(/[^\w\- äöüÄÖÜß]/g, "").trim();
-      const modeSuffix = granularity === "aggregiert" ? "Aggregiert" : "Roh";
+      const safeCourseName = (payload.courseName ?? view.courseName)
+        .replace(/[^\w\- äöüÄÖÜß]/g, "")
+        .trim();
+      const modeSuffix =
+        granularity === "aggregiert" ? "Aggregiert_anonym" : "Rohdaten_anonym";
+      const sanitize = (v: string | number | null | undefined) =>
+        String(v ?? "").replaceAll(";", ",");
 
       if (format === "csv") {
         const bom = "\uFEFF";
@@ -791,419 +485,10 @@ export default function KursuebersichtTab() {
         XLSX.utils.book_append_sheet(wb, ws, "Statistiken");
         XLSX.writeFile(wb, `${safeCourseName}_Statistiken_${modeSuffix}.xlsx`);
       }
-    } finally {
-      setIsExporting(false);
-    }
-  }
-
-  async function handleExportUserPdf() {
-    if (view.type !== "course") return;
-    setIsExporting(true);
-
-    const { courseId, courseName } = view;
-
-    try {
-      const [{ data: categories }, { data: activities }, { data: allDays }] =
-        await Promise.all([
-          supabase
-            .from("category")
-            .select("category_id, name")
-            .order("category_id"),
-          supabase
-            .from("activity")
-            .select(
-              "activity_id, name, subcategory:subcategory_id(category_id)",
-            ),
-          supabase
-            .from("day")
-            .select("day_id, profiles_id, is_submitted")
-            .eq("course_id", courseId),
-        ]);
-
-      const { data: digitalMediaTypes } = await supabase
-        .from("digital_media_type")
-        .select("digital_media_type_id, name");
-
-      const categoryNameById: Record<number, string> = {};
-      const categoryIds = (categories ?? []).map((c) => {
-        categoryNameById[c.category_id] = c.name;
-        return c.category_id;
-      });
-
-      const activityNameById: Record<number, string> = {};
-      const activityToCategoryId: Record<number, number> = {};
-      for (const a of activities ?? []) {
-        activityNameById[a.activity_id] = a.name;
-        const catId =
-          a.subcategory &&
-          typeof a.subcategory === "object" &&
-          "category_id" in a.subcategory
-            ? (a.subcategory as { category_id: number }).category_id
-            : null;
-        if (catId != null) activityToCategoryId[a.activity_id] = catId;
-      }
-
-      const digitalMediaTypeNameById: Record<number, string> = {};
-      for (const m of digitalMediaTypes ?? []) {
-        digitalMediaTypeNameById[m.digital_media_type_id] = m.name;
-      }
-
-      const dayProfileMap: Record<number, string> = {};
-      const submittedDayIds = new Set<number>();
-      for (const d of allDays ?? []) {
-        dayProfileMap[d.day_id] = d.profiles_id;
-        if (d.is_submitted) submittedDayIds.add(d.day_id);
-      }
-
-      const dayIds = Array.from(submittedDayIds);
-      let entries: {
-        entry_id: number;
-        day_id: number;
-        primary_activity_id: number | null;
-        digital_media_used: boolean | null;
-        start_time: string;
-        end_time: string;
-        time_entry_digital_media_type?: {
-          digital_media_type_id: number | null;
-        }[];
-      }[] = [];
-      if (dayIds.length > 0) {
-        const { data } = await supabase
-          .from("time_entry")
-          .select(
-            "entry_id, day_id, primary_activity_id, digital_media_used, start_time, end_time, time_entry_digital_media_type(digital_media_type_id)",
-          )
-          .in("day_id", dayIds);
-        entries = data ?? [];
-      }
-
-      const minutesFromTimes = (start: string, end: string) => {
-        const [sh, sm] = start.split(":").map(Number);
-        const [eh, em] = end.split(":").map(Number);
-        const startMin = sh * 60 + sm;
-        const endMin =
-          eh === 0 && em === 0 && startMin > 0 ? 1440 : eh * 60 + em;
-        const mins = endMin - startMin;
-        return mins > 0 ? mins : 0;
-      };
-
-      const submittedDaysByUser: Record<string, number> = {};
-      for (const d of allDays ?? []) {
-        if (d.is_submitted) {
-          submittedDaysByUser[d.profiles_id] =
-            (submittedDaysByUser[d.profiles_id] ?? 0) + 1;
-        }
-      }
-
-      const minutesByUserCategory: Record<string, Record<number, number>> = {};
-      const minutesByUserActivity: Record<string, Record<number, number>> = {};
-      const minutesByUserDevice: Record<string, Record<string, number>> = {};
-      const withItMinutesByUser: Record<string, number> = {};
-      const withoutItMinutesByUser: Record<string, number> = {};
-      for (const e of entries) {
-        const userId = dayProfileMap[e.day_id];
-        if (!userId || e.primary_activity_id == null) continue;
-        const mins = minutesFromTimes(e.start_time, e.end_time);
-        if (mins <= 0) continue;
-
-        const catId = activityToCategoryId[e.primary_activity_id];
-        if (catId != null) {
-          if (!minutesByUserCategory[userId])
-            minutesByUserCategory[userId] = {};
-          minutesByUserCategory[userId][catId] =
-            (minutesByUserCategory[userId][catId] ?? 0) + mins;
-        }
-
-        if (!minutesByUserActivity[userId]) minutesByUserActivity[userId] = {};
-        minutesByUserActivity[userId][e.primary_activity_id] =
-          (minutesByUserActivity[userId][e.primary_activity_id] ?? 0) + mins;
-
-        if (!minutesByUserDevice[userId]) minutesByUserDevice[userId] = {};
-        if (!e.digital_media_used) {
-          withoutItMinutesByUser[userId] =
-            (withoutItMinutesByUser[userId] ?? 0) + mins;
-          minutesByUserDevice[userId]["Ohne IT-Gerät"] =
-            (minutesByUserDevice[userId]["Ohne IT-Gerät"] ?? 0) + mins;
-        } else {
-          withItMinutesByUser[userId] =
-            (withItMinutesByUser[userId] ?? 0) + mins;
-          const mediaIds = (e.time_entry_digital_media_type ?? [])
-            .map((m) => m.digital_media_type_id)
-            .filter((id): id is number => typeof id === "number");
-
-          if (mediaIds.length === 0) {
-            minutesByUserDevice[userId]["IT-Gerät (nicht spezifiziert)"] =
-              (minutesByUserDevice[userId]["IT-Gerät (nicht spezifiziert)"] ??
-                0) + mins;
-          } else {
-            for (const mediaId of mediaIds) {
-              const name =
-                digitalMediaTypeNameById[mediaId] ?? `Gerät ${mediaId}`;
-              minutesByUserDevice[userId][name] =
-                (minutesByUserDevice[userId][name] ?? 0) + mins;
-            }
-          }
-        }
-      }
-
-      const usersWithData = courseUsers.filter(
-        (u) => !u.isExcluded && (submittedDaysByUser[u.userId] ?? 0) > 0,
-      );
-      if (usersWithData.length === 0) {
-        window.alert(
-          "Keine abgegebenen Nutzerdaten für den PDF-Export gefunden.",
-        );
-        return;
-      }
-
-      const userCount = usersWithData.length;
-      const courseAvgMinutesByCategory: Record<number, number> = {};
-      for (const catId of categoryIds) {
-        let sum = 0;
-        for (const u of usersWithData) {
-          sum += minutesByUserCategory[u.userId]?.[catId] ?? 0;
-        }
-        courseAvgMinutesByCategory[catId] = sum / userCount;
-      }
-
-      const safeCourseName = courseName.replace(/[^\w\- äöüÄÖÜß]/g, "").trim();
-      const doc = new jsPDF({ unit: "mm", format: "a4" });
-      const generatedAt = new Date().toLocaleDateString("de-DE");
-
-      const drawComparisonChart = (
-        title: string,
-        startY: number,
-        rows: {
-          label: string;
-          userValue: number;
-          avgValue: number;
-          color: [number, number, number];
-        }[],
-      ) => {
-        doc.setFontSize(11);
-        doc.text(title, 14, startY);
-        doc.setFontSize(8);
-        doc.setFillColor(15, 118, 110);
-        doc.rect(14, startY + 2, 3, 3, "F");
-        doc.text("Kursschnitt", 19, startY + 4.5);
-
-        const topRows = rows.slice(0, 5);
-        const maxValue = Math.max(
-          ...topRows.flatMap((r) => [r.userValue, r.avgValue]),
-          1,
-        );
-        let y = startY + 7;
-
-        topRows.forEach((row) => {
-          const label =
-            row.label.length > 22 ? `${row.label.slice(0, 22)}...` : row.label;
-          const baseX = 62;
-          const fullWidth = 74;
-          const userW = (row.userValue / maxValue) * fullWidth;
-          const avgW = (row.avgValue / maxValue) * fullWidth;
-
-          doc.setFontSize(8);
-          doc.text(label, 14, y + 4);
-
-          doc.setDrawColor(203, 213, 225);
-          doc.rect(baseX, y, fullWidth, 3);
-          doc.setFillColor(row.color[0], row.color[1], row.color[2]);
-          doc.rect(baseX, y, userW, 3, "F");
-
-          doc.setDrawColor(203, 213, 225);
-          doc.rect(baseX, y + 4, fullWidth, 3);
-          doc.setFillColor(15, 118, 110);
-          doc.rect(baseX, y + 4, avgW, 3, "F");
-
-          doc.text(
-            `${Math.round(row.userValue * 10) / 10} / ${Math.round(row.avgValue * 10) / 10} h`,
-            140,
-            y + 4,
-          );
-          y += 10;
-        });
-
-        return y;
-      };
-
-      usersWithData.forEach((u, index) => {
-        if (index > 0) doc.addPage();
-
-        const fullName =
-          [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
-        const submittedDays = submittedDaysByUser[u.userId] ?? 0;
-        const userCategoryMinutes = minutesByUserCategory[u.userId] ?? {};
-        const userActivityMinutes = minutesByUserActivity[u.userId] ?? {};
-        const totalMinutes = Object.values(userCategoryMinutes).reduce(
-          (acc, m) => acc + m,
-          0,
-        );
-
-        doc.setFontSize(14);
-        doc.text("Benutzer-Auswertung", 14, 16);
-        doc.setFontSize(10);
-        doc.text(`Kurs: ${courseName}`, 14, 23);
-        doc.text(`Teilnehmer: ${fullName}`, 14, 28);
-        doc.text(`Erstellt am: ${generatedAt}`, 14, 33);
-
-        doc.setFontSize(10);
-        doc.text(`Abgegebene Tage: ${submittedDays}`, 14, 40);
-        doc.text(
-          `Gesamtstunden: ${Math.round((totalMinutes / 60) * 10) / 10}`,
-          14,
-          45,
-        );
-
-        const comparisonHoursData = categoryIds
-          .map((catId) => ({
-            label: categoryNameById[catId] ?? `Kategorie ${catId}`,
-            userValue:
-              Math.round(((userCategoryMinutes[catId] ?? 0) / 60) * 10) / 10,
-            avgValue:
-              Math.round((courseAvgMinutesByCategory[catId] / 60) * 10) / 10,
-            color: hexToRgbTuple(getCategoryColorById(catId)),
-          }))
-          .filter((r) => r.userValue > 0 || r.avgValue > 0)
-          .sort((a, b) => b.userValue - a.userValue);
-
-        const chartEndY = drawComparisonChart(
-          "Vergleich mit Kursschnitt",
-          50,
-          comparisonHoursData,
-        );
-
-        const categoryRows = categoryIds
-          .map((catId) => {
-            const mins = userCategoryMinutes[catId] ?? 0;
-            const hours = Math.round((mins / 60) * 10) / 10;
-            const share =
-              totalMinutes > 0 ? Math.round((mins / totalMinutes) * 100) : 0;
-            const avgHours =
-              Math.round((courseAvgMinutesByCategory[catId] / 60) * 10) / 10;
-            const diff = Math.round((hours - avgHours) * 10) / 10;
-            return [
-              categoryNameById[catId] ?? `Kategorie ${catId}`,
-              String(hours),
-              `${share}%`,
-              String(avgHours),
-              `${diff >= 0 ? "+" : ""}${diff}`,
-            ];
-          })
-          .filter((row) => Number(row[1]) > 0);
-
-        const activityRows = Object.entries(userActivityMinutes)
-          .map(([activityId, mins]) => {
-            const actId = Number(activityId);
-            const catId = activityToCategoryId[actId];
-            const hours = Math.round((mins / 60) * 10) / 10;
-            const share =
-              totalMinutes > 0 ? Math.round((mins / totalMinutes) * 100) : 0;
-            return [
-              catId != null
-                ? (categoryNameById[catId] ?? `Kategorie ${catId}`)
-                : "Unbekannt",
-              activityNameById[actId] ?? `Aktivitaet ${activityId}`,
-              String(hours),
-              `${share}%`,
-            ];
-          })
-          .sort((a, b) => Number(b[2]) - Number(a[2]));
-
-        const topActivityRows = activityRows.slice(0, 5);
-
-        autoTable(doc, {
-          startY: chartEndY + 6,
-          head: [
-            ["Kategorie", "Stunden", "Anteil", "Kursschnitt (h)", "Differenz"],
-          ],
-          body:
-            categoryRows.length > 0
-              ? categoryRows
-              : [["Keine erfassten Kategorien", "0", "0%", "0", "0"]],
-          styles: { fontSize: 9 },
-          headStyles: { fillColor: [71, 85, 105] },
-        });
-
-        const afterCategoryTableY =
-          ((doc as unknown as { lastAutoTable?: { finalY?: number } })
-            .lastAutoTable?.finalY ?? chartEndY + 6) + 6;
-        doc.setFontSize(11);
-        doc.text("Top 5 Aktivitaeten", 14, afterCategoryTableY);
-
-        autoTable(doc, {
-          startY: afterCategoryTableY + 2,
-          head: [["Kategorie", "Aktivitaet", "Stunden", "Anteil"]],
-          body:
-            topActivityRows.length > 0
-              ? topActivityRows
-              : [["-", "Keine Aktivitaeten", "0", "0%"]],
-          styles: { fontSize: 8 },
-          headStyles: { fillColor: [59, 130, 246] },
-          columnStyles: {
-            0: { cellWidth: 38 },
-            1: { cellWidth: 78 },
-            2: { cellWidth: 22, halign: "right" },
-            3: { cellWidth: 18, halign: "right" },
-          },
-        });
-
-        const withItHours =
-          Math.round(((withItMinutesByUser[u.userId] ?? 0) / 60) * 10) / 10;
-        const withoutItHours =
-          Math.round(((withoutItMinutesByUser[u.userId] ?? 0) / 60) * 10) / 10;
-        const totalItHours = withItHours + withoutItHours;
-        const withItPercent =
-          totalItHours > 0 ? Math.round((withItHours / totalItHours) * 100) : 0;
-        const withoutItPercent =
-          totalItHours > 0
-            ? Math.round((withoutItHours / totalItHours) * 100)
-            : 0;
-        const deviceSplitRows = [
-          ["Mit IT-Nutzung", String(withItHours), `${withItPercent}%`],
-          ["Ohne IT-Nutzung", String(withoutItHours), `${withoutItPercent}%`],
-        ];
-
-        const deviceRows = Object.entries(minutesByUserDevice[u.userId] ?? {})
-          .map(([deviceName, mins]) => [
-            deviceName,
-            String(Math.round((mins / 60) * 10) / 10),
-          ])
-          .filter((row) => row[0] !== "Ohne IT-Gerät")
-          .sort((a, b) => Number(b[1]) - Number(a[1]));
-
-        const afterActivityTableY =
-          ((doc as unknown as { lastAutoTable?: { finalY?: number } })
-            .lastAutoTable?.finalY ?? afterCategoryTableY + 2) + 8;
-        doc.setFontSize(11);
-        doc.text("Geräte-Nutzung", 14, afterActivityTableY);
-
-        autoTable(doc, {
-          startY: afterActivityTableY + 2,
-          head: [["IT-Nutzung", "Stunden", "Anteil"]],
-          body: deviceSplitRows,
-          styles: { fontSize: 9 },
-          headStyles: { fillColor: [30, 64, 175] },
-        });
-
-        const afterDeviceSplitY =
-          ((doc as unknown as { lastAutoTable?: { finalY?: number } })
-            .lastAutoTable?.finalY ?? afterActivityTableY + 2) + 6;
-        doc.setFontSize(11);
-        doc.text("Geräte innerhalb IT-Nutzung", 14, afterDeviceSplitY);
-
-        autoTable(doc, {
-          startY: afterDeviceSplitY + 2,
-          head: [["Geraet", "Stunden"]],
-          body:
-            deviceRows.length > 0
-              ? deviceRows
-              : [["Keine detaillierten Gerätedaten", "0"]],
-          styles: { fontSize: 9 },
-          headStyles: { fillColor: [51, 65, 85] },
-        });
-      });
-
-      doc.save(`${safeCourseName}_Benutzerauswertungen.pdf`);
+      return true;
+    } catch {
+      setExportError("Export konnte nicht erstellt werden.");
+      return false;
     } finally {
       setIsExporting(false);
     }
@@ -1762,14 +1047,17 @@ export default function KursuebersichtTab() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <ChevronLeft size={13} />
-            Zur Kursuebersicht
+            Zur Kursübersicht
           </button>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
               disabled={isExporting || courseUsers.length === 0}
-              onClick={() => setIsExportModalOpen(true)}
+              onClick={() => {
+                setExportError("");
+                setIsExportModalOpen(true);
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
             >
               <Download size={13} />
@@ -1822,10 +1110,10 @@ export default function KursuebersichtTab() {
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    Datenexport
+                    Datenexport (anonymisiert)
                   </h3>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Waehle Exporttyp und Dateiformat für diesen Kurs.
+                    Wähle Inhalt und Dateiformat für diesen Kurs.
                   </p>
                 </div>
                 <button
@@ -1840,122 +1128,98 @@ export default function KursuebersichtTab() {
               </div>
 
               <div className="space-y-3">
+                <div className="flex items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 p-3 dark:border-violet-800 dark:bg-violet-900/20">
+                  <ShieldCheck
+                    size={15}
+                    className="mt-0.5 shrink-0 text-violet-600 dark:text-violet-400"
+                  />
+                  <p className="text-xs text-violet-800 dark:text-violet-300">
+                    Der Export enthält keine Namen, E-Mails, IDs, Aliase oder
+                    Datumsangaben. Die Zeilen sind zufällig gemischt und
+                    können keiner Person zugeordnet werden. Ausgeschlossene
+                    Teilnehmende und nicht abgegebene Tage werden nicht
+                    berücksichtigt. Mindestens 3 Teilnehmende mit Daten sind
+                    nötig.
+                  </p>
+                </div>
+
                 <div>
                   <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                    Export für
+                    Inhalt
                   </p>
                   <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
                     <button
                       type="button"
-                      onClick={() => setExportTarget("admin")}
+                      onClick={() => setExportGranularity("aggregiert")}
                       className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                        exportTarget === "admin"
+                        exportGranularity === "aggregiert"
                           ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
                           : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                       }`}
                     >
-                      Admin
+                      Aggregiert
                     </button>
                     <button
                       type="button"
-                      onClick={() => setExportTarget("benutzer")}
+                      onClick={() => setExportGranularity("roh")}
                       className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                        exportTarget === "benutzer"
+                        exportGranularity === "roh"
                           ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
                           : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                       }`}
                     >
-                      Benutzer
+                      Rohdaten
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    {exportGranularity === "aggregiert"
+                      ? "Eine anonyme Zeile pro Teilnehmer:in mit Ø Stunden pro abgegebenem Tag je Kategorie, plus Kursdurchschnitt."
+                      : "Eine Zeile pro Zeiteintrag (Start, Ende, Tätigkeit, Ort, Kontext, Wohlbefinden) – ohne Personen- oder Tagesbezug."}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+                    Format
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={isExporting}
+                      onClick={async () => {
+                        const ok = await handleExportCourse(
+                          "csv",
+                          exportGranularity,
+                        );
+                        if (ok) setIsExportModalOpen(false);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                    >
+                      <Download size={13} />
+                      {isExporting ? "Exportiere..." : "CSV"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isExporting}
+                      onClick={async () => {
+                        const ok = await handleExportCourse(
+                          "xlsx",
+                          exportGranularity,
+                        );
+                        if (ok) setIsExportModalOpen(false);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                    >
+                      <Download size={13} />
+                      {isExporting ? "Exportiere..." : "Excel"}
                     </button>
                   </div>
                 </div>
 
-                {exportTarget === "admin" ? (
-                  <>
-                    <div>
-                      <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                        Inhalt
-                      </p>
-                      <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
-                        <button
-                          type="button"
-                          onClick={() => setExportGranularity("aggregiert")}
-                          className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                            exportGranularity === "aggregiert"
-                              ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
-                              : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                          }`}
-                        >
-                          Aggregiert
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setExportGranularity("roh")}
-                          className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                            exportGranularity === "roh"
-                              ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
-                              : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                          }`}
-                        >
-                          Rohdaten
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                        Format
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={isExporting}
-                          onClick={async () => {
-                            await handleExportCourse("csv", exportGranularity);
-                            setIsExportModalOpen(false);
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                        >
-                          <Download size={13} />
-                          {isExporting ? "Exportiere..." : "CSV"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isExporting}
-                          onClick={async () => {
-                            await handleExportCourse("xlsx", exportGranularity);
-                            setIsExportModalOpen(false);
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                        >
-                          <Download size={13} />
-                          {isExporting ? "Exportiere..." : "Excel"}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/40">
-                    <p className="text-xs text-slate-600 dark:text-slate-300">
-                      Erstellt ein PDF mit einer eigenen Auswertungsseite pro
-                      Teilnehmer (nur abgegebene Tage): Zeitverteilung,
-                      Top-Aktivitaeten und Vergleich mit dem Kursschnitt.
-                    </p>
-                    <div className="mt-3">
-                      <button
-                        type="button"
-                        disabled={isExporting}
-                        onClick={async () => {
-                          await handleExportUserPdf();
-                          setIsExportModalOpen(false);
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                      >
-                        <Download size={13} />
-                        {isExporting ? "Erstelle PDF..." : "PDF erstellen"}
-                      </button>
-                    </div>
-                  </div>
+                {exportError && (
+                  <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                    {exportError}
+                  </p>
                 )}
               </div>
             </div>
@@ -2013,7 +1277,6 @@ export default function KursuebersichtTab() {
                                 userId: u.userId,
                                 userDisplayName: displayLabel,
                               });
-                              setUserDetailView("tage");
                               void loadUserDays(u.userId, view.courseId);
                             }
                           }}
@@ -2105,6 +1368,9 @@ export default function KursuebersichtTab() {
   function renderUserDetail() {
     if (view.type !== "user") return null;
 
+    const submittedCount = userDays.filter((d) => d.isSubmitted).length;
+    const totalCount = Math.max(userDays.length, view.courseTotalDays);
+
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -2125,7 +1391,7 @@ export default function KursuebersichtTab() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <ChevronLeft size={13} />
-            Zurueck zum Kurs
+            Zurück zum Kurs
           </button>
           <button
             type="button"
@@ -2133,160 +1399,109 @@ export default function KursuebersichtTab() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <ChevronLeft size={13} />
-            Zur Kursuebersicht
+            Zur Kursübersicht
           </button>
         </div>
 
-        {/* View toggle */}
-        <div className="flex gap-1 rounded-xl bg-slate-100 p-1 max-w-xs">
-          <button
-            type="button"
-            onClick={() => setUserDetailView("tage")}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-              userDetailView === "tage"
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            Tagesübersicht
-          </button>
-          <button
-            type="button"
-            onClick={() => setUserDetailView("statistiken")}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-              userDetailView === "statistiken"
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            Zeitverteilung
-          </button>
+        {/* Summary card: name + completion count only */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-base font-semibold text-slate-800 dark:text-slate-100">
+                {view.userDisplayName}
+              </p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                {isLoadingDays ? (
+                  "Wird geladen…"
+                ) : (
+                  <>
+                    <span className="font-medium">{submittedCount}</span>
+                    <span className="text-slate-400 dark:text-slate-500">
+                      {" "}
+                      / {totalCount} Tage abgeschlossen
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+            <div className="flex items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 dark:border-violet-800 dark:bg-violet-900/20 sm:max-w-sm">
+              <ShieldCheck
+                size={15}
+                className="mt-0.5 shrink-0 text-violet-600 dark:text-violet-400"
+              />
+              <p className="text-xs text-violet-800 dark:text-violet-300">
+                Pro Person ist nur ersichtlich, ob die Eingabe eines Tages
+                abgeschlossen wurde. Zeitnutzungsdaten sind für Admins nur
+                aggregiert und ohne Personenbezug einsehbar (Statistiken,
+                Datenexport).
+              </p>
+            </div>
+          </div>
         </div>
 
-        {userDetailView === "statistiken" ? (
-          <UserStatsView userId={view.userId} courseId={view.courseId} />
-        ) : (
-          renderUserDayList()
-        )}
+        {renderUserDayList()}
       </div>
     );
   }
 
   function renderUserDayList() {
     if (view.type !== "user") return null;
-    if (isLoadingDays)
-      return <p className="text-sm text-slate-500">Wird geladen…</p>;
+    if (isLoadingDays) return null; // summary card already shows the loading state
     if (userDays.length === 0) {
       return (
         <p className="text-sm text-slate-500">
-          Dieser Nutzer hat noch keine Tage erfasst.
+          Für diesen Kurs sind keine Kurstage hinterlegt.
         </p>
       );
     }
 
     return (
-      <div className="space-y-2">
-        {userDays.map((day) => {
-          const isExpanded = expandedDayIds.has(day.day_id);
-          const isLoadingEntries = loadingEntryDayIds.has(day.day_id);
-          const entries = dayEntries[day.day_id];
-
-          return (
-            <div
-              key={day.day_id}
-              className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
-            >
-              <button
-                type="button"
-                className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                onClick={() => toggleDayExpanded(day.day_id)}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Kurstag
+              </th>
+              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Abgeschlossen
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {userDays.map((day) => (
+              <tr
+                key={day.date}
+                className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                    {new Date(day.date).toLocaleDateString("de-DE", {
+                <td className="px-4 py-3 text-slate-800 dark:text-slate-100">
+                  {new Date(`${day.date}T00:00:00`).toLocaleDateString(
+                    "de-DE",
+                    {
                       weekday: "long",
                       day: "numeric",
                       month: "long",
                       year: "numeric",
-                    })}
-                  </span>
-                  {day.is_submitted ? (
-                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      Abgeschlossen
+                    },
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {day.isSubmitted ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      <CheckCircle2 size={13} />
+                      Ja
                     </span>
                   ) : (
-                    <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                      In Bearbeitung
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                      <Circle size={13} />
+                      Nein
                     </span>
                   )}
-                </div>
-                <span className="text-slate-400 text-sm">
-                  {isExpanded ? "▲" : "▼"}
-                </span>
-              </button>
-
-              {isExpanded && (
-                <div className="border-t border-slate-100 dark:border-slate-800">
-                  {isLoadingEntries ? (
-                    <p className="px-4 py-3 text-sm text-slate-500">Lädt…</p>
-                  ) : !entries || entries.length === 0 ? (
-                    <p className="px-4 py-3 text-sm text-slate-400">
-                      Keine Einträge für diesen Tag.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto scrollbar-thin">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
-                            {[
-                              "Zeit",
-                              "Haupttätigkeit",
-                              "Nebentätigkeit",
-                              "Ort / Transport",
-                              "Wohlbefinden",
-                            ].map((h) => (
-                              <th
-                                key={h}
-                                className="px-3 py-2 font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500"
-                              >
-                                {h}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                          {entries.map((entry) => (
-                            <tr
-                              key={entry.entry_id}
-                              className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
-                            >
-                              <td className="whitespace-nowrap px-3 py-2 font-mono text-slate-600 dark:text-slate-300">
-                                {entry.start_time.slice(0, 5)} –{" "}
-                                {entry.end_time.slice(0, 5)}
-                              </td>
-                              <td className="px-3 py-2 text-slate-700 dark:text-slate-200">
-                                {entry.primaryActivity ?? "–"}
-                              </td>
-                              <td className="px-3 py-2 text-slate-500 dark:text-slate-400">
-                                {entry.secondaryActivity ?? "–"}
-                              </td>
-                              <td className="px-3 py-2 text-slate-500 dark:text-slate-400">
-                                {entry.locationTransport ?? "–"}
-                              </td>
-                              <td className="px-3 py-2 text-slate-500 dark:text-slate-400">
-                                {entry.satisfaction ?? "–"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     );
   }
