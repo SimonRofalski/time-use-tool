@@ -18,6 +18,7 @@ import {
   BookOpen,
   Calendar,
   ClipboardList,
+  Languages,
   LogOut,
   Moon,
   Settings,
@@ -78,6 +79,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const [profileModalMandatory, setProfileModalMandatory] = useState(false);
   const [profileFormIsEditing, setProfileFormIsEditing] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
+  const [isChangingLocale, setIsChangingLocale] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
   const [activeAdminTab, setActiveAdminTab] = useState("kursuebersicht");
   // Role fetched from profiles.role (the authoritative source — not JWT metadata)
@@ -407,6 +409,17 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setSecurityQuestionsModalOpen(true);
   }
 
+  // Persists the chosen language to profiles.locale (the cross-device source
+  // of truth, read by proxy.ts on every request) and to the NEXT_LOCALE
+  // cookie next-intl reads, then reloads so the new locale takes effect.
+  async function handleLocaleChange(newLocale: "de" | "en") {
+    if (!user || newLocale === locale || isChangingLocale) return;
+    setIsChangingLocale(true);
+    await supabase.from("profiles").update({ locale: newLocale }).eq("id", user.id);
+    document.cookie = `NEXT_LOCALE=${newLocale}; path=/; max-age=31536000`;
+    window.location.reload();
+  }
+
   if (
     !user ||
     !accessCheckReady ||
@@ -728,6 +741,43 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     )}
                   </div>
                 </button>
+
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-800">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {t("languageTitle")}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {t("languageDescription")}
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={isChangingLocale}
+                      onClick={() => handleLocaleChange("de")}
+                      className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                        locale === "de"
+                          ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-500"
+                      }`}
+                    >
+                      <Languages size={14} className="shrink-0" />
+                      {t("languageDe")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isChangingLocale}
+                      onClick={() => handleLocaleChange("en")}
+                      className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                        locale === "en"
+                          ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-500"
+                      }`}
+                    >
+                      <Languages size={14} className="shrink-0" />
+                      {t("languageEn")}
+                    </button>
+                  </div>
+                </div>
 
                 <div className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-950">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">

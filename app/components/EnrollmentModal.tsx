@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useRouter } from "next/navigation";
 
@@ -11,9 +12,9 @@ type AvailableCourse = {
   end_date: string;
 };
 
-function formatShortDateGerman(dateString: string): string {
+function formatShortDate(dateString: string, locale: string): string {
   const date = new Date(dateString);
-  return date.toLocaleDateString("de-DE", {
+  return date.toLocaleDateString(locale === "en" ? "en-US" : "de-DE", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -27,6 +28,8 @@ export default function EnrollmentModal({
   userId: string;
   onEnrolled: () => void;
 }) {
+  const t = useTranslations("enrollmentModal");
+  const locale = useLocale();
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
 
@@ -58,7 +61,7 @@ export default function EnrollmentModal({
       .order("start_date", { ascending: false });
 
     if (error) {
-      setErrorMessage("Kurse konnten nicht geladen werden.");
+      setErrorMessage(t("loadCoursesError"));
     } else {
       const courses = (data ?? []) as AvailableCourse[];
       setAvailableCourses(courses);
@@ -76,13 +79,13 @@ export default function EnrollmentModal({
     setErrorMessage("");
 
     if (!selectedCourseId) {
-      setErrorMessage("Bitte wähle einen Kurs aus.");
+      setErrorMessage(t("selectCourseError"));
       setIsSubmitting(false);
       return;
     }
 
     if (!accessCode.trim()) {
-      setErrorMessage("Bitte gib den Zugangscode ein.");
+      setErrorMessage(t("enterAccessCodeError"));
       setIsSubmitting(false);
       return;
     }
@@ -94,15 +97,13 @@ export default function EnrollmentModal({
       .single();
 
     if (fetchError || !courseData) {
-      setErrorMessage(
-        "Kurs konnte nicht geladen werden. Bitte versuche es erneut.",
-      );
+      setErrorMessage(t("courseLoadRetryError"));
       setIsSubmitting(false);
       return;
     }
 
     if (courseData.accessCode !== accessCode.trim()) {
-      setErrorMessage("Ungültiger Zugangscode. Bitte versuche es erneut.");
+      setErrorMessage(t("invalidAccessCodeError"));
       setIsSubmitting(false);
       return;
     }
@@ -112,9 +113,7 @@ export default function EnrollmentModal({
       .insert({ profiles_id: userId, course_id: selectedCourseId });
 
     if (enrollError) {
-      setErrorMessage(
-        "Einschreibung fehlgeschlagen. Bitte versuche es erneut.",
-      );
+      setErrorMessage(t("enrollFailedError"));
       setIsSubmitting(false);
       return;
     }
@@ -127,29 +126,25 @@ export default function EnrollmentModal({
       <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-xl">
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-slate-800">
-            Kurs beitreten
+            {t("title")}
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Du bist noch keinem Kurs zugewiesen. Wähle einen Kurs aus und
-            gib den Zugangscode ein, um fortzufahren.
-          </p>
+          <p className="mt-1 text-sm text-slate-500">{t("description")}</p>
         </div>
 
         {isLoadingCourses && (
-          <p className="text-center text-sm text-slate-500">Wird geladen...</p>
+          <p className="text-center text-sm text-slate-500">{t("loading")}</p>
         )}
 
         {!isLoadingCourses && availableCourses.length === 0 && (
           <p className="text-center text-sm text-slate-500">
-            Derzeit sind keine Kurse verfügbar. Bitte wende dich an deinen
-            Administrator.
+            {t("noCoursesAvailable")}
           </p>
         )}
 
         {!isLoadingCourses && availableCourses.length > 0 && (
           <form onSubmit={handleEnroll} className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">
-              Kurs auswählen
+              {t("selectCourseLabel")}
               <select
                 value={selectedCourseId ?? ""}
                 onChange={(e) => {
@@ -160,15 +155,15 @@ export default function EnrollmentModal({
               >
                 {availableCourses.map((course) => (
                   <option key={course.course_id} value={course.course_id}>
-                    {course.name} ({formatShortDateGerman(course.start_date)} -{" "}
-                    {formatShortDateGerman(course.end_date)})
+                    {course.name} ({formatShortDate(course.start_date, locale)} -{" "}
+                    {formatShortDate(course.end_date, locale)})
                   </option>
                 ))}
               </select>
             </label>
 
             <label className="block text-sm font-medium text-slate-700">
-              Zugangscode
+              {t("accessCodeLabel")}
               <input
                 type="text"
                 value={accessCode}
@@ -176,7 +171,7 @@ export default function EnrollmentModal({
                   setAccessCode(e.target.value);
                   setErrorMessage("");
                 }}
-                placeholder="Zugangscode eingeben"
+                placeholder={t("accessCodePlaceholder")}
                 className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </label>
@@ -190,7 +185,7 @@ export default function EnrollmentModal({
               disabled={isSubmitting}
               className="w-full rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
             >
-              {isSubmitting ? "Wird eingeschrieben..." : "Kurs beitreten"}
+              {isSubmitting ? t("submittingButton") : t("submitButton")}
             </button>
           </form>
         )}
@@ -200,7 +195,7 @@ export default function EnrollmentModal({
           onClick={handleBackToLogin}
           className="mt-4 w-full rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-800"
         >
-          Zurück zum Login
+          {t("backToLoginButton")}
         </button>
       </div>
     </div>
