@@ -695,5 +695,32 @@
     "savedMessage": "Security questions have been saved.",
     "saveButton": "Save security questions",
     "savingButton": "Saving..."
+  },
+  "apiErrors": {
+    "passwordResetComplete": {
+      "invalidRequest": "Invalid request.",
+      "passwordTooShort": "Password must be at least 6 characters long.",
+      "invalidOrExpiredLink": "The reset link is invalid or has expired."
+    },
+    "passwordResetSecurityQuestions": {
+      "emailRequired": "Please enter an email address.",
+      "accountNotFound": "No account could be found for this email.",
+      "loadError": "Security questions could not be loaded.",
+      "notTwoQuestionsSet": "This account doesn't have two security questions set up yet. Please contact an admin."
+    },
+    "passwordResetVerify": {
+      "answerBothRequired": "Please answer both security questions.",
+      "checkFailed": "Security questions could not be verified.",
+      "answersDontMatch": "The answers don't match the ones on file.",
+      "resetPrepareFailed": "The reset could not be prepared."
+    },
+    "securityQuestions": {
+      "notAuthenticated": "Not signed in.",
+      "loadError": "Security questions could not be loaded.",
+      "invalidRequest": "Invalid request. Please try again.",
+      "needTwoQuestions": "Please provide exactly two security questions.",
+      "needTwoDifferentQuestions": "Please provide two different questions with answers.",
+      "internalError": "Internal error while saving the security questions."
+    }
   }
 }
