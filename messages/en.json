@@ -118,5 +118,105 @@
       "daysLoadError": "Days could not be loaded.",
       "entriesLoadError": "Entries could not be loaded."
     }
+  },
+  "zeiterfassung": {
+    "gridLoading": "Loading grid...",
+    "questionnaireLoading": "Loading questionnaire...",
+    "noCourseFound": "No course found.",
+    "entriesLoadError": "Entries could not be loaded.",
+    "deleteError": "Entries could not be deleted.",
+    "saveError": "Entry could not be saved: {message}",
+    "unknownError": "unknown error",
+    "dayCreateError": "Day entry could not be created: {message}",
+    "completionBar": {
+      "previousLabel": "Previous",
+      "nextLabel": "Next",
+      "noPreviousDay": "No earlier day",
+      "noNextDay": "No later day"
+    },
+    "idlePlaceholder": {
+      "title": "Select a time slot",
+      "line1": "Click on a slot – or hold and drag across several consecutive slots to mark a time span at once.",
+      "line2": "Then choose category and activity."
+    },
+    "gridToggle": {
+      "label": "Time grid",
+      "expand": "▼ Expand",
+      "collapse": "▲ Collapse"
+    },
+    "abandonDialog": {
+      "title": "Discard entry?",
+      "description": "You've already made selections. If you switch now, your current input will be lost.",
+      "continueButton": "Keep entering",
+      "discardButton": "Yes, discard"
+    }
+  },
+  "activitySelector": {
+    "questions": {
+      "primaryActivity": "What was your main activity?",
+      "secondaryActivity": "Did you do a secondary activity at the same time?",
+      "digitalMedia": "Did you use a device? (smartphone, tablet, PC…)",
+      "digitalMediaType": "Which devices did you use?",
+      "locationTransport": "Where were you during this time?",
+      "socialContext": "Was anyone else with you?",
+      "satisfaction": "How did you feel?"
+    },
+    "stepLabels": {
+      "primaryActivity": "Main activity",
+      "secondaryActivity": "Secondary activity",
+      "digitalMedia": "Device?",
+      "digitalMediaType": "Device type",
+      "locationTransport": "Location",
+      "socialContext": "Social",
+      "satisfaction": "Mood"
+    },
+    "slotsRangeLabel": "{start} – {end} · {count, plural, one {# field} other {# fields}}",
+    "backButton": "Back",
+    "continueButton": "Continue",
+    "activityList": {
+      "categoriesBackLabel": "Categories",
+      "noActivitiesFound": "No activities found.",
+      "matchCount": "{count, plural, one {# match} other {# matches}}",
+      "primarySearchPlaceholder": "Search main activity or keyword...",
+      "secondarySearchPlaceholder": "Search secondary activity or keyword...",
+      "noSecondaryActivityButton": "No secondary activity → Continue"
+    },
+    "digitalMedia": {
+      "yes": "Yes",
+      "no": "No"
+    },
+    "digitalMediaTypeStep": {
+      "validationError": "Please select at least one device type."
+    },
+    "locationCategories": {
+      "orte": "Places",
+      "privateVerkehrsmittel": "Private transport",
+      "oeffentlicherVerkehr": "Public transport",
+      "sonstiges": "Other"
+    },
+    "socialContextStep": {
+      "validationError": "Please select at least one social context."
+    },
+    "overview": {
+      "timeLabel": "Time",
+      "noTimeSlots": "No time slots",
+      "categoryLabel": "Category",
+      "mainCategory": "Main category: {name}",
+      "selectedCategory": "Selected category: {name}",
+      "mainActivity": "Main activity: {name}",
+      "secondaryCategory": "Secondary category: {name}",
+      "secondaryActivity": "Secondary activity: {name}",
+      "nothingSelected": "Nothing selected yet",
+      "contextLabel": "Context",
+      "locationTransport": "Location/transport: {name}",
+      "social": "Social: {name}",
+      "mediaLabel": "Media",
+      "moodLabel": "Mood",
+      "timeOrderedListing": "Time-ordered listing",
+      "noEntry": "No entry",
+      "addEntryTitle": "Add entry",
+      "editTitle": "Edit",
+      "deleteTitle": "Delete"
+    }
   }
 }

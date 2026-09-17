@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
+import { getLocalizedName } from "@/lib/i18n/localized-name";
 import {
   Baby,
   Bike,
@@ -117,6 +120,7 @@ type ActivitySelectorProps = {
 function buildActivityHierarchy(
   lookupData: LookupData,
   searchQuery: string,
+  locale: Locale,
   excludeActivityId?: number | null,
 ): CategoryNode[] {
   const query = searchQuery.toLowerCase().trim();
@@ -131,14 +135,17 @@ function buildActivityHierarchy(
           const activities = lookupData.activities
             .filter((act) => act.subcategory_id === sub.subcategory_id)
             .filter((act) => act.activity_id !== excludeActivityId)
+            .map((act) => ({
+              activity_id: act.activity_id,
+              name: getLocalizedName(act, locale),
+            }))
             .filter((act) =>
               query ? act.name.toLowerCase().includes(query) : true,
-            )
-            .map((act) => ({ activity_id: act.activity_id, name: act.name }));
+            );
 
           return {
             subcategory_id: sub.subcategory_id,
-            name: sub.name,
+            name: getLocalizedName(sub, locale),
             activities,
           };
         })
@@ -147,7 +154,7 @@ function buildActivityHierarchy(
       return {
         category_id: cat.category_id,
         code: cat.code,
-        name: cat.name,
+        name: getLocalizedName(cat, locale),
         color,
         subcategories,
       };
@@ -155,28 +162,38 @@ function buildActivityHierarchy(
     .filter((cat) => cat.subcategories.length > 0); // hide empty categories
 }
 
-// Returns the German question text for each questionnaire step
-function getStepQuestion(step: QuestionnaireStep): string {
+type ActivitySelectorTranslate = ReturnType<
+  typeof useTranslations<"activitySelector">
+>;
+
+// Returns the question text for each questionnaire step
+function getStepQuestion(
+  step: QuestionnaireStep,
+  t: ActivitySelectorTranslate,
+): string {
   switch (step) {
     case "primary_activity":
-      return "Welche Haupttätigkeit hast du ausgeführt?";
+      return t("questions.primaryActivity");
     case "secondary_activity":
-      return "Hast du gleichzeitig eine Nebentätigkeit ausgeführt?";
+      return t("questions.secondaryActivity");
     case "digital_media":
-      return "Hast du ein Gerät genutzt? (Smartphone, Tablet, PC…)";
+      return t("questions.digitalMedia");
     case "digital_media_type":
-      return "Welche Geräte hast du genutzt?";
+      return t("questions.digitalMediaType");
     case "location_transport":
-      return "Wo warst du während dieser Zeit?";
+      return t("questions.locationTransport");
     case "social_context":
-      return "War jemand anders mit dabei?";
+      return t("questions.socialContext");
     case "satisfaction":
-      return "Wie hast du dich gefühlt?";
+      return t("questions.satisfaction");
   }
 }
 
 // Returns label and step index (1-based) out of total for the step indicator
-function getStepMeta(step: QuestionnaireStep): {
+function getStepMeta(
+  step: QuestionnaireStep,
+  t: ActivitySelectorTranslate,
+): {
   index: number;
   total: number;
   label: string;
@@ -191,13 +208,13 @@ function getStepMeta(step: QuestionnaireStep): {
     "satisfaction",
   ];
   const labels: Record<QuestionnaireStep, string> = {
-    primary_activity: "Haupttätigkeit",
-    secondary_activity: "Nebentätigkeit",
-    digital_media: "Gerät?",
-    digital_media_type: "Geräteart",
-    location_transport: "Ort",
-    social_context: "Sozial",
-    satisfaction: "Stimmung",
+    primary_activity: t("stepLabels.primaryActivity"),
+    secondary_activity: t("stepLabels.secondaryActivity"),
+    digital_media: t("stepLabels.digitalMedia"),
+    digital_media_type: t("stepLabels.digitalMediaType"),
+    location_transport: t("stepLabels.locationTransport"),
+    social_context: t("stepLabels.socialContext"),
+    satisfaction: t("stepLabels.satisfaction"),
   };
   return {
     index: steps.indexOf(step) + 1,
@@ -206,8 +223,11 @@ function getStepMeta(step: QuestionnaireStep): {
   };
 }
 
-// Formats the selected slot range as a readable string: "08:00 – 09:30 (9 Felder)"
-function formatSlotsRange(slots: Set<string>): string {
+// Formats the selected slot range as a readable string: "08:00 – 09:30 · 9 Felder"
+function formatSlotsRange(
+  slots: Set<string>,
+  t: ActivitySelectorTranslate,
+): string {
   if (slots.size === 0) return "";
   const sorted = [...slots].sort();
   const firstSlot = sorted[0];
@@ -217,7 +237,7 @@ function formatSlotsRange(slots: Set<string>): string {
   const endStr = `${Math.floor(endTotal / 60)
     .toString()
     .padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}`;
-  return `${firstSlot} – ${endStr} · ${slots.size} Felder`;
+  return t("slotsRangeLabel", { start: firstSlot, end: endStr, count: slots.size });
 }
 
 function slotToMinutes(slot: string): number {
@@ -292,15 +312,16 @@ function findCategoryForActivity(
   );
 }
 
-function findNameById<T extends Record<string, unknown>>(
+function findNameById<T extends { name: string; name_en: string }>(
   rows: T[],
   idKey: keyof T,
   idValue: number | null,
+  locale: Locale,
 ): string | null {
   if (idValue === null) return null;
   const row = rows.find((item) => item[idKey] === idValue);
   if (!row) return null;
-  return typeof row.name === "string" ? row.name : null;
+  return getLocalizedName(row, locale);
 }
 
 // Mirrors findNameById but returns the language-neutral `code` instead —
@@ -495,6 +516,7 @@ function ActivityList({
   searchPlaceholder: string;
   topSlot?: React.ReactNode; // optional slot for the "Keine" button in step 2
 }) {
+  const t = useTranslations("activitySelector");
   const trimmedQuery = searchQuery.trim();
   const isSearching = trimmedQuery.length > 0;
   const activeCategory = hierarchy.find(
@@ -519,7 +541,7 @@ function ActivityList({
             >
               <span>←</span>
               <span className="text-[10px] font-normal text-slate-400 leading-none">
-                Kategorien
+                {t("activityList.categoriesBackLabel")}
               </span>
             </button>
           )}
@@ -544,7 +566,7 @@ function ActivityList({
       >
         {hierarchy.length === 0 && (
           <p className="py-8 text-center text-sm text-slate-400">
-            Keine Tätigkeiten gefunden.
+            {t("activityList.noActivitiesFound")}
           </p>
         )}
 
@@ -649,7 +671,9 @@ function ActivityList({
                       {category.name}
                     </span>
                     <span className="text-xs text-slate-500">
-                      {countActivities(category.subcategories)} Treffer
+                      {t("activityList.matchCount", {
+                        count: countActivities(category.subcategories),
+                      })}
                     </span>
                   </div>
                 )}
@@ -730,6 +754,8 @@ export default function ActivitySelector({
   showDeleteSelection,
   isDeletingSelection = false,
 }: ActivitySelectorProps) {
+  const t = useTranslations("activitySelector");
+  const locale = useLocale() as Locale;
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [stepValidationError, setStepValidationError] = useState<string | null>(
@@ -768,7 +794,7 @@ export default function ActivitySelector({
     }
   }, [searchQuery]);
 
-  const hierarchy = buildActivityHierarchy(lookupData, searchQuery);
+  const hierarchy = buildActivityHierarchy(lookupData, searchQuery, locale);
   const activeBrowsingCategory = hierarchy.find(
     (category) => category.category_id === activeCategoryId,
   );
@@ -815,24 +841,26 @@ export default function ActivitySelector({
     lookupData.locationTransports,
     "location_transport_id",
     pendingEntry.location_transport_id,
+    locale,
   );
   const satisfactionName = findNameById(
     lookupData.satisfactions,
     "satisfaction_id",
     pendingEntry.satisfaction_id,
+    locale,
   );
 
   const socialContextNames = lookupData.socialContexts
     .filter((item) =>
       pendingEntry.social_context_ids.includes(item.social_context_id),
     )
-    .map((item) => item.name);
+    .map((item) => getLocalizedName(item, locale));
 
   const digitalMediaTypeNames = lookupData.digitalMediaTypes
     .filter((item) =>
       pendingEntry.digital_media_type_ids.includes(item.digital_media_type_id),
     )
-    .map((item) => item.name);
+    .map((item) => getLocalizedName(item, locale));
 
   // ── Step content renderers ──────────────────────────────────────────────────
 
@@ -849,18 +877,19 @@ export default function ActivitySelector({
         }
         activeCategoryId={activeCategoryId}
         onActiveCategoryChange={setActiveCategoryId}
-        searchPlaceholder="Haupttätigkeit oder Stichwort suchen..."
+        searchPlaceholder={t("activityList.primarySearchPlaceholder")}
       />
     );
   }
 
   // Step 2: select an optional secondary activity
-  // Includes a "Keine Nebentätigkeit" button at the top
+  // Includes a "no secondary activity" button at the top
   // The primary activity is excluded from the list to prevent check constraint violations
   function renderSecondaryActivityStep() {
     const hierarchyWithoutPrimary = buildActivityHierarchy(
       lookupData,
       searchQuery,
+      locale,
       pendingEntry.primary_activity_id,
     );
 
@@ -875,14 +904,14 @@ export default function ActivitySelector({
         }
         activeCategoryId={activeCategoryId}
         onActiveCategoryChange={setActiveCategoryId}
-        searchPlaceholder="Nebentätigkeit oder Stichwort suchen..."
+        searchPlaceholder={t("activityList.secondarySearchPlaceholder")}
         topSlot={
           <button
             type="button"
             onClick={() => onStepComplete({ secondary_activity_id: null })}
             className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-600"
           >
-            Keine Nebentätigkeit → Weiter
+            {t("activityList.noSecondaryActivityButton")}
           </button>
         }
       />
@@ -894,8 +923,8 @@ export default function ActivitySelector({
     return (
       <div className="grid grid-cols-2 gap-3">
         {[
-          { label: "Ja", value: true, icon: "📱" },
-          { label: "Nein", value: false, icon: "🚫" },
+          { label: t("digitalMedia.yes"), value: true, icon: "📱" },
+          { label: t("digitalMedia.no"), value: false, icon: "🚫" },
         ].map(({ label, value, icon }) => {
           const isSelected = pendingEntry.digital_media_used === value;
           return (
@@ -986,7 +1015,7 @@ export default function ActivitySelector({
 
     function handleContinue() {
       if (selectedIds.size === 0) {
-        setStepValidationError("Bitte wähle mindestens eine Geräteart aus.");
+        setStepValidationError(t("digitalMediaTypeStep.validationError"));
         return;
       }
       onStepComplete({
@@ -1029,7 +1058,7 @@ export default function ActivitySelector({
                     isSelected ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-300"
                   }`}
                 >
-                  {type.name}
+                  {getLocalizedName(type, locale)}
                 </span>
               </button>
             );
@@ -1050,7 +1079,7 @@ export default function ActivitySelector({
               : "bg-slate-800 text-white hover:bg-slate-700"
           }`}
         >
-          Weiter
+          {t("continueButton")}
         </button>
       </div>
     );
@@ -1070,90 +1099,90 @@ export default function ActivitySelector({
   > = {
     "10": {
       icon: MapPin,
-      category: "Orte",
+      category: "orte",
       chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
     }, // Nicht spezifizierter Ort (keine Reise)
     "11": {
       icon: Home,
-      category: "Orte",
+      category: "orte",
       chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
     }, // Zuhause
     "12": {
       icon: Hotel,
-      category: "Orte",
+      category: "orte",
       chipClass: "bg-cyan-50 text-cyan-600 ring-cyan-100",
     }, // Wochenendhaus oder Ferienwohnung
     "13": {
       icon: Briefcase,
-      category: "Orte",
+      category: "orte",
       chipClass: "bg-amber-50 text-amber-600 ring-amber-100",
     }, // Arbeitsplatz
     "14": {
       icon: Home,
       secondaryIcon: UserRound,
-      category: "Orte",
+      category: "orte",
       chipClass: "bg-violet-50 text-violet-600 ring-violet-100",
     }, // Zuhause anderer Personen
     "15": {
       icon: UtensilsCrossed,
-      category: "Orte",
+      category: "orte",
       chipClass: "bg-rose-50 text-rose-600 ring-rose-100",
     }, // Restaurant, Café oder Bar
     "16": {
       icon: ShoppingBag,
-      category: "Orte",
+      category: "orte",
       chipClass: "bg-emerald-50 text-emerald-600 ring-emerald-100",
     }, // Einkaufszentrum, Markt oder andere Geschäfte
     "17": {
       icon: Hotel,
-      category: "Orte",
+      category: "orte",
       chipClass: "bg-sky-50 text-sky-600 ring-sky-100",
     }, // Hotel, Pension oder Campingplatz
     "18": {
       icon: GraduationCap,
-      category: "Orte",
+      category: "orte",
       chipClass: "bg-indigo-50 text-indigo-600 ring-indigo-100",
     }, // Schule/Universität
     "19": {
       icon: MapPin,
-      category: "Orte",
+      category: "orte",
       chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
     }, // Anderer spezifizierter Ort (keine Reise) — hidden from the picker, see renderLocationStep
     "20": {
       icon: MapPin,
-      category: "Private Verkehrsmittel",
+      category: "privateVerkehrsmittel",
       chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
     }, // Nicht spezifizierter Transportmodus
     "21": {
       icon: Footprints,
-      category: "Private Verkehrsmittel",
+      category: "privateVerkehrsmittel",
       chipClass: "bg-green-50 text-green-600 ring-green-100",
     }, // Zu Fuss
     "22": {
       icon: Bike,
-      category: "Private Verkehrsmittel",
+      category: "privateVerkehrsmittel",
       chipClass: "bg-lime-50 text-lime-600 ring-lime-100",
     }, // Fahrrad
     "23": {
       icon: Gauge,
-      category: "Private Verkehrsmittel",
+      category: "privateVerkehrsmittel",
       chipClass: "bg-orange-50 text-orange-600 ring-orange-100",
     }, // Moped, Motorrad oder Motorboot
     "24": {
       icon: Car,
-      category: "Private Verkehrsmittel",
+      category: "privateVerkehrsmittel",
       chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
     }, // Pkw / Auto
     "31": {
       icon: Bus,
-      category: "Öffentlicher Verkehr",
+      category: "oeffentlicherVerkehr",
       chipClass: "bg-teal-50 text-teal-600 ring-teal-100",
     }, // Öffentlicher Verkehr
   };
 
   const DEFAULT_LOCATION_MAPPING = {
     icon: MapPin,
-    category: "Sonstiges",
+    category: "sonstiges",
     chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
   };
 
@@ -1175,11 +1204,17 @@ export default function ActivitySelector({
   function renderLocationStep() {
     // Group locations by category
     const grouped = new Map<string, typeof lookupData.locationTransports>();
+    const categoryLabels: Record<string, string> = {
+      orte: t("locationCategories.orte"),
+      privateVerkehrsmittel: t("locationCategories.privateVerkehrsmittel"),
+      oeffentlicherVerkehr: t("locationCategories.oeffentlicherVerkehr"),
+      sonstiges: t("locationCategories.sonstiges"),
+    };
     const categoryOrder = [
-      "Orte",
-      "Private Verkehrsmittel",
-      "Öffentlicher Verkehr",
-      "Sonstiges",
+      "orte",
+      "privateVerkehrsmittel",
+      "oeffentlicherVerkehr",
+      "sonstiges",
     ];
 
     for (const loc of lookupData.locationTransports) {
@@ -1204,7 +1239,7 @@ export default function ActivitySelector({
               className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/60 p-3"
             >
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {category}
+                {categoryLabels[category]}
               </h4>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                 {items.map((loc) => {
@@ -1241,7 +1276,7 @@ export default function ActivitySelector({
                         )}
                       </div>
                       <span className="text-xs font-medium leading-snug text-slate-700 dark:text-slate-300">
-                        {loc.name}
+                        {getLocalizedName(loc, locale)}
                       </span>
                     </button>
                   );
@@ -1305,9 +1340,7 @@ export default function ActivitySelector({
 
     function handleContinue() {
       if (selectedIds.size === 0) {
-        setStepValidationError(
-          "Bitte wähle mindestens einen Sozialkontext aus.",
-        );
+        setStepValidationError(t("socialContextStep.validationError"));
         return;
       }
       onStepComplete({
@@ -1344,7 +1377,7 @@ export default function ActivitySelector({
                   )}
                 </div>
                 <span className="text-xs font-medium leading-snug text-slate-700 dark:text-slate-300">
-                  {ctx.name}
+                  {getLocalizedName(ctx, locale)}
                 </span>
               </button>
             );
@@ -1369,7 +1402,7 @@ export default function ActivitySelector({
               : "bg-slate-800 text-white hover:bg-slate-700"
           }`}
         >
-          Weiter
+          {t("continueButton")}
         </button>
       </div>
     );
@@ -1432,7 +1465,7 @@ export default function ActivitySelector({
             >
               <div className="text-4xl">{emoji}</div>
               <div className="text-center text-xs font-semibold text-slate-700 dark:text-slate-300">
-                {sat.name}
+                {getLocalizedName(sat, locale)}
               </div>
             </button>
           );
@@ -1461,9 +1494,8 @@ export default function ActivitySelector({
     }
   }
 
-  const stepMeta = getStepMeta(step);
+  const stepMeta = getStepMeta(step, t);
   const isFirstStep = step === "primary_activity";
-  const isSecondaryStep = step === "secondary_activity";
 
   const containerRef = useRef<HTMLDivElement>(null);
   const forceEditorOpenRef = useRef(false);
@@ -1494,18 +1526,14 @@ export default function ActivitySelector({
         <div className="flex items-center gap-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 text-blue-700 dark:text-blue-300 ring-1 ring-blue-100 dark:ring-blue-800/30 shrink-0">
           <Clock3 className="h-4 w-4 shrink-0" />
           <span className="text-sm font-semibold">
-            {formatSlotsRange(selectedSlots)}
+            {formatSlotsRange(selectedSlots, t)}
           </span>
         </div>
 
         {isEditorVisible && (
           <div className="flex flex-1 flex-col gap-1 min-w-0">
             <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
-              {step === "primary_activity"
-                ? "Haupttätigkeit"
-                : isSecondaryStep
-                  ? "Nebentätigkeit"
-                  : stepMeta.label}
+              {stepMeta.label}
             </span>
             <div className="flex gap-1">
               {Array.from({ length: stepMeta.total }, (_, i) => {
@@ -1536,7 +1564,7 @@ export default function ActivitySelector({
             type="button"
             onClick={onBack}
             className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-2.5 py-1 text-xs text-slate-500 dark:text-slate-400 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-600"
-            title="Zurück"
+            title={t("backButton")}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -1550,7 +1578,7 @@ export default function ActivitySelector({
             >
               <path d="M15 18l-6-6 6-6" />
             </svg>
-            Zurück
+            {t("backButton")}
           </button>
         </div>
       )}
@@ -1561,7 +1589,7 @@ export default function ActivitySelector({
           <div className="hidden">
             <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Zeit
+                {t("overview.timeLabel")}
               </p>
               <div className="mt-1.5 flex max-h-36 flex-wrap gap-1.5 overflow-auto pr-1">
                 {mergedSlotRanges.length > 0 ? (
@@ -1575,44 +1603,44 @@ export default function ActivitySelector({
                     </span>
                   ))
                 ) : (
-                  <p className="text-xs text-slate-400">Keine Zeitslots</p>
+                  <p className="text-xs text-slate-400">{t("overview.noTimeSlots")}</p>
                 )}
               </div>
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Kategorie
+                {t("overview.categoryLabel")}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {primaryCategory && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
                     <BookOpen className="h-3.5 w-3.5" />
-                    Hauptkategorie: {primaryCategory.name}
+                    {t("overview.mainCategory", { name: getLocalizedName(primaryCategory, locale) })}
                   </span>
                 )}
                 {activeBrowsingCategory && !primaryCategory && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-100">
                     <BookOpen className="h-3.5 w-3.5" />
-                    Gewählte Kategorie: {activeBrowsingCategory.name}
+                    {t("overview.selectedCategory", { name: activeBrowsingCategory.name })}
                   </span>
                 )}
                 {primaryActivity && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
                     <Briefcase className="h-3.5 w-3.5" />
-                    Haupttätigkeit: {primaryActivity.name}
+                    {t("overview.mainActivity", { name: getLocalizedName(primaryActivity, locale) })}
                   </span>
                 )}
                 {secondaryCategory && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700 ring-1 ring-teal-100">
                     <BookOpen className="h-3.5 w-3.5" />
-                    Nebenkategorie: {secondaryCategory.name}
+                    {t("overview.secondaryCategory", { name: getLocalizedName(secondaryCategory, locale) })}
                   </span>
                 )}
                 {secondaryActivity && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700 ring-1 ring-teal-100">
                     <Briefcase className="h-3.5 w-3.5" />
-                    Nebentätigkeit: {secondaryActivity.name}
+                    {t("overview.secondaryActivity", { name: getLocalizedName(secondaryActivity, locale) })}
                   </span>
                 )}
                 {!primaryCategory &&
@@ -1620,7 +1648,7 @@ export default function ActivitySelector({
                   !secondaryCategory &&
                   !secondaryActivity && (
                     <p className="text-xs text-slate-400">
-                      Noch nichts ausgewählt
+                      {t("overview.nothingSelected")}
                     </p>
                   )}
               </div>
@@ -1628,13 +1656,13 @@ export default function ActivitySelector({
 
             <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Kontext
+                {t("overview.contextLabel")}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {locationName && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-100">
                     <MapPin className="h-3.5 w-3.5" />
-                    Ort/Transport: {locationName}
+                    {t("overview.locationTransport", { name: locationName })}
                   </span>
                 )}
                 {socialContextNames.map((name) => (
@@ -1643,12 +1671,12 @@ export default function ActivitySelector({
                     className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-100"
                   >
                     <Users className="h-3.5 w-3.5" />
-                    Sozial: {name}
+                    {t("overview.social", { name })}
                   </span>
                 ))}
                 {!locationName && socialContextNames.length === 0 && (
                   <p className="text-xs text-slate-400">
-                    Noch nichts ausgewählt
+                    {t("overview.nothingSelected")}
                   </p>
                 )}
               </div>
@@ -1656,7 +1684,7 @@ export default function ActivitySelector({
 
             <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Medien
+                {t("overview.mediaLabel")}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {digitalMediaTypeNames.map((name) => (
@@ -1670,7 +1698,7 @@ export default function ActivitySelector({
                 ))}
                 {digitalMediaTypeNames.length === 0 && (
                   <p className="text-xs text-slate-400">
-                    Noch nichts ausgewählt
+                    {t("overview.nothingSelected")}
                   </p>
                 )}
               </div>
@@ -1678,7 +1706,7 @@ export default function ActivitySelector({
 
             <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 xl:col-span-1">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Stimmung
+                {t("overview.moodLabel")}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {satisfactionName ? (
@@ -1688,7 +1716,7 @@ export default function ActivitySelector({
                   </span>
                 ) : (
                   <p className="text-xs text-slate-400">
-                    Noch nichts ausgewählt
+                    {t("overview.nothingSelected")}
                   </p>
                 )}
               </div>
@@ -1698,7 +1726,7 @@ export default function ActivitySelector({
           {selectedSlotGroups.length > 0 && (
             <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-2">
               <p className="hidden text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Zeitgeführte Auflistung
+                {t("overview.timeOrderedListing")}
               </p>
               <div className="mt-2 space-y-1.5">
                 {selectedSlotGroups.map((group, index) => {
@@ -1714,11 +1742,11 @@ export default function ActivitySelector({
                           {timeRange}
                         </span>
                         <span className="flex-1 text-xs text-slate-400">
-                          Kein Eintrag
+                          {t("overview.noEntry")}
                         </span>
                         <button
                           type="button"
-                          title="Eintrag hinzufügen"
+                          title={t("overview.addEntryTitle")}
                           onClick={() => {
                             const groupSlots: string[] = [];
                             for (
@@ -1758,6 +1786,7 @@ export default function ActivitySelector({
                     lookupData.locationTransports,
                     "location_transport_id",
                     group.entry.location_transport_id,
+                    locale,
                   );
                   const rowLocationCode = findCodeById(
                     lookupData.locationTransports,
@@ -1768,6 +1797,7 @@ export default function ActivitySelector({
                     lookupData.satisfactions,
                     "satisfaction_id",
                     group.entry.satisfaction_id,
+                    locale,
                   );
                   const rowSatisfactionCode = findCodeById(
                     lookupData.satisfactions,
@@ -1781,7 +1811,7 @@ export default function ActivitySelector({
                       ),
                     )
                     .map((item) => ({
-                      name: item.name,
+                      name: getLocalizedName(item, locale),
                       ...getDigitalMediaTypeVisual(item.code),
                     }));
                   const rowSocialItems = lookupData.socialContexts
@@ -1791,7 +1821,7 @@ export default function ActivitySelector({
                       ),
                     )
                     .map((sc) => ({
-                      name: sc.name,
+                      name: getLocalizedName(sc, locale),
                       ...getSocialContextVisual(sc.code),
                     }));
 
@@ -1857,7 +1887,7 @@ export default function ActivitySelector({
                             }}
                           >
                             <RowPriActIcon className="h-3.5 w-3.5" />
-                            {rowPrimaryActivity.name}
+                            {getLocalizedName(rowPrimaryActivity, locale)}
                           </span>
                         )}
                         {rowSecondaryActivity && RowSecActIcon && (
@@ -1870,7 +1900,7 @@ export default function ActivitySelector({
                             }}
                           >
                             <RowSecActIcon className="h-3.5 w-3.5" />
-                            {rowSecondaryActivity.name}
+                            {getLocalizedName(rowSecondaryActivity, locale)}
                           </span>
                         )}
                         {rowLocationName && RowLocIcon && (
@@ -1912,7 +1942,7 @@ export default function ActivitySelector({
                       <div className="flex shrink-0 items-center gap-1.5">
                         <button
                           type="button"
-                          title="Bearbeiten"
+                          title={t("overview.editTitle")}
                           onClick={() => {
                             const groupSlots: string[] = [];
                             for (
@@ -1930,7 +1960,7 @@ export default function ActivitySelector({
                         </button>
                         <button
                           type="button"
-                          title="Löschen"
+                          title={t("overview.deleteTitle")}
                           onClick={() => {
                             const groupSlots: string[] = [];
                             for (
@@ -1965,7 +1995,7 @@ export default function ActivitySelector({
             onClick={onBack}
             className="rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm transition-colors hover:border-slate-400 dark:hover:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-600"
           >
-            ← Zurück
+            ← {t("backButton")}
           </button>
         </div>
       )}
@@ -1974,7 +2004,7 @@ export default function ActivitySelector({
       <div className={isEditorVisible ? "block" : "hidden"}>
         <div className="px-4 pb-2 pt-3">
           <h3 className="text-base font-bold leading-snug text-slate-900 dark:text-slate-100">
-            {getStepQuestion(step)}
+            {getStepQuestion(step, t)}
           </h3>
         </div>
 

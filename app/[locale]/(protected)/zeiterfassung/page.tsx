@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import {
   type TimeEntryRecord,
@@ -12,20 +13,30 @@ import {
 } from "./types";
 import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
 
-const TimeGrid = dynamic(() => import("./TimeGrid"), {
-  loading: () => (
+function TimeGridLoading() {
+  const t = useTranslations("zeiterfassung");
+  return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-      Raster wird geladen...
+      {t("gridLoading")}
     </div>
-  ),
+  );
+}
+
+function ActivitySelectorLoading() {
+  const t = useTranslations("zeiterfassung");
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+      {t("questionnaireLoading")}
+    </div>
+  );
+}
+
+const TimeGrid = dynamic(() => import("./TimeGrid"), {
+  loading: TimeGridLoading,
 });
 
 const ActivitySelector = dynamic(() => import("./ActivitySelector"), {
-  loading: () => (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-      Fragebogen wird geladen...
-    </div>
-  ),
+  loading: ActivitySelectorLoading,
 });
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -34,24 +45,30 @@ const TOTAL_SLOTS_PER_DAY = 144;
 
 // ─── Pure helper functions ────────────────────────────────────────────────────
 
-// Formats a date string to German long format: "Freitag, 28. März 2026"
-function formatDateGerman(dateString: string): string {
-  return new Date(dateString).toLocaleDateString("de-DE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+// Formats a date string to long format: "Freitag, 28. März 2026"
+function formatDateLong(dateString: string, locale: string): string {
+  return new Date(dateString).toLocaleDateString(
+    locale === "en" ? "en-US" : "de-DE",
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    },
+  );
 }
 
-// Formats a date string to compact German format: "Di., 05.05.2026"
-function formatDateCompactGerman(dateString: string): string {
-  return new Date(dateString).toLocaleDateString("de-DE", {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+// Formats a date string to compact format: "Di., 05.05.2026"
+function formatDateCompact(dateString: string, locale: string): string {
+  return new Date(dateString).toLocaleDateString(
+    locale === "en" ? "en-US" : "de-DE",
+    {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    },
+  );
 }
 
 // Strips seconds from a DB time string: "08:30:00" → "08:30"
@@ -206,6 +223,8 @@ function CompletionBar({
   allDates: string[];
   onDateChange: (date: string) => void;
 }) {
+  const t = useTranslations("zeiterfassung");
+  const locale = useLocale();
   const currentIndex = allDates.indexOf(currentDate);
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex < allDates.length - 1;
@@ -242,19 +261,19 @@ function CompletionBar({
             ‹
           </span>
           <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-            Letzter
+            {t("completionBar.previousLabel")}
           </p>
           <p className="relative text-xs font-medium text-slate-600 dark:text-slate-300">
             {previousDate
-              ? formatDateCompactGerman(previousDate)
-              : "Kein früherer Tag"}
+              ? formatDateCompact(previousDate, locale)
+              : t("completionBar.noPreviousDay")}
           </p>
         </button>
 
         {/* Current date + progress inline */}
         <div className="rounded-lg border border-blue-200 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:shadow-none">
           <p className="text-sm font-bold text-blue-950 dark:text-blue-200 sm:text-[15px] leading-tight">
-            {formatDateGerman(currentDate)}
+            {formatDateLong(currentDate, locale)}
           </p>
           <div className="mt-1 flex items-center gap-2">
             <div className="flex-1 h-1.5 rounded-full bg-blue-100">
@@ -281,10 +300,12 @@ function CompletionBar({
             ›
           </span>
           <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-            Nächster
+            {t("completionBar.nextLabel")}
           </p>
           <p className="relative text-xs font-medium text-slate-600 dark:text-slate-300">
-            {nextDate ? formatDateCompactGerman(nextDate) : "Kein späterer Tag"}
+            {nextDate
+              ? formatDateCompact(nextDate, locale)
+              : t("completionBar.noNextDay")}
           </p>
         </button>
       </div>
@@ -292,9 +313,29 @@ function CompletionBar({
   );
 }
 
+// ─── IdlePlaceholder component ────────────────────────────────────────────────
+
+// Shown both during initial load and whenever no slots are selected
+function IdlePlaceholder() {
+  const t = useTranslations("zeiterfassung");
+  return (
+    <>
+      <p className="text-3xl mb-4">⏱️</p>
+      <p className="text-base font-semibold text-slate-700 dark:text-slate-200">
+        {t("idlePlaceholder.title")}
+      </p>
+      <p className="mt-2 text-sm text-slate-400 leading-relaxed">
+        {t("idlePlaceholder.line1")}
+        <br className="hidden sm:block" /> {t("idlePlaceholder.line2")}
+      </p>
+    </>
+  );
+}
+
 // ─── Main page component ──────────────────────────────────────────────────────
 
 export default function ZeiterfassungPage() {
+  const t = useTranslations("zeiterfassung");
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -399,7 +440,7 @@ export default function ZeiterfassungPage() {
       .eq("profiles_id", uid)
       .single();
     if (!userCourse) {
-      setErrorMessage("Kein Kurs gefunden.");
+      setErrorMessage(t("noCourseFound"));
       setIsLoading(false);
       return;
     }
@@ -521,7 +562,7 @@ export default function ZeiterfassungPage() {
       .eq("day_id", targetDayId);
 
     if (error) {
-      setErrorMessage("Einträge konnten nicht geladen werden.");
+      setErrorMessage(t("entriesLoadError"));
       return;
     }
 
@@ -641,7 +682,7 @@ export default function ZeiterfassungPage() {
       await updateDayCompletion(dayId);
       handleCancel();
     } catch {
-      setErrorMessage("Einträge konnten nicht gelöscht werden.");
+      setErrorMessage(t("deleteError"));
     } finally {
       setIsDeletingSelection(false);
     }
@@ -656,7 +697,7 @@ export default function ZeiterfassungPage() {
       await loadEntriesForDay(dayId);
       await updateDayCompletion(dayId);
     } catch {
-      setErrorMessage("Einträge konnten nicht gelöscht werden.");
+      setErrorMessage(t("deleteError"));
     } finally {
       setIsDeletingSelection(false);
     }
@@ -708,7 +749,9 @@ export default function ZeiterfassungPage() {
 
     if (insertError || !newEntries) {
       setErrorMessage(
-        `Eintrag konnte nicht gespeichert werden: ${insertError?.message ?? "unbekannter Fehler"}`,
+        t("saveError", {
+          message: insertError?.message ?? t("unknownError"),
+        }),
       );
       isSavingRef.current = false;
       return;
@@ -758,7 +801,9 @@ export default function ZeiterfassungPage() {
 
     if (error || !data) {
       setErrorMessage(
-        `Tageseintrag konnte nicht erstellt werden: ${error?.message ?? "unbekannter Fehler"}`,
+        t("dayCreateError", {
+          message: error?.message ?? t("unknownError"),
+        }),
       );
       return null;
     }
@@ -838,22 +883,13 @@ export default function ZeiterfassungPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-start">
           <div className="w-full md:w-1/3 min-w-0 md:self-start">
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-              Raster wird geladen...
+              {t("gridLoading")}
             </div>
           </div>
 
           <div className="w-full md:w-2/3 min-w-0">
             <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-10 text-center">
-              <p className="text-3xl mb-4">⏱️</p>
-              <p className="text-base font-semibold text-slate-700 dark:text-slate-200">
-                Zeitslot auswählen
-              </p>
-              <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-                Klicke auf einen Slot – oder halte und ziehe über mehrere
-                aufeinanderfolgende Slots, um eine Zeitspanne auf einmal zu markieren.
-                <br className="hidden sm:block" /> Danach wählst du Kategorie und
-                Aktivität aus.
-              </p>
+              <IdlePlaceholder />
             </div>
           </div>
         </div>
@@ -893,9 +929,11 @@ export default function ZeiterfassungPage() {
               className="flex w-full items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-700 md:hidden"
               onClick={() => setGridCollapsed((v) => !v)}
             >
-              <span>Zeitraster</span>
+              <span>{t("gridToggle.label")}</span>
               <span className="text-slate-400 text-xs">
-                {gridCollapsed ? "▼ Aufklappen" : "▲ Einklappen"}
+                {gridCollapsed
+                  ? t("gridToggle.expand")
+                  : t("gridToggle.collapse")}
               </span>
             </button>
           )}
@@ -935,16 +973,7 @@ export default function ZeiterfassungPage() {
             />
           ) : (
             <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-10 text-center">
-              <p className="text-3xl mb-4">⏱️</p>
-              <p className="text-base font-semibold text-slate-700 dark:text-slate-200">
-                Zeitslot auswählen
-              </p>
-              <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-                Klicke auf einen Slot – oder halte und ziehe über mehrere
-                aufeinanderfolgende Slots, um eine Zeitspanne auf einmal zu markieren.
-                <br className="hidden sm:block" /> Danach wählst du Kategorie und
-                Aktivität aus.
-              </p>
+              <IdlePlaceholder />
             </div>
           )}
         </div>
@@ -955,11 +984,10 @@ export default function ZeiterfassungPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <h2 className="text-base font-semibold text-slate-900">
-              Eingabe abbrechen?
+              {t("abandonDialog.title")}
             </h2>
             <p className="mt-2 text-sm text-slate-500">
-              Du hast bereits Angaben gemacht. Wenn du jetzt wechselst, gehen
-              deine bisherigen Eingaben verloren.
+              {t("abandonDialog.description")}
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button
@@ -967,7 +995,7 @@ export default function ZeiterfassungPage() {
                 onClick={() => setAbandonDialog(null)}
                 className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
               >
-                Weiter eingeben
+                {t("abandonDialog.continueButton")}
               </button>
               <button
                 type="button"
@@ -977,7 +1005,7 @@ export default function ZeiterfassungPage() {
                 }}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
               >
-                Ja, verwerfen
+                {t("abandonDialog.discardButton")}
               </button>
             </div>
           </div>
