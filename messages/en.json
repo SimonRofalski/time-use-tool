@@ -1,0 +1,866 @@
+{
+  "settingsPage": {
+    "title": "Settings",
+    "description": "Settings have been moved to the panel in the top right. There you can switch night mode and view your account information."
+  },
+  "adminPage": {
+    "title": "Admin"
+  },
+  "resetPassword": {
+    "brand": "Time Use Tool",
+    "subtitle": "Set new password",
+    "invalidToken": "Invalid or expired recovery link. Please request a new one.",
+    "passwordMismatch": "Passwords don't match.",
+    "passwordTooShort": "Password must be at least 6 characters long.",
+    "samePasswordError": "Your new password must be different from the old one.",
+    "successMessage": "Password reset successfully!",
+    "newPasswordLabel": "New password",
+    "newPasswordPlaceholder": "At least 6 characters",
+    "confirmPasswordLabel": "Confirm password",
+    "confirmPasswordPlaceholder": "Repeat password",
+    "submitButton": "Reset password",
+    "submitButtonLoading": "Resetting...",
+    "checking": "Checking..."
+  },
+  "login": {
+    "brand": "Time Use Tool",
+    "modes": {
+      "signin": {
+        "title": "Sign in",
+        "submitLabel": "Sign in now"
+      },
+      "signup": {
+        "title": "Sign up",
+        "submitLabel": "Create account"
+      },
+      "forgotPassword": {
+        "title": "Reset password",
+        "submitLabel": "Start security questions"
+      }
+    },
+    "emailLabel": "Email",
+    "emailPlaceholder": "name@example.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "At least 6 characters",
+    "loadSecurityQuestionsButton": "Load security questions",
+    "checkAnswersButton": "Check answers",
+    "answerPlaceholder": "Answer",
+    "newPasswordLabel": "New password",
+    "confirmPasswordLabel": "Confirm password",
+    "confirmPasswordPlaceholder": "Repeat password",
+    "setNewPasswordButton": "Set new password",
+    "noAccountButton": "Don't have an account yet? Create one here",
+    "forgotPasswordButton": "Forgot password?",
+    "backToSigninButton": "Back to sign in",
+    "status": {
+      "emailRequired": "Please enter your email address.",
+      "emailInvalid": "Please enter a valid email address.",
+      "securityQuestionsLoadError": "Security questions could not be loaded.",
+      "accountCreated": "Account created. You can now sign in.",
+      "wrongCredentials": "Wrong password or email.",
+      "answerBothQuestions": "Please answer both security questions.",
+      "answersCheckError": "The answers could not be verified.",
+      "resetSessionExpired": "The reset process is no longer valid.",
+      "passwordMismatch": "Passwords don't match.",
+      "passwordTooShort": "Password must be at least 6 characters long.",
+      "passwordSetError": "The password could not be set.",
+      "passwordResetSuccess": "Password reset successfully. You can now sign in."
+    }
+  },
+  "protectedLayout": {
+    "loadingSession": "Preparing session...",
+    "tabs": {
+      "zeiterfassung": "ENTRY",
+      "erfassteZeit": "OVERVIEW",
+      "statistiken": "STATISTICS"
+    },
+    "adminTabs": {
+      "kursuebersicht": "COURSE OVERVIEW",
+      "nutzeruebersicht": "USER OVERVIEW",
+      "statistiken": "STATISTICS"
+    },
+    "adminModeBadge": "Admin mode",
+    "backToEntryAriaLabel": "Back to time diary",
+    "backToEntryLine1": "Back to",
+    "backToEntryLine2": "entry",
+    "adminCenterAriaLabel": "Open admin center",
+    "adminModeLine1": "Admin",
+    "adminModeLine2": "mode",
+    "profileMenuAriaLabel": "Open profile menu",
+    "profileTooltip": "Profile",
+    "profileNameMissing": "Profile name missing",
+    "personalDetailsMenuItem": "Personal details",
+    "securityQuestionsMenuItem": "Security questions",
+    "signOutMenuItem": "Sign out",
+    "settingsAriaLabel": "Open settings",
+    "settingsTooltip": "Settings",
+    "settingsPanelTitle": "Settings",
+    "settingsPanelDescription": "Adjust appearance and account information.",
+    "darkModeTitle": "Dark mode",
+    "darkModeDescription": "Switches between light and dark appearance.",
+    "languageTitle": "Language",
+    "languageDescription": "Choose the language of the user interface.",
+    "languageDe": "Deutsch",
+    "languageEn": "English",
+    "accountSectionTitle": "Account",
+    "userIdLabel": "User ID",
+    "lastLoginLabel": "Last login",
+    "lastLoginNever": "-",
+    "kursuebersichtTitle": "Course overview",
+    "nutzeruebersichtTitle": "User overview",
+    "statistikenTitle": "Statistics",
+    "confirmDiscardProfileEdit": "Your profile edits haven't been saved yet. Really close?"
+  },
+  "erfassteZeit": {
+    "loadingAriaLabel": "Loading",
+    "loadingCarouselLabel": "Loading…",
+    "dayCountLabel": "{count, plural, one {# day} other {# days}}",
+    "status": {
+      "abgeschlossen": "Completed",
+      "inBearbeitung": "In progress",
+      "nichtBegonnen": "Not started",
+      "nichtVerfuegbar": "Not yet available"
+    },
+    "errors": {
+      "userLoadError": "User could not be loaded.",
+      "noCourseFound": "No course found. Please contact your administrator.",
+      "courseInfoLoadError": "Course information could not be loaded.",
+      "daysLoadError": "Days could not be loaded.",
+      "entriesLoadError": "Entries could not be loaded."
+    }
+  },
+  "zeiterfassung": {
+    "gridLoading": "Loading grid...",
+    "questionnaireLoading": "Loading questionnaire...",
+    "noCourseFound": "No course found.",
+    "entriesLoadError": "Entries could not be loaded.",
+    "deleteError": "Entries could not be deleted.",
+    "saveError": "Entry could not be saved: {message}",
+    "unknownError": "unknown error",
+    "dayCreateError": "Day entry could not be created: {message}",
+    "completionBar": {
+      "previousLabel": "Previous",
+      "nextLabel": "Next",
+      "noPreviousDay": "No earlier day",
+      "noNextDay": "No later day"
+    },
+    "idlePlaceholder": {
+      "title": "Select a time slot",
+      "line1": "Click on a slot – or hold and drag across several consecutive slots to mark a time span at once.",
+      "line2": "Then choose category and activity."
+    },
+    "gridToggle": {
+      "label": "Time grid",
+      "expand": "▼ Expand",
+      "collapse": "▲ Collapse"
+    },
+    "abandonDialog": {
+      "title": "Discard entry?",
+      "description": "You've already made selections. If you switch now, your current input will be lost.",
+      "continueButton": "Keep entering",
+      "discardButton": "Yes, discard"
+    }
+  },
+  "activitySelector": {
+    "questions": {
+      "primaryActivity": "What was your main activity?",
+      "secondaryActivity": "Did you do a secondary activity at the same time?",
+      "digitalMedia": "Did you use a device? (smartphone, tablet, PC…)",
+      "digitalMediaType": "Which devices did you use?",
+      "locationTransport": "Where were you during this time?",
+      "socialContext": "Was anyone else with you?",
+      "satisfaction": "How did you feel?"
+    },
+    "stepLabels": {
+      "primaryActivity": "Main activity",
+      "secondaryActivity": "Secondary activity",
+      "digitalMedia": "Device?",
+      "digitalMediaType": "Device type",
+      "locationTransport": "Location",
+      "socialContext": "Social",
+      "satisfaction": "Mood"
+    },
+    "slotsRangeLabel": "{start} – {end} · {count, plural, one {# field} other {# fields}}",
+    "backButton": "Back",
+    "continueButton": "Continue",
+    "activityList": {
+      "categoriesBackLabel": "Categories",
+      "noActivitiesFound": "No activities found.",
+      "matchCount": "{count, plural, one {# match} other {# matches}}",
+      "primarySearchPlaceholder": "Search main activity or keyword...",
+      "secondarySearchPlaceholder": "Search secondary activity or keyword...",
+      "noSecondaryActivityButton": "No secondary activity → Continue"
+    },
+    "digitalMedia": {
+      "yes": "Yes",
+      "no": "No"
+    },
+    "digitalMediaTypeStep": {
+      "validationError": "Please select at least one device type."
+    },
+    "locationCategories": {
+      "orte": "Places",
+      "privateVerkehrsmittel": "Private transport",
+      "oeffentlicherVerkehr": "Public transport",
+      "sonstiges": "Other"
+    },
+    "socialContextStep": {
+      "validationError": "Please select at least one social context."
+    },
+    "overview": {
+      "timeLabel": "Time",
+      "noTimeSlots": "No time slots",
+      "categoryLabel": "Category",
+      "mainCategory": "Main category: {name}",
+      "selectedCategory": "Selected category: {name}",
+      "mainActivity": "Main activity: {name}",
+      "secondaryCategory": "Secondary category: {name}",
+      "secondaryActivity": "Secondary activity: {name}",
+      "nothingSelected": "Nothing selected yet",
+      "contextLabel": "Context",
+      "locationTransport": "Location/transport: {name}",
+      "social": "Social: {name}",
+      "mediaLabel": "Media",
+      "moodLabel": "Mood",
+      "timeOrderedListing": "Time-ordered listing",
+      "noEntry": "No entry",
+      "addEntryTitle": "Add entry",
+      "editTitle": "Edit",
+      "deleteTitle": "Delete"
+    }
+  },
+  "statistiken": {
+    "loading": "Loading...",
+    "errors": {
+      "noCourseFound": "No course found.",
+      "courseDataLoadError": "Course data could not be loaded.",
+      "lookupDataLoadError": "Reference data could not be loaded."
+    },
+    "tabs": {
+      "zeitverteilung": "Time distribution",
+      "kursvergleich": "Course comparison"
+    },
+    "comparisonLocked": {
+      "title": "Course comparison isn't enabled yet",
+      "description": "Please ask your course instructor/admin to enable course comparison in the course overview."
+    },
+    "weekLabel": "CW {week}",
+    "uncategorizedLabel": "Unassigned",
+    "fallbackLabels": {
+      "unknownDevice": "Device #{id}",
+      "unknownContext": "Context #{id}",
+      "unknownLocation": "Unknown",
+      "noDevice": "No device",
+      "aloneFallback": "Alone"
+    },
+    "comparisonTopics": {
+      "schlaf": "Sleep",
+      "sport": "Sport & exercise",
+      "smartphone": "Smartphone"
+    },
+    "perDayUnit": "h/day",
+    "zeitverteilung": {
+      "dayFilter": {
+        "label": "Days",
+        "all": "All",
+        "weekdays": "Weekdays",
+        "weekend": "Weekend"
+      },
+      "weekFilter": {
+        "label": "CW",
+        "all": "All"
+      },
+      "chart": {
+        "title": "Daily time distribution",
+        "noDays": "No days available for the selected filter.",
+        "notSubmitted": "Not submitted yet"
+      },
+      "metaLists": {
+        "devicesTitle": "Device usage",
+        "devicesTitleAvg": "Device usage (avg/day)",
+        "socialTitle": "Social context",
+        "socialTitleAvg": "Social context (avg/day)",
+        "locationsTitle": "Locations & transport",
+        "locationsTitleAvg": "Locations & transport (avg/day)",
+        "noData": "No data",
+        "wellbeingTitle": "Avg. wellbeing",
+        "wellbeingSubtitle": "Time-weighted by entry duration"
+      },
+      "table": {
+        "title": "Time distribution by category",
+        "noEntries": "No submitted entries yet.",
+        "viewModeTotal": "Total",
+        "viewModeAvgPerDay": "Avg / day",
+        "showMeta": "Show meta variables",
+        "hideMeta": "Hide meta variables",
+        "columns": {
+          "category": "Category",
+          "time": "Time",
+          "timeAvg": "Avg / day",
+          "percent": "Share",
+          "itDevice": "IT device",
+          "social": "Social",
+          "location": "Location",
+          "satisfaction": "Avg. feeling"
+        },
+        "satisfactionColumnTitle": "Time-weighted average of the selected feeling levels within this row",
+        "pairLabels": {
+          "withIt": "with IT",
+          "withoutIt": "without IT",
+          "withOthers": "with others",
+          "alone": "alone",
+          "atHome": "home",
+          "elsewhere": "elsewhere"
+        }
+      }
+    },
+    "kursvergleich": {
+      "readingAid": "Ø course · “above X% of the group” = that share of participants is below your value · anonymous, no individual values of other people",
+      "you": "you",
+      "youShort": "You",
+      "courseShort": "Course",
+      "focusSubtitle": "Ø hours per submitted day",
+      "categoryTitle": "Time distribution vs. course",
+      "categorySubtitle": "Ø hours per submitted day per life area",
+      "noComparableData": "No comparable data yet.",
+      "contextMetrics": {
+        "itDevice": {
+          "label": "Time with IT device",
+          "description": "Share of time with smartphone, laptop etc."
+        },
+        "social": {
+          "label": "Time with others",
+          "description": "Share of time in company rather than alone"
+        },
+        "location": {
+          "label": "Time at home",
+          "description": "Share of time at home rather than elsewhere"
+        },
+        "wellbeing": {
+          "label": "Well-being",
+          "description": "Ø time-weighted, scale 1–{max}"
+        }
+      },
+      "wellbeingSubtitle": "you: {you} · course: {course} · scale 1–{max}",
+      "verdict": {
+        "noOwnData": "no own data",
+        "inAverage": "course average",
+        "hoursDiff": "{sign}{value} h/day vs. course",
+        "hoursDiffShort": "{sign}{value} h/day",
+        "percentDiff": "{sign}{value} pp vs. course",
+        "pointsDiff": "{sign}{value} pts vs. course",
+        "above": "above {percentile}% of the group",
+        "highest": "highest value in the group",
+        "lowest": "lowest value in the group",
+        "percentDiffShort": "{sign}{value} pp",
+        "pointsDiffShort": "{sign}{value} pts"
+      },
+      "notEnoughUsers": {
+        "title": "Comparison not available yet",
+        "description": "The course comparison needs at least {minUsers} participants with 2 submitted days each. Check back later!",
+        "qualifying": "Currently qualifying: {count} / {minUsers} people"
+      }
+    },
+    "satisfactionLevels": {
+      "1": "very bad",
+      "2": "bad",
+      "3": "average",
+      "4": "good",
+      "5": "very good"
+    },
+    "pdf": {
+      "button": "PDF",
+      "buttonBusy": "PDF…",
+      "buttonTitle": "Download personal report as PDF",
+      "filter": {
+        "allDays": "All course days",
+        "weekdaysOnly": "weekdays only",
+        "weekendOnly": "weekend only"
+      },
+      "title": "Personal Time Use Report",
+      "courseLine": "Course: {name}",
+      "participantLine": "Participant: {name}",
+      "participantIdLine": "Participant ID: {id}",
+      "periodLine": "Period: {filter} · Created on {date}",
+      "privacyNote": "This report contains only your own time use data. Course values are averages over at least three anonymous participants; individual values of other people are not included. The participant ID is a reference for you.",
+      "kpi": {
+        "submittedDays": "Submitted days",
+        "submittedDaysHint": "in the selected period",
+        "trackedTime": "Tracked time",
+        "trackedTimeHint": "Ø {hours} h per day",
+        "wellbeing": "Ø well-being",
+        "wellbeingHint": "time-weighted",
+        "itShare": "Time with IT device",
+        "itShareHint": "share of tracked time"
+      },
+      "daily": {
+        "title": "Daily time distribution",
+        "subtitle": "Hours per course day by category · grey: day not submitted",
+        "noDays": "No days in the selected period."
+      },
+      "categories": {
+        "title": "Time distribution by category",
+        "subtitleWithCourse": "Ø hours per submitted day · colour: you · grey: Ø course",
+        "subtitle": "Ø hours per submitted day",
+        "noEntries": "No time entries yet.",
+        "colCategory": "Category",
+        "colBars": "Ø h/day (you / course)",
+        "colBarsSolo": "Ø h/day",
+        "colPerDay": "Ø / day",
+        "colCourse": "Ø course",
+        "colDiff": "Difference",
+        "colPosition": "Position",
+        "colTotal": "Total",
+        "colShare": "Share"
+      },
+      "comparison": {
+        "title": "Course comparison – where do you stand?",
+        "subtitle": "Compared with {count} anonymous participants (at least 2 submitted days each) · blue: your value · dashed: Ø course",
+        "notEnabled": "The course comparison is not (yet) enabled for this course.",
+        "notEnough": "Not available yet: at least 3 participants with 2 submitted days each are needed (currently {count}).",
+        "yourValue": "Your value {value} {unit}",
+        "courseValue": "Ø course {value} {unit}",
+        "positionAbove": "You are above {percentile}% of the course group",
+        "positionBelow": "You are below {percentile}% of the course group",
+        "positionNone": "No own entries in this period",
+        "colMetric": "Metric",
+        "colYou": "You",
+        "colCourse": "Ø course",
+        "itDevice": "IT device (with / without)",
+        "social": "Social (with others / alone)",
+        "location": "Place (at home / elsewhere)",
+        "wellbeing": "Well-being (Ø, time-weighted)"
+      },
+      "context": {
+        "title": "Context of your time",
+        "subtitle": "With what, with whom and where you spent your tracked time (share of total time)",
+        "devices": "Device use",
+        "social": "Social context",
+        "locations": "Places & transport"
+      },
+      "activities": {
+        "title": "Your top activities",
+        "subtitle": "The 12 activities with the most time · well-being time-weighted · IT: share of time with a device",
+        "colCategory": "Category",
+        "colActivity": "Activity",
+        "colTime": "Time",
+        "colShare": "Share",
+        "colWellbeing": "Ø well-being",
+        "colIt": "IT"
+      },
+      "footer": "Time Use Tool · Personal report · Own data and anonymous course averages only",
+      "page": "Page {page} / {total}",
+      "fileName": "TimeUse",
+      "diffAverage": "course average",
+      "diffHours": "{sign}{value} h/day",
+      "minutesShort": "{minutes} min",
+      "hoursShort": "{hours} h",
+      "hoursMinutes": "{hours} h {minutes} min"
+    }
+  },
+  "common": {
+    "confirmButton": "Confirm",
+    "cancelButton": "Cancel"
+  },
+  "kursuebersicht": {
+    "subTabs": {
+      "alleKurse": "All courses",
+      "neuerKurs": "New course"
+    },
+    "loading": "Loading…",
+    "errors": {
+      "coursesLoadError": "Courses could not be loaded.",
+      "fillAllFields": "Please fill in all fields.",
+      "periodDatesRequired": "Please provide a start and end date for every period.",
+      "periodEndBeforeStart": "The end date must be after the start date.",
+      "courseCreateError": "Course could not be created: {message}",
+      "periodsSaveError": "Periods could not be saved: {message}"
+    },
+    "newCourseForm": {
+      "nameLabel": "Course name",
+      "namePlaceholder": "e.g. Summer semester 2026",
+      "periodsLabel": "Periods",
+      "addPeriodButton": "Add period",
+      "periodStartLabel": "Period {index} – start",
+      "startDateLabel": "Start date",
+      "periodEndLabel": "End",
+      "endDateLabel": "End date",
+      "removePeriodTitle": "Remove period",
+      "accessCodeLabel": "Access code",
+      "accessCodePlaceholder": "e.g. SS2026",
+      "createSuccess": "Course created successfully.",
+      "creatingButton": "Creating…",
+      "createButton": "Create course"
+    },
+    "breadcrumb": {
+      "allCourses": "All courses"
+    },
+    "courseList": {
+      "noCourses": "No courses yet.",
+      "participantsLabel": "{count, plural, one {# participant} other {# participants}}",
+      "anonymizedBadge": "Anonymized",
+      "comparisonEnabledBadge": "Comparison enabled",
+      "comparisonDisabledBadge": "Comparison locked",
+      "accessCodeLabel": "Access code:",
+      "saveButton": "Save",
+      "cancelButton": "Cancel",
+      "changeButton": "Change",
+      "endCourseButton": "End course",
+      "endCourseConfirm": {
+        "title": "End course",
+        "message": "Do you really want to end the course \"{name}\"? This action cannot be undone.",
+        "confirmLabel": "End"
+      }
+    },
+    "courseDetail": {
+      "backToOverviewButton": "Back to course overview",
+      "exportButton": "Data export",
+      "comparisonEnableButton": "Enable comparison",
+      "comparisonDisableButton": "Lock comparison",
+      "anonymizeButton": "Anonymize course",
+      "anonymizingButton": "Anonymizing…",
+      "anonymizeConfirm": {
+        "title": "Anonymize course",
+        "message": "All participants get an alias (TN-0001, TN-0002, …). Real names and email addresses are replaced by aliases in the admin view. This action cannot be undone.",
+        "confirmLabel": "Anonymize"
+      },
+      "noParticipants": "No participants in this course.",
+      "table": {
+        "participantColumn": "Participant",
+        "progressColumn": "Progress",
+        "actionsColumn": "Actions",
+        "daysUnit": "days",
+        "includeButton": "Include",
+        "excludeButton": "Exclude",
+        "includeConfirm": {
+          "title": "Lift exclusion",
+          "message": "{name}'s data will be included in the statistics again.",
+          "confirmLabel": "Lift"
+        },
+        "excludeConfirm": {
+          "title": "Exclude from statistics",
+          "message": "{name}'s data will be removed from all statistics. The participant will not be notified.",
+          "confirmLabel": "Exclude"
+        },
+        "removeButton": "Remove",
+        "removeConfirm": {
+          "title": "Remove participant",
+          "message": "Do you really want to remove {name} from the course? Their time entries are kept.",
+          "confirmLabel": "Remove"
+        }
+      }
+    },
+    "exportModal": {
+      "title": "Data export (anonymised)",
+      "subtitle": "Choose content and file format for this course.",
+      "closeAriaLabel": "Close export dialog",
+      "privacyNote": "The export contains no names, e-mails, IDs, aliases or dates. Rows are shuffled and cannot be attributed to a person. Excluded participants and unsubmitted days are not included. At least 3 participants with data are required.",
+      "contentLabel": "Content",
+      "aggregatedOption": "Aggregated",
+      "rawOption": "Raw data",
+      "aggregatedDescription": "One anonymous row per participant with Ø hours per submitted day per category, plus the course average.",
+      "rawDescription": "One row per time entry (start, end, activity, place, context, well-being) – without reference to person or day.",
+      "formatLabel": "Format",
+      "csvButton": "CSV",
+      "excelButton": "Excel",
+      "exportingLabel": "Exporting...",
+      "exportError": "The export could not be created."
+    },
+    "userDetail": {
+      "backToCourseButton": "Back to course",
+      "backToOverviewButton": "Back to course overview",
+      "loading": "Loading…",
+      "daysCompleted": "/ {total} days completed",
+      "privacyNote": "Per person, only whether a day's entry has been completed is visible. Time use data is available to admins only in aggregated form without reference to persons (statistics, data export)."
+    },
+    "dayList": {
+      "noCourseDays": "No course days are defined for this course.",
+      "colDay": "Course day",
+      "colCompleted": "Completed",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "csvExport": {
+      "firstName": "First name",
+      "lastName": "Last name",
+      "daysRecorded": "Days recorded",
+      "categoryHoursColumn": "{category} (h)",
+      "date": "Date",
+      "start": "Start",
+      "end": "End",
+      "durationMin": "Duration (min)",
+      "durationH": "Duration (h)",
+      "category": "Category",
+      "activity": "Activity",
+      "secondaryActivity": "Secondary activity",
+      "digitalMediaUsed": "Used digital media",
+      "yes": "Yes",
+      "no": "No",
+      "mediaTypes": "Media types",
+      "locationTransport": "Location / transport",
+      "socialContext": "Social context",
+      "satisfaction": "Satisfaction",
+      "sheetName": "Statistics",
+      "modeAggregated": "Aggregated",
+      "modeRaw": "Raw"
+    }
+  },
+  "nutzeruebersicht": {
+    "loading": "Loading…",
+    "loadError": "User data could not be loaded.",
+    "kpis": {
+      "activeUsers": "Active users",
+      "completedDays": "Completed days",
+      "completedDaysSubtitle": "Total across all users",
+      "avgCompletionRate": "Avg. completion rate",
+      "avgCompletionRateSubtitle": "Avg. across all users who started"
+    },
+    "searchPlaceholder": "Search users…",
+    "noUserFound": "No user found.",
+    "noActiveUsers": "No active users.",
+    "courseLabel": "Course",
+    "progressLabel": "Progress",
+    "progressDaysLabel": "{submitted} / {total} days",
+    "daysUnit": "days",
+    "noCoursePlaceholder": "–",
+    "includeButton": "Include",
+    "excludeButton": "Exclude",
+    "table": {
+      "user": "User",
+      "course": "Course",
+      "progress": "Progress",
+      "actions": "Actions"
+    },
+    "includeConfirm": {
+      "title": "Lift exclusion",
+      "message": "{name}'s data will again be included in all statistics.",
+      "confirmLabel": "Lift"
+    },
+    "excludeConfirm": {
+      "title": "Exclude user",
+      "message": "{name}'s data will be removed from all statistics. The user will not be notified.",
+      "confirmLabel": "Exclude"
+    }
+  },
+  "adminStatistiken": {
+    "loading": "Loading statistics…",
+    "loadError": "Statistics could not be loaded.",
+    "kpis": {
+      "totalUsers": "Total users",
+      "courses": "Courses",
+      "coursesSubtitle": "{active} active · {closed} completed",
+      "newEntries7d": "New entries (7 days)",
+      "totalEntries": "Total entries"
+    },
+    "activeUsersTrend": {
+      "title": "Active users — last 14 days",
+      "noActivity": "No activity in the last 14 days.",
+      "tooltipActiveUsers": "{count} active users"
+    },
+    "courseProgress": {
+      "title": "Course progress",
+      "noCourseData": "No course data available.",
+      "legendOpen": "Open",
+      "legendInProgress": "In progress",
+      "legendDone": "Completed"
+    },
+    "topActivities": {
+      "title": "Top 7 main activities",
+      "noEntries": "No entries yet.",
+      "tooltipEntries": "{count} entries",
+      "tooltipCount": "Count",
+      "fallbackActivity": "Activity #{id}"
+    },
+    "categoryDistribution": {
+      "title": "Activity categories — time distribution",
+      "noEntries": "No entries yet.",
+      "fallbackCategory": "Category #{id}"
+    },
+    "wellbeing": {
+      "title": "Wellbeing distribution",
+      "noEntries": "No entries yet."
+    }
+  },
+  "profileDetailsForm": {
+    "loadingProfile": "Loading profile…",
+    "noResultsFound": "No matches",
+    "title": "Profile",
+    "subtitle": "Your personal details",
+    "popupHint": "You'll also find the most important account info in the profile popup in the top right.",
+    "savedMessage": "Profile saved!",
+    "editButton": "Edit",
+    "saveButton": "Save",
+    "savingButton": "Saving...",
+    "saveProfileButton": "Save profile",
+    "genericSaveError": "Error while saving: {message}",
+    "unknownError": "Unknown error",
+    "missingFieldsError": "Please fill in all required fields.",
+    "fillOrSelectHint": "Please fill in or select an option.",
+    "accountBar": {
+      "nameLabel": "Name:",
+      "emailLabel": "Email:",
+      "userIdLabel": "User ID:",
+      "roleLabel": "Role:",
+      "lastLoginLabel": "Last login:",
+      "roleAdmin": "Admin",
+      "roleUser": "User"
+    },
+    "fields": {
+      "firstName": {
+        "label": "First name",
+        "placeholder": "e.g. Max"
+      },
+      "lastName": {
+        "label": "Last name",
+        "placeholder": "e.g. Sample"
+      },
+      "gender": {
+        "label": "Gender"
+      },
+      "age": {
+        "label": "Age",
+        "placeholder": "e.g. 32"
+      },
+      "maritalStatus": {
+        "label": "Marital / family status"
+      },
+      "partnerInHousehold": {
+        "label": "Does a partner live in the same household?",
+        "yes": "Yes",
+        "no": "No"
+      },
+      "childrenInHousehold": {
+        "label": "Number of children in the household"
+      },
+      "educationLevel": {
+        "label": "Highest completed education level"
+      },
+      "employmentStatus": {
+        "label": "Current employment status",
+        "helper": "Multiple selection possible, maximum 2 answers."
+      },
+      "occupationalStatus": {
+        "label": "Position at work"
+      },
+      "weeklyWorkHours": {
+        "label": "Usual weekly working hours",
+        "placeholder": "e.g. 40"
+      },
+      "mainWorkplace": {
+        "label": "Main place of work"
+      },
+      "nationality": {
+        "label": "Nationality",
+        "searchPlaceholder": "Search nationality…"
+      },
+      "region": {
+        "label": "Region / place of residence",
+        "searchPlaceholder": "Search region…"
+      },
+      "healthStatus": {
+        "label": "General health status"
+      },
+      "urbanity": {
+        "label": "Urbanity"
+      }
+    }
+  },
+  "enrollmentModal": {
+    "loadCoursesError": "Courses could not be loaded.",
+    "selectCourseError": "Please select a course.",
+    "enterAccessCodeError": "Please enter the access code.",
+    "courseLoadRetryError": "Course could not be loaded. Please try again.",
+    "invalidAccessCodeError": "Invalid access code. Please try again.",
+    "enrollFailedError": "Enrollment failed. Please try again.",
+    "title": "Join a course",
+    "description": "You're not assigned to a course yet. Choose a course and enter the access code to continue.",
+    "loading": "Loading...",
+    "noCoursesAvailable": "No courses are currently available. Please contact your administrator.",
+    "selectCourseLabel": "Select course",
+    "accessCodeLabel": "Access code",
+    "accessCodePlaceholder": "Enter access code",
+    "submitButton": "Join course",
+    "submittingButton": "Enrolling...",
+    "backToLoginButton": "Back to login"
+  },
+  "securityQuestionsForm": {
+    "loadQuestionsError": "Security questions could not be loaded.",
+    "userLoadError": "User could not be loaded.",
+    "incompleteError": "Please select two questions and provide both answers.",
+    "duplicateQuestionError": "Please select two different security questions.",
+    "unexpectedServerResponse": "Unexpected server response while saving.",
+    "saveFailedWithStatus": "Security questions could not be saved (status {status}).",
+    "verifyFailedError": "Save was performed but could not be confirmed. Please try again.",
+    "networkError": "Network error while saving security questions.",
+    "loading": "Loading security questions…",
+    "title": "Security questions",
+    "description": "Choose two different questions and answer them as briefly as possible.",
+    "alreadySetHint": "Security questions are on file. Answers aren't shown for security reasons and must be re-entered to make a change.",
+    "editButton": "Edit",
+    "questionLabel": "Question {index}",
+    "selectPlaceholder": "Please select",
+    "answerLabel": "Answer",
+    "answerPlaceholderEditable": "Short answer",
+    "answerPlaceholderHidden": "Hidden for security reasons",
+    "savedMessage": "Security questions have been saved.",
+    "saveButton": "Save security questions",
+    "savingButton": "Saving..."
+  },
+  "apiErrors": {
+    "passwordResetComplete": {
+      "invalidRequest": "Invalid request.",
+      "passwordTooShort": "Password must be at least 6 characters long.",
+      "invalidOrExpiredLink": "The reset link is invalid or has expired."
+    },
+    "passwordResetSecurityQuestions": {
+      "emailRequired": "Please enter an email address.",
+      "accountNotFound": "No account could be found for this email.",
+      "loadError": "Security questions could not be loaded.",
+      "notTwoQuestionsSet": "This account doesn't have two security questions set up yet. Please contact an admin."
+    },
+    "passwordResetVerify": {
+      "answerBothRequired": "Please answer both security questions.",
+      "checkFailed": "Security questions could not be verified.",
+      "answersDontMatch": "The answers don't match the ones on file.",
+      "resetPrepareFailed": "The reset could not be prepared."
+    },
+    "securityQuestions": {
+      "notAuthenticated": "Not signed in.",
+      "loadError": "Security questions could not be loaded.",
+      "invalidRequest": "Invalid request. Please try again.",
+      "needTwoQuestions": "Please provide exactly two security questions.",
+      "needTwoDifferentQuestions": "Please provide two different questions with answers.",
+      "internalError": "Internal error while saving the security questions."
+    },
+    "courseExport": {
+      "invalidRequest": "Invalid request.",
+      "courseNotFound": "Course not found.",
+      "tooFewParticipants": "Export not possible: at least {minimum} participants with submitted days are needed so that individual rows cannot be attributed to a person (currently {participants}).",
+      "exportFailed": "The export could not be created.",
+      "columns": {
+        "rowLabel": "Row",
+        "anonymousParticipant": "Participant (anonymous)",
+        "courseAverage": "Course average",
+        "hoursPerDaySuffix": "(h/day)",
+        "totalTracked": "Total tracked (h/day)",
+        "start": "Start",
+        "end": "End",
+        "durationMinutes": "Duration (min)",
+        "durationHours": "Duration (h)",
+        "category": "Category",
+        "activity": "Activity",
+        "secondaryActivity": "Secondary activity",
+        "digitalMediaUsed": "Digital media used",
+        "mediaTypes": "Media types",
+        "locationTransport": "Location / transport",
+        "socialContext": "Social context",
+        "wellbeing": "Well-being",
+        "yes": "Yes",
+        "no": "No"
+      }
+    },
+    "adminStatistics": {
+      "loadFailed": "Statistics could not be loaded."
+    }
+  }
+}

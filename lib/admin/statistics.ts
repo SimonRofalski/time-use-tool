@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Locale } from "@/i18n/routing";
+import { getLocalizedName } from "@/lib/i18n/localized-name";
 import { totalPeriodDays } from "@/lib/course-periods";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import type {
@@ -17,12 +19,15 @@ import type {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatDateShort(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString("de-DE", {
-    weekday: "short",
-    day: "numeric",
-    month: "numeric",
-  });
+function formatDateShort(isoDate: string, locale: Locale): string {
+  return new Date(isoDate).toLocaleDateString(
+    locale === "en" ? "en-US" : "de-DE",
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "numeric",
+    },
+  );
 }
 
 // ISO date string for N days ago (midnight UTC)
@@ -89,6 +94,7 @@ function getSatisfactionSortRank(name: string): number {
 function buildTrendData(
   recentEntries: { day_id: number; created_at: string }[],
   dayById: Record<number, { profiles_id: string }>,
+  locale: Locale,
 ): TrendPoint[] {
   const dates = lastNDates(14);
   // Map: dateKey → Set<profiles_id>
@@ -103,7 +109,7 @@ function buildTrendData(
   }
 
   return dates.map((date) => ({
-    date: formatDateShort(date),
+    date: formatDateShort(date, locale),
     users: usersByDate[date].size,
   }));
 }
@@ -231,6 +237,7 @@ function buildSatisfactionData(
 
 export async function loadAdminStatistics(
   admin: SupabaseClient,
+  locale: Locale = "de",
 ): Promise<AdminStatistics> {
   const sevenDaysAgo = daysAgoISO(7);
   const fourteenDaysAgo = daysAgoISO(14);
@@ -301,10 +308,10 @@ export async function loadAdminStatistics(
         .order("entry_id")
         .range(from, to),
     ),
-    admin.from("activity").select("activity_id, name, subcategory_id"),
+    admin.from("activity").select("activity_id, name, name_en, subcategory_id"),
     admin.from("subcategory").select("subcategory_id, category_id"),
-    admin.from("category").select("category_id, name"),
-    admin.from("satisfaction").select("satisfaction_id, name"),
+    admin.from("category").select("category_id, name, name_en"),
+    admin.from("satisfaction").select("satisfaction_id, name, name_en"),
   ]);
 
   if (coursesRes.error) {
@@ -364,8 +371,10 @@ export async function loadAdminStatistics(
     }
   }
 
+  // Lookup names in the requested language (German `name`, English `name_en`)
   const activityById: Record<number, string> = {};
-  for (const a of activities) activityById[a.activity_id] = a.name;
+  for (const a of activities)
+    activityById[a.activity_id] = getLocalizedName(a, locale);
 
   // activity_id → category_id (via subcategory)
   const subcatToCategory: Record<number, number> = {};
@@ -379,7 +388,12 @@ export async function loadAdminStatistics(
   }
 
   const categoryById: Record<number, string> = {};
-  for (const c of categories) categoryById[c.category_id] = c.name;
+  for (const c of categories)
+    categoryById[c.category_id] = getLocalizedName(c, locale);
+  const localizedSatisfactions = satisfactions.map((s) => ({
+    ...s,
+    name: getLocalizedName(s, locale),
+  }));
 
   return {
     kpis: {
@@ -389,7 +403,7 @@ export async function loadAdminStatistics(
       newEntriesLast7Days: newEntriesRes.count ?? 0,
       totalEntries: totalEntriesRes.count ?? 0,
     },
-    trendData: buildTrendData(recentEntries, dayById),
+    trendData: buildTrendData(recentEntries, dayById, locale),
     courseProgress: buildCourseProgress(courses, userCountByCourse, filteredDays),
     topActivities: buildTopActivities(
       filteredEntries,
@@ -401,6 +415,9 @@ export async function loadAdminStatistics(
       activityToCategory,
       categoryById,
     ),
-    satisfactionData: buildSatisfactionData(filteredEntries, satisfactions),
+    satisfactionData: buildSatisfactionData(
+      filteredEntries,
+      localizedSatisfactions,
+    ),
   };
 }

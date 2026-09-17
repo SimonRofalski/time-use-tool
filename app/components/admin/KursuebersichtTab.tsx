@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -106,12 +108,15 @@ type ConfirmModalState = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+function formatDate(dateString: string, locale: Locale): string {
+  return new Date(dateString).toLocaleDateString(
+    locale === "en" ? "en-US" : "de-DE",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    },
+  );
 }
 
 function courseDurationDays(startDate: string, endDate: string): number {
@@ -123,9 +128,15 @@ function courseDurationDays(startDate: string, endDate: string): number {
   );
 }
 
-function courseDurationLabel(startDate: string, endDate: string): string {
+function courseDurationLabel(
+  startDate: string,
+  endDate: string,
+  locale: Locale,
+): string {
   const days = courseDurationDays(startDate, endDate);
-  return `${days} Tag${days !== 1 ? "e" : ""}`;
+  const dayLabel =
+    locale === "en" ? `day${days !== 1 ? "s" : ""}` : `Tag${days !== 1 ? "e" : ""}`;
+  return `${days} ${dayLabel}`;
 }
 
 function userDisplayName(user: EnrolledUser, isAnonymized: boolean): string {
@@ -139,6 +150,8 @@ function userDisplayName(user: EnrolledUser, isAnonymized: boolean): string {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function KursuebersichtTab() {
+  const t = useTranslations("kursuebersicht");
+  const locale = useLocale() as Locale;
   const supabase = getSupabaseBrowserClient();
 
   const [subTab, setSubTab] = useState<"alle" | "neu">("alle");
@@ -203,7 +216,7 @@ export default function KursuebersichtTab() {
       .order("start_date", { ascending: false });
 
     if (courseErr || !courseData) {
-      setCoursesError("Kurse konnten nicht geladen werden.");
+      setCoursesError(t("errors.coursesLoadError"));
       setIsLoadingCourses(false);
       return;
     }
@@ -439,7 +452,7 @@ export default function KursuebersichtTab() {
       // Rows are built server-side without any person reference
       // (no names, e-mails, IDs, aliases or dates; shuffled order).
       const res = await fetch(
-        `/api/admin/course-export?courseId=${courseId}&mode=${granularity}`,
+        `/api/admin/course-export?courseId=${courseId}&mode=${granularity}&locale=${locale}`,
         { cache: "no-store" },
       );
       const payload = (await res.json()) as {
@@ -449,7 +462,7 @@ export default function KursuebersichtTab() {
       };
 
       if (!res.ok || !payload.rows) {
-        setExportError(payload.error ?? "Export konnte nicht erstellt werden.");
+        setExportError(payload.error ?? t("exportModal.exportError"));
         return false;
       }
 
@@ -487,7 +500,7 @@ export default function KursuebersichtTab() {
       }
       return true;
     } catch {
-      setExportError("Export konnte nicht erstellt werden.");
+      setExportError(t("exportModal.exportError"));
       return false;
     } finally {
       setIsExporting(false);
@@ -578,7 +591,7 @@ export default function KursuebersichtTab() {
     setCreateSuccess(false);
 
     if (!newName.trim() || !newAccessCode.trim()) {
-      setCreateError("Bitte alle Felder ausfüllen.");
+      setCreateError(t("errors.fillAllFields"));
       setIsCreating(false);
       return;
     }
@@ -586,12 +599,12 @@ export default function KursuebersichtTab() {
     // Validate every period
     for (const p of newPeriods) {
       if (!p.start || !p.end) {
-        setCreateError("Bitte für jeden Zeitraum Start- und Enddatum angeben.");
+        setCreateError(t("errors.periodDatesRequired"));
         setIsCreating(false);
         return;
       }
       if (p.end < p.start) {
-        setCreateError("Das Enddatum muss nach dem Startdatum liegen.");
+        setCreateError(t("errors.periodEndBeforeStart"));
         setIsCreating(false);
         return;
       }
@@ -600,6 +613,7 @@ export default function KursuebersichtTab() {
     // Validate no overlaps between periods
     const overlapError = validatePeriodsNoOverlap(
       newPeriods.map((p) => ({ start_date: p.start, end_date: p.end })),
+      locale,
     );
     if (overlapError) {
       setCreateError(overlapError);
@@ -633,7 +647,7 @@ export default function KursuebersichtTab() {
 
     if (courseError || !courseInsert) {
       setCreateError(
-        "Kurs konnte nicht erstellt werden: " + (courseError?.message ?? ""),
+        t("errors.courseCreateError", { message: courseError?.message ?? "" }),
       );
       setIsCreating(false);
       return;
@@ -652,7 +666,7 @@ export default function KursuebersichtTab() {
 
     if (periodError) {
       setCreateError(
-        "Zeiträume konnten nicht gespeichert werden: " + periodError.message,
+        t("errors.periodsSaveError", { message: periodError.message }),
       );
       setIsCreating(false);
       return;
@@ -676,7 +690,7 @@ export default function KursuebersichtTab() {
           onClick={() => setView({ type: "list" })}
           className="hover:text-slate-800 transition-colors"
         >
-          Alle Kurse
+          {t("breadcrumb.allCourses")}
         </button>
         {view.type === "course" && (
           <>
@@ -722,7 +736,7 @@ export default function KursuebersichtTab() {
       <form onSubmit={handleCreateCourse} className="max-w-md space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Kursname
+            {t("newCourseForm.nameLabel")}
           </label>
           <input
             type="text"
@@ -732,7 +746,7 @@ export default function KursuebersichtTab() {
               setCreateError("");
               setCreateSuccess(false);
             }}
-            placeholder="z. B. Sommersemester 2026"
+            placeholder={t("newCourseForm.namePlaceholder")}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
@@ -741,7 +755,7 @@ export default function KursuebersichtTab() {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <label className="block text-sm font-medium text-slate-700">
-              Zeiträume
+              {t("newCourseForm.periodsLabel")}
             </label>
             <button
               type="button"
@@ -753,7 +767,7 @@ export default function KursuebersichtTab() {
               className="flex items-center gap-1 text-xs font-medium text-blue-600 transition-colors hover:text-blue-700"
             >
               <Plus size={13} />
-              Zeitraum hinzufügen
+              {t("newCourseForm.addPeriodButton")}
             </button>
           </div>
 
@@ -763,8 +777,8 @@ export default function KursuebersichtTab() {
                 <div className="flex-1">
                   <label className="block text-xs text-slate-500 mb-1">
                     {newPeriods.length > 1
-                      ? `Zeitraum ${i + 1} – Start`
-                      : "Startdatum"}
+                      ? t("newCourseForm.periodStartLabel", { index: i + 1 })
+                      : t("newCourseForm.startDateLabel")}
                   </label>
                   <input
                     type="date"
@@ -782,7 +796,9 @@ export default function KursuebersichtTab() {
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs text-slate-500 mb-1">
-                    {newPeriods.length > 1 ? `Ende` : "Enddatum"}
+                    {newPeriods.length > 1
+                      ? t("newCourseForm.periodEndLabel")
+                      : t("newCourseForm.endDateLabel")}
                   </label>
                   <input
                     type="date"
@@ -807,7 +823,7 @@ export default function KursuebersichtTab() {
                       setCreateSuccess(false);
                     }}
                     className="mb-0.5 rounded p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                    title="Zeitraum entfernen"
+                    title={t("newCourseForm.removePeriodTitle")}
                   >
                     <X size={14} />
                   </button>
@@ -819,7 +835,7 @@ export default function KursuebersichtTab() {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Zugangscode
+            {t("newCourseForm.accessCodeLabel")}
           </label>
           <input
             type="text"
@@ -829,7 +845,7 @@ export default function KursuebersichtTab() {
               setCreateError("");
               setCreateSuccess(false);
             }}
-            placeholder="z. B. SS2026"
+            placeholder={t("newCourseForm.accessCodePlaceholder")}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
@@ -837,7 +853,7 @@ export default function KursuebersichtTab() {
         {createError && <p className="text-sm text-red-600">{createError}</p>}
         {createSuccess && (
           <p className="text-sm text-green-600 font-medium">
-            Kurs wurde erfolgreich erstellt.
+            {t("newCourseForm.createSuccess")}
           </p>
         )}
 
@@ -846,7 +862,7 @@ export default function KursuebersichtTab() {
           disabled={isCreating}
           className="rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
-          {isCreating ? "Wird erstellt…" : "Kurs erstellen"}
+          {isCreating ? t("newCourseForm.creatingButton") : t("newCourseForm.createButton")}
         </button>
       </form>
     );
@@ -854,12 +870,12 @@ export default function KursuebersichtTab() {
 
   function renderCourseList() {
     if (isLoadingCourses)
-      return <p className="text-sm text-slate-500">Wird geladen…</p>;
+      return <p className="text-sm text-slate-500">{t("loading")}</p>;
     if (coursesError)
       return <p className="text-sm text-red-600">{coursesError}</p>;
     if (courses.length === 0) {
       return (
-        <p className="text-sm text-slate-500">Noch keine Kurse vorhanden.</p>
+        <p className="text-sm text-slate-500">{t("courseList.noCourses")}</p>
       );
     }
 
@@ -909,21 +925,24 @@ export default function KursuebersichtTab() {
                     {course.periods.length > 0 ? (
                       course.periods.map((p) => (
                         <p key={p.course_period_id} className="break-words">
-                          {formatPeriodLabel(p.start_date, p.end_date)}
+                          {formatPeriodLabel(p.start_date, p.end_date, locale)}
                         </p>
                       ))
                     ) : (
                       <p className="break-words">
-                        {formatDate(course.start_date)} –{" "}
-                        {formatDate(course.end_date)}
+                        {formatDate(course.start_date, locale)} –{" "}
+                        {formatDate(course.end_date, locale)}
                         {" · "}
                         {courseDurationLabel(
                           course.start_date,
                           course.end_date,
+                          locale,
                         )}
                       </p>
                     )}
-                    <p className="break-words">{course.userCount} Teilnehmer</p>
+                    <p className="break-words">
+                      {t("courseList.participantsLabel", { count: course.userCount })}
+                    </p>
                   </div>
                 </button>
 
@@ -931,16 +950,16 @@ export default function KursuebersichtTab() {
                 <div className="flex flex-wrap items-center gap-1.5 sm:justify-end sm:gap-2">
                   {course.anonymized_at && (
                     <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 sm:px-2.5 sm:py-1 sm:text-xs">
-                      Anonymisiert
+                      {t("courseList.anonymizedBadge")}
                     </span>
                   )}
                   {course.comparison_enabled ? (
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 sm:px-2.5 sm:py-1 sm:text-xs">
-                      Kursvergleich frei
+                      {t("courseList.comparisonEnabledBadge")}
                     </span>
                   ) : (
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400 sm:px-2.5 sm:py-1 sm:text-xs">
-                      Kursvergleich gesperrt
+                      {t("courseList.comparisonDisabledBadge")}
                     </span>
                   )}
                 </div>
@@ -950,7 +969,7 @@ export default function KursuebersichtTab() {
               <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800 sm:mt-3 sm:pt-3">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <span className="text-[11px] text-slate-400 dark:text-slate-500 sm:text-xs">
-                    Zugangscode:
+                    {t("courseList.accessCodeLabel")}
                   </span>
                   {isEditingCode ? (
                     <>
@@ -976,14 +995,14 @@ export default function KursuebersichtTab() {
                         }
                         className="text-[11px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 sm:text-xs"
                       >
-                        Speichern
+                        {t("courseList.saveButton")}
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingAccessCode(null)}
                         className="text-[11px] text-slate-400 hover:text-slate-600 sm:text-xs"
                       >
-                        Abbrechen
+                        {t("courseList.cancelButton")}
                       </button>
                     </>
                   ) : (
@@ -1001,7 +1020,7 @@ export default function KursuebersichtTab() {
                         }
                         className="text-[11px] text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300 sm:text-xs"
                       >
-                        Ändern
+                        {t("courseList.changeButton")}
                       </button>
                     </>
                   )}
@@ -1012,17 +1031,19 @@ export default function KursuebersichtTab() {
                     type="button"
                     onClick={() =>
                       setConfirmModal({
-                        title: `Kurs beenden`,
-                        message: `Soll der Kurs „${course.name}" wirklich beendet werden? Diese Aktion kann nicht rückgängig gemacht werden.`,
+                        title: t("courseList.endCourseConfirm.title"),
+                        message: t("courseList.endCourseConfirm.message", {
+                          name: course.name,
+                        }),
                         variant: "danger",
-                        confirmLabel: "Beenden",
+                        confirmLabel: t("courseList.endCourseConfirm.confirmLabel"),
                         onConfirm: () =>
                           void handleLockCourse(course.course_id),
                       })
                     }
                     className="rounded-lg border border-red-200 px-2.5 py-1 text-[11px] font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 sm:px-3 sm:py-1.5 sm:text-xs"
                   >
-                    Kurs beenden
+                    {t("courseList.endCourseButton")}
                   </button>
                 )}
               </div>
@@ -1047,7 +1068,7 @@ export default function KursuebersichtTab() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <ChevronLeft size={13} />
-            Zur Kursübersicht
+            {t("courseDetail.backToOverviewButton")}
           </button>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1061,7 +1082,7 @@ export default function KursuebersichtTab() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
             >
               <Download size={13} />
-              Datenexport
+              {t("courseDetail.exportButton")}
             </button>
 
             <button
@@ -1079,8 +1100,8 @@ export default function KursuebersichtTab() {
               }`}
             >
               {isComparisonEnabled
-                ? "Kursvergleich sperren"
-                : "Kursvergleich freigeben"}
+                ? t("courseDetail.comparisonDisableButton")
+                : t("courseDetail.comparisonEnableButton")}
             </button>
 
             {!isAnonymized && (
@@ -1089,16 +1110,16 @@ export default function KursuebersichtTab() {
                 disabled={isAnonymizing}
                 onClick={() =>
                   setConfirmModal({
-                    title: "Kurs anonymisieren",
-                    message: `Alle Teilnehmer erhalten ein Alias (TN-0001, TN-0002, …). Realnamen und E-Mail-Adressen werden in der Admin-Ansicht durch Aliases ersetzt. Diese Aktion kann nicht rückgängig gemacht werden.`,
+                    title: t("courseDetail.anonymizeConfirm.title"),
+                    message: t("courseDetail.anonymizeConfirm.message"),
                     variant: "warning",
-                    confirmLabel: "Anonymisieren",
+                    confirmLabel: t("courseDetail.anonymizeConfirm.confirmLabel"),
                     onConfirm: () => void handleAnonymizeCourse(view.courseId),
                   })
                 }
                 className="rounded-lg border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-50 disabled:opacity-50 dark:border-violet-800 dark:text-violet-400 dark:hover:bg-violet-900/20"
               >
-                {isAnonymizing ? "Anonymisiere…" : "Kurs anonymisieren"}
+                {isAnonymizing ? t("courseDetail.anonymizingButton") : t("courseDetail.anonymizeButton")}
               </button>
             )}
           </div>
@@ -1110,10 +1131,10 @@ export default function KursuebersichtTab() {
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    Datenexport (anonymisiert)
+                    {t("exportModal.title")}
                   </h3>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Wähle Inhalt und Dateiformat für diesen Kurs.
+                    {t("exportModal.subtitle")}
                   </p>
                 </div>
                 <button
@@ -1121,7 +1142,7 @@ export default function KursuebersichtTab() {
                   disabled={isExporting}
                   onClick={() => setIsExportModalOpen(false)}
                   className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                  aria-label="Exportdialog schliessen"
+                  aria-label={t("exportModal.closeAriaLabel")}
                 >
                   <X size={16} />
                 </button>
@@ -1134,18 +1155,13 @@ export default function KursuebersichtTab() {
                     className="mt-0.5 shrink-0 text-violet-600 dark:text-violet-400"
                   />
                   <p className="text-xs text-violet-800 dark:text-violet-300">
-                    Der Export enthält keine Namen, E-Mails, IDs, Aliase oder
-                    Datumsangaben. Die Zeilen sind zufällig gemischt und
-                    können keiner Person zugeordnet werden. Ausgeschlossene
-                    Teilnehmende und nicht abgegebene Tage werden nicht
-                    berücksichtigt. Mindestens 3 Teilnehmende mit Daten sind
-                    nötig.
+                    {t("exportModal.privacyNote")}
                   </p>
                 </div>
 
                 <div>
                   <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                    Inhalt
+                    {t("exportModal.contentLabel")}
                   </p>
                   <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
                     <button
@@ -1157,7 +1173,7 @@ export default function KursuebersichtTab() {
                           : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                       }`}
                     >
-                      Aggregiert
+                      {t("exportModal.aggregatedOption")}
                     </button>
                     <button
                       type="button"
@@ -1168,19 +1184,19 @@ export default function KursuebersichtTab() {
                           : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                       }`}
                     >
-                      Rohdaten
+                      {t("exportModal.rawOption")}
                     </button>
                   </div>
                   <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                     {exportGranularity === "aggregiert"
-                      ? "Eine anonyme Zeile pro Teilnehmer:in mit Ø Stunden pro abgegebenem Tag je Kategorie, plus Kursdurchschnitt."
-                      : "Eine Zeile pro Zeiteintrag (Start, Ende, Tätigkeit, Ort, Kontext, Wohlbefinden) – ohne Personen- oder Tagesbezug."}
+                      ? t("exportModal.aggregatedDescription")
+                      : t("exportModal.rawDescription")}
                   </p>
                 </div>
 
                 <div>
                   <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                    Format
+                    {t("exportModal.formatLabel")}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -1196,7 +1212,7 @@ export default function KursuebersichtTab() {
                       className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                     >
                       <Download size={13} />
-                      {isExporting ? "Exportiere..." : "CSV"}
+                      {isExporting ? t("exportModal.exportingLabel") : t("exportModal.csvButton")}
                     </button>
                     <button
                       type="button"
@@ -1211,7 +1227,7 @@ export default function KursuebersichtTab() {
                       className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                     >
                       <Download size={13} />
-                      {isExporting ? "Exportiere..." : "Excel"}
+                      {isExporting ? t("exportModal.exportingLabel") : t("exportModal.excelButton")}
                     </button>
                   </div>
                 </div>
@@ -1227,10 +1243,10 @@ export default function KursuebersichtTab() {
         )}
 
         {isLoadingUsers ? (
-          <p className="text-sm text-slate-500">Wird geladen…</p>
+          <p className="text-sm text-slate-500">{t("loading")}</p>
         ) : courseUsers.length === 0 ? (
           <p className="text-sm text-slate-500">
-            Keine Teilnehmer in diesem Kurs.
+            {t("courseDetail.noParticipants")}
           </p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
@@ -1238,13 +1254,13 @@ export default function KursuebersichtTab() {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Teilnehmer
+                    {t("courseDetail.table.participantColumn")}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Fortschritt
+                    {t("courseDetail.table.progressColumn")}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Aktionen
+                    {t("courseDetail.table.actionsColumn")}
                   </th>
                 </tr>
               </thead>
@@ -1297,7 +1313,7 @@ export default function KursuebersichtTab() {
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                         {u.submittedDays}{" "}
                         <span className="text-slate-400 dark:text-slate-500">
-                          / {u.courseTotalDays} Tage
+                          / {u.courseTotalDays} {t("courseDetail.table.daysUnit")}
                         </span>
                       </td>
 
@@ -1310,18 +1326,28 @@ export default function KursuebersichtTab() {
                             onClick={() => {
                               if (u.isExcluded) {
                                 setConfirmModal({
-                                  title: "Ausschluss aufheben",
-                                  message: `Die Daten von ${displayLabel} werden wieder in den Statistiken berücksichtigt.`,
+                                  title: t("courseDetail.table.includeConfirm.title"),
+                                  message: t(
+                                    "courseDetail.table.includeConfirm.message",
+                                    { name: displayLabel },
+                                  ),
                                   variant: "default",
-                                  confirmLabel: "Aufheben",
+                                  confirmLabel: t(
+                                    "courseDetail.table.includeConfirm.confirmLabel",
+                                  ),
                                   onConfirm: () => void handleToggleExclude(u),
                                 });
                               } else {
                                 setConfirmModal({
-                                  title: "Aus Statistiken ausschliessen",
-                                  message: `Die Daten von ${displayLabel} werden aus allen Statistiken entfernt. Der Teilnehmer wird nicht informiert.`,
+                                  title: t("courseDetail.table.excludeConfirm.title"),
+                                  message: t(
+                                    "courseDetail.table.excludeConfirm.message",
+                                    { name: displayLabel },
+                                  ),
                                   variant: "warning",
-                                  confirmLabel: "Ausschliessen",
+                                  confirmLabel: t(
+                                    "courseDetail.table.excludeConfirm.confirmLabel",
+                                  ),
                                   onConfirm: () => void handleToggleExclude(u),
                                 });
                               }
@@ -1332,7 +1358,9 @@ export default function KursuebersichtTab() {
                                 : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
                             }`}
                           >
-                            {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
+                            {u.isExcluded
+                              ? t("courseDetail.table.includeButton")
+                              : t("courseDetail.table.excludeButton")}
                           </button>
 
                           {/* Kick user */}
@@ -1340,17 +1368,22 @@ export default function KursuebersichtTab() {
                             type="button"
                             onClick={() =>
                               setConfirmModal({
-                                title: "Teilnehmer entfernen",
-                                message: `Soll ${displayLabel} wirklich aus dem Kurs entfernt werden? Die Zeiteinträge bleiben erhalten.`,
+                                title: t("courseDetail.table.removeConfirm.title"),
+                                message: t(
+                                  "courseDetail.table.removeConfirm.message",
+                                  { name: displayLabel },
+                                ),
                                 variant: "danger",
-                                confirmLabel: "Entfernen",
+                                confirmLabel: t(
+                                  "courseDetail.table.removeConfirm.confirmLabel",
+                                ),
                                 onConfirm: () =>
                                   void handleKickUser(u.userCourseId, u.userId),
                               })
                             }
                             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
                           >
-                            Entfernen
+                            {t("courseDetail.table.removeButton")}
                           </button>
                         </div>
                       </td>
@@ -1391,7 +1424,7 @@ export default function KursuebersichtTab() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <ChevronLeft size={13} />
-            Zurück zum Kurs
+            {t("userDetail.backToCourseButton")}
           </button>
           <button
             type="button"
@@ -1399,7 +1432,7 @@ export default function KursuebersichtTab() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <ChevronLeft size={13} />
-            Zur Kursübersicht
+            {t("userDetail.backToOverviewButton")}
           </button>
         </div>
 
@@ -1412,13 +1445,13 @@ export default function KursuebersichtTab() {
               </p>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                 {isLoadingDays ? (
-                  "Wird geladen…"
+                  t("userDetail.loading")
                 ) : (
                   <>
                     <span className="font-medium">{submittedCount}</span>
                     <span className="text-slate-400 dark:text-slate-500">
                       {" "}
-                      / {totalCount} Tage abgeschlossen
+                      {t("userDetail.daysCompleted", { total: totalCount })}
                     </span>
                   </>
                 )}
@@ -1430,10 +1463,7 @@ export default function KursuebersichtTab() {
                 className="mt-0.5 shrink-0 text-violet-600 dark:text-violet-400"
               />
               <p className="text-xs text-violet-800 dark:text-violet-300">
-                Pro Person ist nur ersichtlich, ob die Eingabe eines Tages
-                abgeschlossen wurde. Zeitnutzungsdaten sind für Admins nur
-                aggregiert und ohne Personenbezug einsehbar (Statistiken,
-                Datenexport).
+                {t("userDetail.privacyNote")}
               </p>
             </div>
           </div>
@@ -1450,7 +1480,7 @@ export default function KursuebersichtTab() {
     if (userDays.length === 0) {
       return (
         <p className="text-sm text-slate-500">
-          Für diesen Kurs sind keine Kurstage hinterlegt.
+          {t("dayList.noCourseDays")}
         </p>
       );
     }
@@ -1461,10 +1491,10 @@ export default function KursuebersichtTab() {
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
               <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Kurstag
+                {t("dayList.colDay")}
               </th>
               <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Abgeschlossen
+                {t("dayList.colCompleted")}
               </th>
             </tr>
           </thead>
@@ -1476,7 +1506,7 @@ export default function KursuebersichtTab() {
               >
                 <td className="px-4 py-3 text-slate-800 dark:text-slate-100">
                   {new Date(`${day.date}T00:00:00`).toLocaleDateString(
-                    "de-DE",
+                    locale === "en" ? "en-US" : "de-DE",
                     {
                       weekday: "long",
                       day: "numeric",
@@ -1489,12 +1519,12 @@ export default function KursuebersichtTab() {
                   {day.isSubmitted ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                       <CheckCircle2 size={13} />
-                      Ja
+                      {t("dayList.yes")}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                       <Circle size={13} />
-                      Nein
+                      {t("dayList.no")}
                     </span>
                   )}
                 </td>
@@ -1538,7 +1568,7 @@ export default function KursuebersichtTab() {
                   : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
               }`}
             >
-              {tab === "alle" ? "Alle Kurse" : "Neuer Kurs"}
+              {tab === "alle" ? t("subTabs.alleKurse") : t("subTabs.neuerKurs")}
             </button>
           ))}
         </div>

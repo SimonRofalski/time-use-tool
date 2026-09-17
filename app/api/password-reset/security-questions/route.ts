@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin-client";
+import { getApiLocale } from "@/lib/i18n/api-locale";
 
 async function resolveProfileIdByEmail(
   email: string,
@@ -49,13 +51,18 @@ async function resolveProfileIdByEmail(
 }
 
 export async function POST(request: NextRequest) {
+  const t = await getTranslations({
+    locale: getApiLocale(request),
+    namespace: "apiErrors.passwordResetSecurityQuestions",
+  });
+
   try {
     const body = (await request.json()) as { email?: string };
     const email = body.email?.trim();
 
     if (!email) {
       return NextResponse.json(
-        { error: "Bitte gib eine E-Mail-Adresse ein." },
+        { error: t("emailRequired") },
         { status: 400 },
       );
     }
@@ -65,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     if (!profileId) {
       return NextResponse.json(
-        { error: "Für diese E-Mail konnte kein Konto gefunden werden." },
+        { error: t("accountNotFound") },
         { status: 404 },
       );
     }
@@ -80,17 +87,14 @@ export async function POST(request: NextRequest) {
 
     if (questionError) {
       return NextResponse.json(
-        { error: "Sicherheitsfragen konnten nicht geladen werden." },
+        { error: t("loadError") },
         { status: 500 },
       );
     }
 
     if ((questions?.length ?? 0) !== 2) {
       return NextResponse.json(
-        {
-          error:
-            "Für dieses Konto sind noch keine zwei Sicherheitsfragen hinterlegt. Bitte wende dich an einen Admin.",
-        },
+        { error: t("notTwoQuestionsSet") },
         { status: 409 },
       );
     }
@@ -114,7 +118,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("password-reset security-questions POST error", error);
     return NextResponse.json(
-      { error: "Sicherheitsfragen konnten nicht geladen werden." },
+      { error: t("loadError") },
       { status: 500 },
     );
   }

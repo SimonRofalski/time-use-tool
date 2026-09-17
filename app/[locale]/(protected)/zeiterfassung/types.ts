@@ -33,6 +33,7 @@ export type Category = {
   category_id: number;
   code: string;
   name: string;
+  name_en: string;
 };
 
 export type Subcategory = {
@@ -40,6 +41,7 @@ export type Subcategory = {
   category_id: number;
   code: string;
   name: string;
+  name_en: string;
 };
 
 export type Activity = {
@@ -47,30 +49,35 @@ export type Activity = {
   subcategory_id: number;
   code: string;
   name: string;
+  name_en: string;
 };
 
 export type LocationTransport = {
   location_transport_id: number;
   code: string;
   name: string;
+  name_en: string;
 };
 
 export type SocialContext = {
   social_context_id: number;
   code: string;
   name: string;
+  name_en: string;
 };
 
 export type DigitalMediaType = {
   digital_media_type_id: number;
   code: string;
   name: string;
+  name_en: string;
 };
 
 export type Satisfaction = {
   satisfaction_id: number;
   code: string;
   name: string;
+  name_en: string;
 };
 
 // All lookup tables bundled together for convenient passing between components

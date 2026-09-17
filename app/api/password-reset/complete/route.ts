@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin-client";
 import { hashResetChallengeToken } from "@/lib/security-questions-server";
+import { getApiLocale } from "@/lib/i18n/api-locale";
 
 type CompleteBody = {
   token?: string;
@@ -9,15 +11,19 @@ type CompleteBody = {
 };
 
 export async function POST(request: NextRequest) {
+  const t = await getTranslations({
+    locale: getApiLocale(request),
+    namespace: "apiErrors.passwordResetComplete",
+  });
   const body = (await request.json()) as CompleteBody;
 
   if (!body.token || !body.profileId || !body.password) {
-    return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
+    return NextResponse.json({ error: t("invalidRequest") }, { status: 400 });
   }
 
   if (body.password.length < 6) {
     return NextResponse.json(
-      { error: "Passwort muss mindestens 6 Zeichen lang sein." },
+      { error: t("passwordTooShort") },
       { status: 400 },
     );
   }
@@ -34,14 +40,14 @@ export async function POST(request: NextRequest) {
 
   if (challengeError || !challenge) {
     return NextResponse.json(
-      { error: "Der Reset-Link ist ungültig oder abgelaufen." },
+      { error: t("invalidOrExpiredLink") },
       { status: 401 },
     );
   }
 
   if (challenge.consumed_at || new Date(challenge.expires_at) < new Date()) {
     return NextResponse.json(
-      { error: "Der Reset-Link ist ungültig oder abgelaufen." },
+      { error: t("invalidOrExpiredLink") },
       { status: 401 },
     );
   }

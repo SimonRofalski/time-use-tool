@@ -2,13 +2,17 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import { useLocale, useTranslations } from "next-intl";
 import { Check, Loader2, Pencil, Save, Search, User, X } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import type { Locale } from "@/i18n/routing";
+import { getLocalizedName } from "@/lib/i18n/localized-name";
 
 interface LookupRow {
   id: number;
   code: string;
   name: string;
+  name_en: string;
 }
 
 interface LookupTables {
@@ -104,7 +108,7 @@ const db = () => getSupabaseBrowserClient() as any;
 async function fetchLookup(table: string, idCol: string): Promise<LookupRow[]> {
   const { data } = await db()
     .from(table)
-    .select(`${idCol}, code, name`)
+    .select(`${idCol}, code, name, name_en`)
     .order(idCol);
 
   if (!data) {
@@ -115,6 +119,7 @@ async function fetchLookup(table: string, idCol: string): Promise<LookupRow[]> {
     id: row[idCol] as number,
     code: row.code as string,
     name: row.name as string,
+    name_en: row.name_en as string,
   }));
 }
 
@@ -185,8 +190,13 @@ function formToUserDataRow(form: FormData, profilesId: string) {
   };
 }
 
-function formatRole(role: string) {
-  return role === "admin" ? "Admin" : "User";
+function formatRole(
+  role: string,
+  t: ReturnType<typeof useTranslations<"profileDetailsForm">>,
+) {
+  return role === "admin"
+    ? t("accountBar.roleAdmin")
+    : t("accountBar.roleUser");
 }
 
 function getMissingRequiredFields(form: FormData): RequiredField[] {
@@ -228,22 +238,37 @@ function SearchableSelect({
   disabled: boolean;
   invalid?: boolean;
 }) {
+  const t = useTranslations("profileDetailsForm");
+  const locale = useLocale() as Locale;
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const selectedOption = options.find((option) => String(option.id) === value);
+  const localizedOptions = useMemo(
+    () =>
+      options.map((option) => ({
+        ...option,
+        localizedName: getLocalizedName(option, locale),
+      })),
+    [options, locale],
+  );
+
+  const selectedOption = localizedOptions.find(
+    (option) => String(option.id) === value,
+  );
 
   const filtered = useMemo(() => {
     if (!query) {
-      return options.slice(0, 20);
+      return localizedOptions.slice(0, 20);
     }
 
     const normalizedQuery = query.toLowerCase();
-    return options
-      .filter((option) => option.name.toLowerCase().includes(normalizedQuery))
+    return localizedOptions
+      .filter((option) =>
+        option.localizedName.toLowerCase().includes(normalizedQuery),
+      )
       .slice(0, 20);
-  }, [options, query]);
+  }, [localizedOptions, query]);
 
   useEffect(() => {
     const handleMouseDown = (event: MouseEvent) => {
@@ -268,7 +293,7 @@ function SearchableSelect({
         />
         <input
           type="text"
-          value={open ? query : (selectedOption?.name ?? query)}
+          value={open ? query : (selectedOption?.localizedName ?? query)}
           onChange={(event) => {
             setQuery(event.target.value);
             setOpen(true);
@@ -294,7 +319,7 @@ function SearchableSelect({
         <div className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto scrollbar-thin rounded-xl border border-slate-200 bg-white shadow-lg">
           {filtered.length === 0 ? (
             <div className="px-4 py-3 text-sm text-slate-400">
-              Keine Treffer
+              {t("noResultsFound")}
             </div>
           ) : (
             filtered.map((option) => (
@@ -312,7 +337,7 @@ function SearchableSelect({
                     : "text-slate-700 hover:bg-blue-50"
                 }`}
               >
-                <span>{option.name}</span>
+                <span>{option.localizedName}</span>
                 {value === String(option.id) && (
                   <Check size={16} className="text-blue-600" />
                 )}
@@ -342,6 +367,9 @@ export default function ProfileDetailsForm({
   onEditStateChange?: (isEditing: boolean) => void;
   onSaved?: () => void | Promise<void>;
 }) {
+  const t = useTranslations("profileDetailsForm");
+  const tCommon = useTranslations("common");
+  const locale = useLocale() as Locale;
   const supabase = getSupabaseBrowserClient();
   const savedFormData = useRef<string>(JSON.stringify(emptyForm));
   const userDataId = useRef<number | null>(null);
@@ -543,7 +571,7 @@ export default function ProfileDetailsForm({
                   : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
             }`}
           >
-            <span>{option.name}</span>
+            <span>{getLocalizedName(option, locale)}</span>
             {selected && <Check size={18} className="text-blue-600" />}
           </button>
         );
@@ -581,7 +609,7 @@ export default function ProfileDetailsForm({
                     : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
               }`}
             >
-              <span>{option.name}</span>
+              <span>{getLocalizedName(option, locale)}</span>
               {selected && <Check size={18} className="text-blue-600" />}
             </button>
           );
@@ -622,7 +650,7 @@ export default function ProfileDetailsForm({
         )}
         {hasMissingField(field) && (
           <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-300">
-            Bitte ausfüllen oder auswählen.
+            {t("fillOrSelectHint")}
           </p>
         )}
       </div>
@@ -678,7 +706,7 @@ export default function ProfileDetailsForm({
                   : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
             }`}
           >
-            <span>{option.name}</span>
+            <span>{getLocalizedName(option, locale)}</span>
             {selected && <Check size={18} className="text-blue-600" />}
           </button>
         );
@@ -698,7 +726,7 @@ export default function ProfileDetailsForm({
     const missingFields = getMissingRequiredFields(formData);
     if (missingFields.length > 0) {
       setMissingRequiredFields(missingFields);
-      setSaveError("Bitte fülle alle Pflichtfelder aus.");
+      setSaveError(t("missingFieldsError"));
       setSaving(false);
 
       if (typeof document !== "undefined") {
@@ -779,8 +807,8 @@ export default function ProfileDetailsForm({
       const message =
         error && typeof error === "object" && "message" in error
           ? (error as { message: string }).message
-          : "Unbekannter Fehler";
-      setSaveError(`Fehler beim Speichern: ${message}`);
+          : t("unknownError");
+      setSaveError(t("genericSaveError", { message }));
     }
 
     setSaving(false);
@@ -797,7 +825,7 @@ export default function ProfileDetailsForm({
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 size={28} className="animate-spin text-blue-600" />
-        <span className="ml-3 text-slate-500">Profil wird geladen…</span>
+        <span className="ml-3 text-slate-500">{t("loadingProfile")}</span>
       </div>
     );
   }
@@ -810,7 +838,9 @@ export default function ProfileDetailsForm({
         <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-5 py-3 dark:border-slate-800 dark:bg-slate-900/50">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
             <span>
-              <span className="text-slate-400 dark:text-slate-500">Name:</span>{" "}
+              <span className="text-slate-400 dark:text-slate-500">
+                {t("accountBar.nameLabel")}
+              </span>{" "}
               <span className="text-slate-600 dark:text-slate-300">
                 {[formData.firstName, formData.lastName]
                   .filter(Boolean)
@@ -818,14 +848,16 @@ export default function ProfileDetailsForm({
               </span>
             </span>
             <span>
-              <span className="text-slate-400 dark:text-slate-500">Email:</span>{" "}
+              <span className="text-slate-400 dark:text-slate-500">
+                {t("accountBar.emailLabel")}
+              </span>{" "}
               <span className="text-slate-600 dark:text-slate-300">
                 {user.email}
               </span>
             </span>
             <span>
               <span className="text-slate-400 dark:text-slate-500">
-                User ID:
+                {t("accountBar.userIdLabel")}
               </span>{" "}
               <span className="font-mono text-slate-600 dark:text-slate-300">
                 {user.id}
@@ -834,22 +866,24 @@ export default function ProfileDetailsForm({
             {role && (
               <span>
                 <span className="text-slate-400 dark:text-slate-500">
-                  Rolle:
+                  {t("accountBar.roleLabel")}
                 </span>{" "}
                 <span
                   className={`font-medium ${role === "admin" ? "text-amber-600" : "text-slate-600 dark:text-slate-300"}`}
                 >
-                  {formatRole(role)}
+                  {formatRole(role, t)}
                 </span>
               </span>
             )}
             <span>
               <span className="text-slate-400 dark:text-slate-500">
-                Letzter Login:
+                {t("accountBar.lastLoginLabel")}
               </span>{" "}
               <span className="text-slate-600 dark:text-slate-300">
                 {user.last_sign_in_at
-                  ? new Date(user.last_sign_in_at).toLocaleString("de-DE")
+                  ? new Date(user.last_sign_in_at).toLocaleString(
+                      locale === "en" ? "en-US" : "de-DE",
+                    )
                   : "-"}
               </span>
             </span>
@@ -863,15 +897,14 @@ export default function ProfileDetailsForm({
             <User className="text-blue-600" size={28} />
             <div>
               <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">
-                Profil
+                {t("title")}
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Deine persönlichen Angaben
+                {t("subtitle")}
               </p>
               {showPopupHint && (
                 <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                  Die wichtigsten Kontodaten findest du zusätzlich im
-                  Profil-Popup oben rechts.
+                  {t("popupHint")}
                 </p>
               )}
             </div>
@@ -881,7 +914,7 @@ export default function ProfileDetailsForm({
             <div className="flex flex-wrap items-center justify-end gap-2">
               {saved && (
                 <span className="text-sm font-medium text-green-600">
-                  Profil gespeichert!
+                  {t("savedMessage")}
                 </span>
               )}
               {saveError && (
@@ -896,7 +929,7 @@ export default function ProfileDetailsForm({
                   className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-500 dark:hover:bg-blue-400 dark:focus:ring-offset-slate-900"
                 >
                   <Pencil size={16} />
-                  Bearbeiten
+                  {t("editButton")}
                 </button>
               )}
             </div>
@@ -911,11 +944,11 @@ export default function ProfileDetailsForm({
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {renderQuestionPanel(
               "firstName",
-              "Vorname",
+              t("fields.firstName.label"),
               <input
                 type="text"
                 value={formData.firstName}
-                placeholder="z.B. Max"
+                placeholder={t("fields.firstName.placeholder")}
                 disabled={!isInteractive}
                 onChange={(event) =>
                   updateField("firstName", event.target.value)
@@ -932,11 +965,11 @@ export default function ProfileDetailsForm({
 
             {renderQuestionPanel(
               "lastName",
-              "Nachname",
+              t("fields.lastName.label"),
               <input
                 type="text"
                 value={formData.lastName}
-                placeholder="z.B. Mustermann"
+                placeholder={t("fields.lastName.placeholder")}
                 disabled={!isInteractive}
                 onChange={(event) =>
                   updateField("lastName", event.target.value)
@@ -955,19 +988,19 @@ export default function ProfileDetailsForm({
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {renderQuestionPanel(
               "genderId",
-              "Geschlecht",
+              t("fields.gender.label"),
               renderOptionCardsGrid("genderId", lookupData.gender, 2),
             )}
 
             {renderQuestionPanel(
               "age",
-              "Alter",
+              t("fields.age.label"),
               <input
                 type="text"
                 value={formData.age}
                 inputMode="numeric"
                 maxLength={2}
-                placeholder="z.b. 32"
+                placeholder={t("fields.age.placeholder")}
                 disabled={!isInteractive}
                 onChange={(event) => {
                   const value = event.target.value;
@@ -989,17 +1022,17 @@ export default function ProfileDetailsForm({
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {renderQuestionPanel(
               "maritalStatusId",
-              "Zivilstand / Familienstand",
+              t("fields.maritalStatus.label"),
               renderOptionCards("maritalStatusId", lookupData.maritalStatus),
             )}
 
             {renderQuestionPanel(
               "partnerInHousehold",
-              "Lebt ein/e Partner/in im selben Haushalt?",
+              t("fields.partnerInHousehold.label"),
               <div className="space-y-2">
                 {[
-                  { value: "true", label: "Ja" },
-                  { value: "false", label: "Nein" },
+                  { value: "true", label: t("fields.partnerInHousehold.yes") },
+                  { value: "false", label: t("fields.partnerInHousehold.no") },
                 ].map((option) => {
                   const selected = formData.partnerInHousehold === option.value;
                   return (
@@ -1031,7 +1064,7 @@ export default function ProfileDetailsForm({
 
           {renderQuestionPanel(
             "childrenInHouseholdId",
-            "Anzahl Kinder im Haushalt",
+            t("fields.childrenInHousehold.label"),
             renderOptionCardsGrid(
               "childrenInHouseholdId",
               lookupData.childrenInHousehold,
@@ -1041,7 +1074,7 @@ export default function ProfileDetailsForm({
 
           {renderQuestionPanel(
             "educationLevelId",
-            "Höchster abgeschlossener Bildungsabschluss",
+            t("fields.educationLevel.label"),
             renderOptionCardsGrid(
               "educationLevelId",
               lookupData.educationLevel,
@@ -1051,15 +1084,15 @@ export default function ProfileDetailsForm({
 
           {renderQuestionPanel(
             "employmentStatusIds",
-            "Aktueller Erwerbsstatus",
+            t("fields.employmentStatus.label"),
             renderMultiSelectCardsGrid(lookupData.employmentStatus),
-            "Mehrfachauswahl möglich, maximal 2 Antworten.",
+            t("fields.employmentStatus.helper"),
           )}
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {renderQuestionPanel(
               "occupationalStatusId",
-              "Stellung im Beruf",
+              t("fields.occupationalStatus.label"),
               renderOptionCards(
                 "occupationalStatusId",
                 lookupData.occupationalStatus,
@@ -1068,7 +1101,7 @@ export default function ProfileDetailsForm({
 
             {renderQuestionPanel(
               "weeklyWorkHours",
-              "Übliche Wochenarbeitszeit",
+              t("fields.weeklyWorkHours.label"),
               <input
                 type="number"
                 value={formData.weeklyWorkHours}
@@ -1076,7 +1109,7 @@ export default function ProfileDetailsForm({
                 onChange={(event) =>
                   updateField("weeklyWorkHours", event.target.value)
                 }
-                placeholder="z.B. 40"
+                placeholder={t("fields.weeklyWorkHours.placeholder")}
                 min="0"
                 max="100"
                 className={`w-full rounded-xl border-2 px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
@@ -1092,7 +1125,7 @@ export default function ProfileDetailsForm({
 
           {renderQuestionPanel(
             "mainWorkplaceId",
-            "Hauptarbeitsort",
+            t("fields.mainWorkplace.label"),
             renderOptionCardsGrid(
               "mainWorkplaceId",
               lookupData.mainWorkplace,
@@ -1103,12 +1136,12 @@ export default function ProfileDetailsForm({
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {renderQuestionPanel(
               "nationalityId",
-              "Staatsangehörigkeit",
+              t("fields.nationality.label"),
               <SearchableSelect
                 options={lookupData.nationality}
                 value={formData.nationalityId}
                 onChange={(value) => updateField("nationalityId", value)}
-                placeholder="Staatsangehörigkeit suchen…"
+                placeholder={t("fields.nationality.searchPlaceholder")}
                 disabled={!isInteractive}
               />,
               undefined,
@@ -1117,12 +1150,12 @@ export default function ProfileDetailsForm({
 
             {renderQuestionPanel(
               "regionId",
-              "Region / Wohnort",
+              t("fields.region.label"),
               <SearchableSelect
                 options={lookupData.region}
                 value={formData.regionId}
                 onChange={(value) => updateField("regionId", value)}
-                placeholder="Region suchen…"
+                placeholder={t("fields.region.searchPlaceholder")}
                 disabled={!isInteractive}
                 invalid={hasMissingField("regionId")}
               />,
@@ -1132,13 +1165,13 @@ export default function ProfileDetailsForm({
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {renderQuestionPanel(
               "healthStatusId",
-              "Allgemeiner Gesundheitszustand",
+              t("fields.healthStatus.label"),
               renderOptionCards("healthStatusId", lookupData.healthStatus),
             )}
 
             {renderQuestionPanel(
               "urbanityId",
-              "Urbanität",
+              t("fields.urbanity.label"),
               renderOptionCards("urbanityId", lookupData.urbanity),
             )}
           </div>
@@ -1153,7 +1186,7 @@ export default function ProfileDetailsForm({
                     className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus:ring-offset-slate-900"
                   >
                     <X size={16} />
-                    Abbrechen
+                    {tCommon("cancelButton")}
                   </button>
                 )}
                 <button
@@ -1167,10 +1200,10 @@ export default function ProfileDetailsForm({
                     <Save size={16} />
                   )}
                   {saving
-                    ? "Speichern..."
+                    ? t("savingButton")
                     : requireCompletion
-                      ? "Profil speichern"
-                      : "Speichern"}
+                      ? t("saveProfileButton")
+                      : t("saveButton")}
                 </button>
               </div>
             </div>

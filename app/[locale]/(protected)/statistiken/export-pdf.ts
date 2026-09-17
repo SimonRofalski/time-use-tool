@@ -1,4 +1,4 @@
-import { CATEGORY_COLORS } from "@/app/(protected)/zeiterfassung/types";
+import { CATEGORY_COLORS } from "@/app/[locale]/(protected)/zeiterfassung/types";
 import { satisfactionLevelForLabel } from "./satisfaction";
 import type {
   CategoryComparison,

@@ -1,5 +1,8 @@
 import { randomInt } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getTranslations } from "next-intl/server";
+import type { Locale } from "@/i18n/routing";
+import { getLocalizedName } from "@/lib/i18n/localized-name";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 // ─── Server-side, de-identified course export ─────────────────────────────────
@@ -83,7 +86,13 @@ export async function buildCourseExport(
   admin: SupabaseClient,
   courseId: number,
   mode: ExportMode,
+  locale: Locale = "de",
 ): Promise<CourseExportResult> {
+  const tc = await getTranslations({
+    locale,
+    namespace: "apiErrors.courseExport.columns",
+  });
+
   const { data: course } = await admin
     .from("course")
     .select("course_id, name")
@@ -146,20 +155,29 @@ export async function buildCourseExport(
     digitalMediaTypesRes,
     satisfactionsRes,
   ] = await Promise.all([
-    admin.from("category").select("category_id, name").order("category_id"),
+    admin
+      .from("category")
+      .select("category_id, name, name_en")
+      .order("category_id"),
     admin
       .from("activity")
-      .select("activity_id, name, subcategory:subcategory_id(category_id)"),
-    admin.from("location_transport").select("location_transport_id, name"),
-    admin.from("social_context").select("social_context_id, name"),
-    admin.from("digital_media_type").select("digital_media_type_id, name"),
-    admin.from("satisfaction").select("satisfaction_id, name"),
+      .select(
+        "activity_id, name, name_en, subcategory:subcategory_id(category_id)",
+      ),
+    admin
+      .from("location_transport")
+      .select("location_transport_id, name, name_en"),
+    admin.from("social_context").select("social_context_id, name, name_en"),
+    admin
+      .from("digital_media_type")
+      .select("digital_media_type_id, name, name_en"),
+    admin.from("satisfaction").select("satisfaction_id, name, name_en"),
   ]);
 
   const categoryNameById: Record<number, string> = {};
   const categoryIds: number[] = [];
   for (const c of categoriesRes.data ?? []) {
-    categoryNameById[c.category_id] = c.name;
+    categoryNameById[c.category_id] = getLocalizedName(c, locale);
     categoryIds.push(c.category_id);
   }
 
@@ -174,21 +192,24 @@ export async function buildCourseExport(
           ? (sub[0] as { category_id: number }).category_id
           : null;
     if (catId != null) activityToCategoryId[a.activity_id] = catId;
-    activityNameById[a.activity_id] = a.name;
+    activityNameById[a.activity_id] = getLocalizedName(a, locale);
   }
 
   const locationNameById: Record<number, string> = {};
   for (const l of locationsRes.data ?? [])
-    locationNameById[l.location_transport_id] = l.name;
+    locationNameById[l.location_transport_id] = getLocalizedName(l, locale);
   const socialContextNameById: Record<number, string> = {};
   for (const s of socialContextsRes.data ?? [])
-    socialContextNameById[s.social_context_id] = s.name;
+    socialContextNameById[s.social_context_id] = getLocalizedName(s, locale);
   const digitalMediaTypeNameById: Record<number, string> = {};
   for (const m of digitalMediaTypesRes.data ?? [])
-    digitalMediaTypeNameById[m.digital_media_type_id] = m.name;
+    digitalMediaTypeNameById[m.digital_media_type_id] = getLocalizedName(
+      m,
+      locale,
+    );
   const satisfactionNameById: Record<number, string> = {};
   for (const s of satisfactionsRes.data ?? [])
-    satisfactionNameById[s.satisfaction_id] = s.name;
+    satisfactionNameById[s.satisfaction_id] = getLocalizedName(s, locale);
 
   // Time entries of the submitted days
   // (chunked day-id lists keep request URLs short; paged to beat the 1000-row cap)
@@ -227,24 +248,28 @@ export async function buildCourseExport(
     }
 
     // One anonymous row per participant: Ø hours per submitted day
+    const rowKey = tc("rowLabel");
     const perParticipant = participantIds.map((profileId) => {
       const days = submittedDaysByUser[profileId] ?? 0;
-      const row: ExportRow = { Zeile: "Teilnehmer:in (anonym)" };
+      const row: ExportRow = { [rowKey]: tc("anonymousParticipant") };
       let total = 0;
       for (const catId of categoryIds) {
         const mins = minutesByUserCategory[profileId]?.[catId] ?? 0;
         const hoursPerDay = days > 0 ? mins / 60 / days : 0;
         total += hoursPerDay;
-        row[`${categoryNameById[catId]} (h/Tag)`] = round(hoursPerDay, 2);
+        row[`${categoryNameById[catId]} ${tc("hoursPerDaySuffix")}`] = round(
+          hoursPerDay,
+          2,
+        );
       }
-      row["Erfasst gesamt (h/Tag)"] = round(total, 2);
+      row[tc("totalTracked")] = round(total, 2);
       return row;
     });
 
     // Course mean across participants (mean of per-participant Ø values)
-    const meanRow: ExportRow = { Zeile: "Kursdurchschnitt" };
+    const meanRow: ExportRow = { [rowKey]: tc("courseAverage") };
     for (const key of Object.keys(perParticipant[0]).filter(
-      (k) => k !== "Zeile",
+      (k) => k !== rowKey,
     )) {
       const sum = perParticipant.reduce((s, r) => s + Number(r[key] ?? 0), 0);
       meanRow[key] = round(sum / perParticipant.length, 2);
@@ -261,36 +286,38 @@ export async function buildCourseExport(
             ? activityToCategoryId[e.primary_activity_id]
             : undefined;
         return {
-          Start: e.start_time.slice(0, 5),
-          Ende: e.end_time.slice(0, 5),
-          "Dauer (min)": minutes,
-          "Dauer (h)": round(minutes / 60, 2),
-          Kategorie:
+          [tc("start")]: e.start_time.slice(0, 5),
+          [tc("end")]: e.end_time.slice(0, 5),
+          [tc("durationMinutes")]: minutes,
+          [tc("durationHours")]: round(minutes / 60, 2),
+          [tc("category")]:
             categoryId != null ? (categoryNameById[categoryId] ?? "") : "",
-          Aktivitaet:
+          [tc("activity")]:
             e.primary_activity_id != null
               ? (activityNameById[e.primary_activity_id] ?? "")
               : "",
-          Nebenaktivitaet:
+          [tc("secondaryActivity")]:
             e.secondary_activity_id != null
               ? (activityNameById[e.secondary_activity_id] ?? "")
               : "",
-          "Digitale Medien genutzt": e.digital_media_used ? "Ja" : "Nein",
-          Medienarten: (e.time_entry_digital_media_type ?? [])
+          [tc("digitalMediaUsed")]: e.digital_media_used
+            ? tc("yes")
+            : tc("no"),
+          [tc("mediaTypes")]: (e.time_entry_digital_media_type ?? [])
             .map((m) => m.digital_media_type_id)
             .filter((id): id is number => typeof id === "number")
             .map((id) => digitalMediaTypeNameById[id] ?? `#${id}`)
             .join(", "),
-          "Ort / Transport":
+          [tc("locationTransport")]:
             e.location_transport_id != null
               ? (locationNameById[e.location_transport_id] ?? "")
               : "",
-          "Sozialer Kontext": (e.time_entry_social_context ?? [])
+          [tc("socialContext")]: (e.time_entry_social_context ?? [])
             .map((s) => s.social_context_id)
             .filter((id): id is number => typeof id === "number")
             .map((id) => socialContextNameById[id] ?? `#${id}`)
             .join(", "),
-          Zufriedenheit:
+          [tc("wellbeing")]:
             e.satisfaction_id != null
               ? (satisfactionNameById[e.satisfaction_id] ?? "")
               : "",

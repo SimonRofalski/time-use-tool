@@ -1,6 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { hashSecurityAnswer } from "@/lib/security-questions-server";
+import { getApiLocale } from "@/lib/i18n/api-locale";
 
 function getBearerToken(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -11,14 +13,18 @@ function getBearerToken(request: Request) {
   return authHeader.slice(7).trim() || null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const t = await getTranslations({
+    locale: getApiLocale(request),
+    namespace: "apiErrors.securityQuestions",
+  });
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+    return NextResponse.json({ error: t("notAuthenticated") }, { status: 401 });
   }
 
   const { data, error } = await supabase
@@ -27,16 +33,18 @@ export async function GET() {
     .eq("profiles_id", user.id);
 
   if (error) {
-    return NextResponse.json(
-      { error: "Sicherheitsfragen konnten nicht geladen werden." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: t("loadError") }, { status: 500 });
   }
 
   return NextResponse.json({ hasCompleted: (data?.length ?? 0) === 2 });
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const t = await getTranslations({
+    locale: getApiLocale(request),
+    namespace: "apiErrors.securityQuestions",
+  });
+
   try {
     const supabase = await createSupabaseServerClient();
     const {
@@ -56,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     if (!user) {
-      return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+      return NextResponse.json({ error: t("notAuthenticated") }, { status: 401 });
     }
 
     let body: {
@@ -69,14 +77,14 @@ export async function POST(request: Request) {
       };
     } catch {
       return NextResponse.json(
-        { error: "Ungültige Anfrage. Bitte versuche es erneut." },
+        { error: t("invalidRequest") },
         { status: 400 },
       );
     }
 
     if (!body.answers || body.answers.length !== 2) {
       return NextResponse.json(
-        { error: "Bitte gib genau zwei Sicherheitsfragen an." },
+        { error: t("needTwoQuestions") },
         { status: 400 },
       );
     }
@@ -95,9 +103,7 @@ export async function POST(request: Request) {
       )
     ) {
       return NextResponse.json(
-        {
-          error: "Bitte gib zwei unterschiedliche Fragen mit Antwort an.",
-        },
+        { error: t("needTwoDifferentQuestions") },
         { status: 400 },
       );
     }
@@ -129,7 +135,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("security-questions POST error", error);
     return NextResponse.json(
-      { error: "Interner Fehler beim Speichern der Sicherheitsfragen." },
+      { error: t("internalError") },
       { status: 500 },
     );
   }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { totalPeriodDays } from "@/lib/course-periods";
@@ -55,6 +56,7 @@ function displayName(u: UserRow): string {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function NutzeruebersichtTab() {
+  const t = useTranslations("nutzeruebersicht");
   const supabase = getSupabaseBrowserClient();
 
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -81,7 +83,7 @@ export default function NutzeruebersichtTab() {
       .eq("is_active", true);
 
     if (profilesErr || !profiles) {
-      setError("Nutzerdaten konnten nicht geladen werden.");
+      setError(t("loadError"));
       setIsLoading(false);
       return;
     }
@@ -237,18 +239,18 @@ export default function NutzeruebersichtTab() {
   function openExcludeModal(user: UserRow) {
     if (user.isExcluded) {
       setConfirmModal({
-        title: "Ausschluss aufheben",
-        message: `Die Daten von ${displayName(user)} werden wieder in allen Statistiken berücksichtigt.`,
+        title: t("includeConfirm.title"),
+        message: t("includeConfirm.message", { name: displayName(user) }),
         variant: "default",
-        confirmLabel: "Aufheben",
+        confirmLabel: t("includeConfirm.confirmLabel"),
         onConfirm: () => void handleToggleExclude(user),
       });
     } else {
       setConfirmModal({
-        title: "Nutzer ausschliessen",
-        message: `Die Daten von ${displayName(user)} werden aus allen Statistiken entfernt. Der Nutzer wird darüber nicht informiert.`,
+        title: t("excludeConfirm.title"),
+        message: t("excludeConfirm.message", { name: displayName(user) }),
         variant: "warning",
-        confirmLabel: "Ausschliessen",
+        confirmLabel: t("excludeConfirm.confirmLabel"),
         onConfirm: () => void handleToggleExclude(user),
       });
     }
@@ -276,7 +278,7 @@ export default function NutzeruebersichtTab() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-sm text-slate-500">Wird geladen…</p>
+        <p className="text-sm text-slate-500">{t("loading")}</p>
       </div>
     );
   }
@@ -308,7 +310,7 @@ export default function NutzeruebersichtTab() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                Aktive Nutzer
+                {t("kpis.activeUsers")}
               </p>
               <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
                 {kpis.totalUsers}
@@ -317,25 +319,25 @@ export default function NutzeruebersichtTab() {
 
             <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                Abgeschlossene Tage
+                {t("kpis.completedDays")}
               </p>
               <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
                 {kpis.totalSubmittedDays}
               </p>
               <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                Gesamt aller Nutzer
+                {t("kpis.completedDaysSubtitle")}
               </p>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                Ø Abschlussquote
+                {t("kpis.avgCompletionRate")}
               </p>
               <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">
                 {kpis.avgCompletionRate}%
               </p>
               <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                Ø aller gestarteten Nutzer
+                {t("kpis.avgCompletionRateSubtitle")}
               </p>
             </div>
           </div>
@@ -351,7 +353,7 @@ export default function NutzeruebersichtTab() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Nutzer suchen…"
+            placeholder={t("searchPlaceholder")}
             className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
         </div>
@@ -360,9 +362,7 @@ export default function NutzeruebersichtTab() {
         <div className="space-y-3 md:hidden">
           {filteredUsers.length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500">
-              {searchQuery.trim()
-                ? "Kein Nutzer gefunden."
-                : "Keine aktiven Nutzer vorhanden."}
+              {searchQuery.trim() ? t("noUserFound") : t("noActiveUsers")}
             </div>
           ) : (
             filteredUsers.map((u) => (
@@ -392,19 +392,22 @@ export default function NutzeruebersichtTab() {
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                      Kurs
+                      {t("courseLabel")}
                     </p>
                     <p className="mt-1 break-words text-slate-600 dark:text-slate-300">
-                      {u.courseName ?? "–"}
+                      {u.courseName ?? t("noCoursePlaceholder")}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                      Fortschritt
+                      {t("progressLabel")}
                     </p>
                     <p className="mt-1 break-words text-slate-600 dark:text-slate-300">
                       {u.courseTotalDays > 0
-                        ? `${u.submittedDays} / ${u.courseTotalDays} Tage`
+                        ? t("progressDaysLabel", {
+                            submitted: u.submittedDays,
+                            total: u.courseTotalDays,
+                          })
                         : u.submittedDays}
                     </p>
                   </div>
@@ -421,7 +424,7 @@ export default function NutzeruebersichtTab() {
                           : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
                       }`}
                     >
-                      {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
+                      {u.isExcluded ? t("includeButton") : t("excludeButton")}
                     </button>
                   )}
                 </div>
@@ -436,16 +439,16 @@ export default function NutzeruebersichtTab() {
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Nutzer
+                  {t("table.user")}
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Kurs
+                  {t("table.course")}
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Fortschritt
+                  {t("table.progress")}
                 </th>
                 <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Aktionen
+                  {t("table.actions")}
                 </th>
               </tr>
             </thead>
@@ -456,9 +459,7 @@ export default function NutzeruebersichtTab() {
                     colSpan={4}
                     className="px-4 py-10 text-center text-sm text-slate-400 dark:text-slate-500"
                   >
-                    {searchQuery.trim()
-                      ? "Kein Nutzer gefunden."
-                      : "Keine aktiven Nutzer vorhanden."}
+                    {searchQuery.trim() ? t("noUserFound") : t("noActiveUsers")}
                   </td>
                 </tr>
               ) : (
@@ -491,7 +492,7 @@ export default function NutzeruebersichtTab() {
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                       {u.courseName ?? (
                         <span className="text-slate-300 dark:text-slate-600">
-                          –
+                          {t("noCoursePlaceholder")}
                         </span>
                       )}
                     </td>
@@ -502,7 +503,7 @@ export default function NutzeruebersichtTab() {
                         <span>
                           {u.submittedDays}{" "}
                           <span className="text-slate-400 dark:text-slate-500">
-                            / {u.courseTotalDays} Tage
+                            / {u.courseTotalDays} {t("daysUnit")}
                           </span>
                         </span>
                       ) : (
@@ -523,7 +524,7 @@ export default function NutzeruebersichtTab() {
                                 : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
                             }`}
                           >
-                            {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
+                            {u.isExcluded ? t("includeButton") : t("excludeButton")}
                           </button>
                         )}
                       </div>

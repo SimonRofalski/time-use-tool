@@ -71,36 +71,47 @@ export function periodsDurationLabel(
   return `${days} Tag${days !== 1 ? "e" : ""}`;
 }
 
-// Formats a single period's date range for display in German locale.
-// e.g. "23.03.2026 – 05.04.2026 · 14 Tage"
-export function formatPeriodLabel(startDate: string, endDate: string): string {
+// Formats a single period's date range for display.
+// e.g. "23.03.2026 – 05.04.2026 · 14 Tage" (de) / "03/23/2026 – 04/05/2026 · 14 days" (en)
+export function formatPeriodLabel(
+  startDate: string,
+  endDate: string,
+  locale: "de" | "en" = "de",
+): string {
   const days = generateDateRange(startDate, endDate).length;
   const fmt = (d: string) =>
-    new Date(d).toLocaleDateString("de-DE", {
+    new Date(d).toLocaleDateString(locale === "en" ? "en-US" : "de-DE", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
-  return `${fmt(startDate)} – ${fmt(endDate)} · ${days} Tag${days !== 1 ? "e" : ""}`;
+  const dayLabel =
+    locale === "en" ? `day${days !== 1 ? "s" : ""}` : `Tag${days !== 1 ? "e" : ""}`;
+  return `${fmt(startDate)} – ${fmt(endDate)} · ${days} ${dayLabel}`;
 }
 
 // Validates that a list of periods contain no overlapping date ranges.
 // Returns a German error message string, or null if valid.
 export function validatePeriodsNoOverlap(
   periods: Pick<CoursePeriod, "start_date" | "end_date">[],
+  locale: "de" | "en" = "de",
 ): string | null {
   const sorted = [...periods].sort((a, b) =>
     a.start_date.localeCompare(b.start_date),
   );
   const fmt = (d: string) =>
-    new Date(d).toLocaleDateString("de-DE", {
+    new Date(d).toLocaleDateString(locale === "en" ? "en-US" : "de-DE", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i].start_date <= sorted[i - 1].end_date) {
-      return `Zeiträume überschneiden sich: ${fmt(sorted[i - 1].start_date)}–${fmt(sorted[i - 1].end_date)} und ${fmt(sorted[i].start_date)}–${fmt(sorted[i].end_date)}`;
+      const rangeA = `${fmt(sorted[i - 1].start_date)}–${fmt(sorted[i - 1].end_date)}`;
+      const rangeB = `${fmt(sorted[i].start_date)}–${fmt(sorted[i].end_date)}`;
+      return locale === "en"
+        ? `Periods overlap: ${rangeA} and ${rangeB}`
+        : `Zeiträume überschneiden sich: ${rangeA} und ${rangeB}`;
     }
   }
   return null;

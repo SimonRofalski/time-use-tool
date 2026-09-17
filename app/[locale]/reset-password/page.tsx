@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 export default function ResetPasswordPage() {
+  const t = useTranslations("resetPassword");
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState("");
+  const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasToken, setHasToken] = useState(false);
 
@@ -20,28 +23,27 @@ export default function ResetPasswordPage() {
       if (data.session) {
         setHasToken(true);
       } else {
-        setStatus(
-          "Ungültiger oder abgelaufener Recovery-Link. Bitte fordern Sie einen neuen an.",
-        );
+        setStatus(t("invalidToken"));
       }
     };
 
     checkToken();
-  }, [supabase]);
+  }, [supabase, t]);
 
   async function handleResetPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setStatus("");
+    setIsSuccess(false);
 
     if (password !== confirmPassword) {
-      setStatus("Passwörter stimmen nicht überein.");
+      setStatus(t("passwordMismatch"));
       setLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setStatus("Passwort muss mindestens 6 Zeichen lang sein.");
+      setStatus(t("passwordTooShort"));
       setLoading(false);
       return;
     }
@@ -52,12 +54,13 @@ export default function ResetPasswordPage() {
 
     if (error) {
       const msg = error.message.includes("different from the old")
-        ? "Das neue Passwort muss sich vom alten unterscheiden."
+        ? t("samePasswordError")
         : error.message;
       setStatus(msg);
       setLoading(false);
     } else {
-      setStatus("Passwort erfolgreich zurückgesetzt!");
+      setStatus(t("successMessage"));
+      setIsSuccess(true);
       setTimeout(() => {
         router.push("/");
       }, 2000);
@@ -74,9 +77,9 @@ export default function ResetPasswordPage() {
       <div className="relative w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-semibold text-slate-800">
-            Time Use Tool
+            {t("brand")}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">Neues Passwort setzen</p>
+          <p className="mt-1 text-sm text-slate-500">{t("subtitle")}</p>
         </div>
 
         {hasToken ? (
@@ -86,7 +89,7 @@ export default function ResetPasswordPage() {
           >
             <div className="space-y-4">
               <label className="block text-sm font-medium text-slate-700">
-                Neues Passwort
+                {t("newPasswordLabel")}
                 <input
                   type="password"
                   value={password}
@@ -94,11 +97,11 @@ export default function ResetPasswordPage() {
                   required
                   minLength={6}
                   className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="Mindestens 6 Zeichen"
+                  placeholder={t("newPasswordPlaceholder")}
                 />
               </label>
               <label className="block text-sm font-medium text-slate-700">
-                Passwort bestätigen
+                {t("confirmPasswordLabel")}
                 <input
                   type="password"
                   value={confirmPassword}
@@ -106,7 +109,7 @@ export default function ResetPasswordPage() {
                   required
                   minLength={6}
                   className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="Passwort wiederholen"
+                  placeholder={t("confirmPasswordPlaceholder")}
                 />
               </label>
             </div>
@@ -116,15 +119,13 @@ export default function ResetPasswordPage() {
               disabled={loading}
               className="mt-5 w-full rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
             >
-              {loading ? "Wird zurückgesetzt..." : "Passwort zurücksetzen"}
+              {loading ? t("submitButtonLoading") : t("submitButton")}
             </button>
 
             {status && (
               <p
                 className={`mt-3 text-center text-sm ${
-                  status.includes("erfolgreich")
-                    ? "text-green-600"
-                    : "text-slate-600"
+                  isSuccess ? "text-green-600" : "text-slate-600"
                 }`}
                 role="status"
               >
@@ -135,7 +136,7 @@ export default function ResetPasswordPage() {
         ) : (
           <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-center text-sm text-slate-500">
-              {status || "Wird überprüft..."}
+              {status || t("checking")}
             </p>
           </div>
         )}

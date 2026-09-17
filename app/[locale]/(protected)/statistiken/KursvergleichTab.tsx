@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import {
   BedDouble,
   Bike,
@@ -20,7 +21,7 @@ import type {
   ComparisonMetric,
   ComparisonTopic,
 } from "./types";
-import { CATEGORY_COLORS } from "@/app/(protected)/zeiterfassung/types";
+import { CATEGORY_COLORS } from "@/app/[locale]/(protected)/zeiterfassung/types";
 import { satisfactionLevelForAverage } from "./satisfaction";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -43,6 +44,25 @@ const CONTEXT_EMOJI: Record<string, string> = {
   location: "📍",
 };
 
+// Icon per category, keyed by the stable numeric category_id (not by name —
+// names are locale-dependent, ids are not). See lib DB: 1..10 fixed order.
+const CATEGORY_ICON_BY_ID: Record<number, LucideIcon> = {
+  1: BedDouble, // Persönliche Pflege
+  2: Briefcase, // Erwerbstätigkeit
+  3: GraduationCap, // Studium / Ausbildung
+  4: Home, // Haushalt und Familienarbeit
+  5: HandHeart, // Freiwilligenarbeit und Treffen
+  6: Users, // Soziales Leben und Unterhaltung
+  7: Bike, // Sport und Aktivitäten im Freien
+  8: Palette, // Hobbys
+  9: Tv, // Massenmedien
+  10: Route, // Wegezeiten und nicht spezifizierte Zeitnutzung
+};
+
+function getCategoryIcon(categoryId: number): LucideIcon {
+  return CATEGORY_ICON_BY_ID[categoryId] ?? Circle;
+}
+
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
 function calculateMean(values: number[]): number {
@@ -62,32 +82,6 @@ function getCategoryColorById(categoryId: number): string {
   return CATEGORY_COLORS[(categoryId - 1) % CATEGORY_COLORS.length];
 }
 
-function normalize(value: string): string {
-  return value
-    .toLowerCase()
-    .replaceAll("ä", "ae")
-    .replaceAll("ö", "oe")
-    .replaceAll("ü", "ue")
-    .replaceAll("ß", "ss");
-}
-
-// Icon per category, matched on the category name (falls back to a dot)
-function getCategoryIcon(name: string): LucideIcon {
-  const n = normalize(name);
-  if (n.includes("pflege") || n.includes("schlaf")) return BedDouble;
-  if (n.includes("erwerb")) return Briefcase;
-  if (n.includes("studium") || n.includes("ausbildung")) return GraduationCap;
-  if (n.includes("haushalt") || n.includes("familie")) return Home;
-  if (n.includes("freiwillig") || n.includes("treffen")) return HandHeart;
-  if (n.includes("sozial") || n.includes("unterhaltung")) return Users;
-  if (n.includes("sport") || n.includes("freien")) return Bike;
-  if (n.includes("hobby")) return Palette;
-  if (n.includes("medien")) return Tv;
-  if (n.includes("wege") || n.includes("transport")) return Route;
-  return Circle;
-}
-
-
 type Unit = ComparisonMetric["unit"];
 
 function formatValue(value: number, unit: Unit): string {
@@ -96,40 +90,55 @@ function formatValue(value: number, unit: Unit): string {
   return `${value.toFixed(1)} h`;
 }
 
+type VerdictT = ReturnType<typeof useTranslations<"statistiken.kursvergleich.verdict">>;
+
 // "+2.4 h/Tag ggü. Kurs" · "+27 %-Pkt. ggü. Kurs" · "im Kursschnitt"
 function describeDifference(
   userValue: number,
   meanValue: number,
   unit: Unit,
+  t: VerdictT,
   short = false,
 ): string {
   const diff = userValue - meanValue;
   const threshold = unit === "%" ? 3 : unit === "Punkte" ? 0.15 : 0.25;
-  if (Math.abs(diff) < threshold) return "im Kursschnitt";
+  if (Math.abs(diff) < threshold) return t("inAverage");
   const sign = diff > 0 ? "+" : "−";
   const abs = Math.abs(diff);
-  const suffix = short ? "" : " ggü. Kurs";
-  if (unit === "%") return `${sign}${Math.round(abs)} %-Pkt.${suffix}`;
-  if (unit === "Punkte") return `${sign}${abs.toFixed(1)} Pkt.${suffix}`;
-  return `${sign}${abs.toFixed(1)} h/Tag${suffix}`;
+  if (unit === "%") {
+    return t(short ? "percentDiffShort" : "percentDiff", {
+      sign,
+      value: Math.round(abs),
+    } as never);
+  }
+  if (unit === "Punkte") {
+    return t(short ? "pointsDiffShort" : "pointsDiff", {
+      sign,
+      value: abs.toFixed(1),
+    } as never);
+  }
+  return t(short ? "hoursDiffShort" : "hoursDiff", {
+    sign,
+    value: abs.toFixed(1),
+  } as never);
 }
 
 function verdictText(
   row: { userValue: number; allValues: number[]; unit: Unit },
+  t: VerdictT,
   short = false,
 ): string {
-  if (row.userValue <= 0) return "keine eigenen Daten";
+  if (row.userValue <= 0) return t("noOwnData");
   const meanValue = calculateMean(row.allValues);
-  const diff = describeDifference(row.userValue, meanValue, row.unit, short);
+  const diff = describeDifference(row.userValue, meanValue, row.unit, t, short);
   if (row.allValues.length === 0) return diff;
   const p = calculatePercentile(row.allValues, row.userValue);
   const above = row.allValues.some((v) => v > row.userValue);
-  const position =
-    !above
-      ? "höchster Wert der Gruppe"
-      : p === 0
-        ? "tiefster Wert der Gruppe"
-        : `über ${p}% der Gruppe`;
+  const position = !above
+    ? t("highest")
+    : p === 0
+      ? t("lowest")
+      : t("above", { percentile: p });
   return `${diff} · ${position}`;
 }
 
@@ -143,6 +152,8 @@ function BarPair({
   unit,
   color,
   showLabels = false,
+  youLabel,
+  courseLabel,
 }: {
   userValue: number;
   meanValue: number;
@@ -150,6 +161,8 @@ function BarPair({
   unit: Unit;
   color: string;
   showLabels?: boolean;
+  youLabel: string;
+  courseLabel: string;
 }) {
   const pct = (v: number) =>
     Math.min(
@@ -184,8 +197,8 @@ function BarPair({
 
   return (
     <div className="space-y-1">
-      {line("Du", userValue, color, true)}
-      {line("Kurs", meanValue, "#94A3B8", false)}
+      {line(youLabel, userValue, color, true)}
+      {line(courseLabel, meanValue, "#94A3B8", false)}
     </div>
   );
 }
@@ -203,7 +216,17 @@ type MetricCardData = {
   userValue: number;
 };
 
-function MetricCard({ metric }: { metric: MetricCardData }) {
+function MetricCard({
+  metric,
+  youLabel,
+  courseLabel,
+  verdictT,
+}: {
+  metric: MetricCardData;
+  youLabel: string;
+  courseLabel: string;
+  verdictT: VerdictT;
+}) {
   const meanValue = calculateMean(metric.allValues);
   const scaleMax =
     metric.scaleMax ?? Math.max(0.1, metric.userValue, meanValue) * 1.15;
@@ -231,10 +254,12 @@ function MetricCard({ metric }: { metric: MetricCardData }) {
           unit={metric.unit}
           color={USER_BLUE}
           showLabels
+          youLabel={youLabel}
+          courseLabel={courseLabel}
         />
       </div>
       <p className="mt-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-        {verdictText(metric)}
+        {verdictText(metric, verdictT)}
       </p>
     </div>
   );
@@ -245,12 +270,18 @@ function MetricCard({ metric }: { metric: MetricCardData }) {
 function CategoryRow({
   category,
   scaleMax,
+  youLabel,
+  courseLabel,
+  verdictT,
 }: {
   category: CategoryComparison;
   scaleMax: number;
+  youLabel: string;
+  courseLabel: string;
+  verdictT: VerdictT;
 }) {
   const color = getCategoryColorById(category.categoryId);
-  const Icon = getCategoryIcon(category.name);
+  const Icon = getCategoryIcon(category.categoryId);
   const meanValue = calculateMean(category.allValues);
 
   return (
@@ -268,7 +299,7 @@ function CategoryRow({
             {category.name}
           </span>
           <span className="shrink-0 text-[11px] text-slate-500 dark:text-slate-400">
-            {verdictText({ ...category, unit: "h/Tag" }, true)}
+            {verdictText({ ...category, unit: "h/Tag" }, verdictT, true)}
           </span>
         </div>
         <BarPair
@@ -277,6 +308,8 @@ function CategoryRow({
           scaleMax={scaleMax}
           unit="h/Tag"
           color={color}
+          youLabel={youLabel}
+          courseLabel={courseLabel}
         />
       </div>
     </div>
@@ -298,11 +331,14 @@ export default function KursvergleichTab({
   onSetDayFilter,
   actions,
 }: {
-  // Focus topics (Schlaf, Sport, Smartphone) with all participant values
+  // Focus topics (Schlaf, Sport, Smartphone) with all participant values —
+  // labels already localized by the caller (page.tsx)
   topics: ComparisonTopic[];
-  // Per-category Ø h/Tag comparison (empty when not enough users)
+  // Per-category Ø h/Tag comparison (empty when not enough users) —
+  // names already localized by the caller
   categoryComparison: CategoryComparison[];
-  // Context metrics (IT-Gerät, Sozial, Ort, Wohlbefinden) with per-participant values
+  // Context metrics (IT-Gerät, Sozial, Ort, Wohlbefinden) with per-participant
+  // values; label/description are resolved here from the metric key
   contextMetrics: ComparisonMetric[];
   // How many users in the course meet the ≥2 submitted days threshold
   qualifyingUserCount: number;
@@ -315,20 +351,25 @@ export default function KursvergleichTab({
   // Optional controls rendered at the right end of the filter bar (e.g. PDF export)
   actions?: ReactNode;
 }) {
+  const t = useTranslations("statistiken.kursvergleich");
+  const verdictT = useTranslations("statistiken.kursvergleich.verdict");
+  const tFilters = useTranslations("statistiken.zeitverteilung");
+
   const hasEnoughUsers = qualifyingUserCount >= MIN_USERS_FOR_COMPARISON;
   const selectedWeekSet = new Set(selectedWeeks);
 
-  const focusCards: MetricCardData[] = topics.map((t) => ({
-    key: t.key,
-    emoji: TOPIC_EMOJI[t.key] ?? "📊",
-    title: t.label,
-    subtitle: "Ø Stunden pro abgegebenem Tag",
+  const focusCards: MetricCardData[] = topics.map((topic) => ({
+    key: topic.key,
+    emoji: TOPIC_EMOJI[topic.key] ?? "📊",
+    title: topic.label,
+    subtitle: t("focusSubtitle"),
     unit: "h/Tag",
-    allValues: t.allValues,
-    userValue: t.userValue,
+    allValues: topic.allValues,
+    userValue: topic.userValue,
   }));
 
   const contextCards: MetricCardData[] = contextMetrics.map((m) => {
+    const label = t(`contextMetrics.${m.key}.label` as never);
     if (m.key === "wellbeing") {
       // Emoji and word come from the same five levels as in the Zeiterfassung
       const max = m.scaleMax ?? 5;
@@ -337,13 +378,15 @@ export default function KursvergleichTab({
         calculateMean(m.allValues),
         max,
       );
+      const you = level ? t(`satisfactionLevels.${level.rank}` as never) : "–";
+      const course = courseLevel
+        ? t(`satisfactionLevels.${courseLevel.rank}` as never)
+        : "–";
       return {
         key: m.key,
         emoji: level?.emoji ?? "😐",
-        title: m.label,
-        subtitle: level
-          ? `du: ${level.label} · Kurs: ${courseLevel?.label ?? "–"} · Skala 1–${max}`
-          : (m.description ?? ""),
+        title: label,
+        subtitle: t("wellbeingSubtitle", { you, course, max } as never),
         unit: m.unit,
         scaleMax: m.scaleMax,
         allValues: m.allValues,
@@ -353,8 +396,8 @@ export default function KursvergleichTab({
     return {
       key: m.key,
       emoji: CONTEXT_EMOJI[m.key] ?? "📊",
-      title: m.label,
-      subtitle: m.description ?? "",
+      title: label,
+      subtitle: t(`contextMetrics.${m.key}.description` as never),
       unit: m.unit,
       scaleMax: m.scaleMax,
       allValues: m.allValues,
@@ -374,13 +417,16 @@ export default function KursvergleichTab({
     ]),
   );
 
+  const youLabel = t("youShort");
+  const courseLabel = t("courseShort");
+
   return (
     <div className="space-y-4">
       {/* Global filters (same structure as Zeitverteilung) */}
       <div className="flex flex-col gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 shrink-0">
-            Tage
+            {tFilters("dayFilter.label")}
           </span>
           <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
             <button
@@ -392,7 +438,7 @@ export default function KursvergleichTab({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
-              Alle
+              {tFilters("dayFilter.all")}
             </button>
             <button
               type="button"
@@ -403,7 +449,7 @@ export default function KursvergleichTab({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
-              Werktage
+              {tFilters("dayFilter.weekdays")}
             </button>
             <button
               type="button"
@@ -414,7 +460,7 @@ export default function KursvergleichTab({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
             >
-              Wochenende
+              {tFilters("dayFilter.weekend")}
             </button>
           </div>
         </div>
@@ -426,7 +472,7 @@ export default function KursvergleichTab({
         {weekOptions.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 shrink-0">
-              KW
+              {tFilters("weekFilter.label")}
             </span>
             <button
               type="button"
@@ -437,7 +483,7 @@ export default function KursvergleichTab({
                   : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600"
               }`}
             >
-              Alle
+              {tFilters("weekFilter.all")}
             </button>
             {weekOptions.map((w) => (
               <button
@@ -462,10 +508,9 @@ export default function KursvergleichTab({
       {/* Reading aid — one line */}
       <p className="px-1 text-[11px] text-slate-500 dark:text-slate-400">
         <span className="mr-1.5 inline-block h-2 w-5 rounded-full bg-blue-500 align-middle" />
-        du
+        {t("you")}
         <span className="ml-3 mr-1.5 inline-block h-2 w-5 rounded-full bg-slate-400 align-middle" />
-        Ø Kurs · «über X % der Gruppe» = so viele Teilnehmende liegen unter
-        deinem Wert · anonym, keine Einzelwerte anderer Personen
+        {t("readingAid")}
       </p>
 
       {/* Not enough users disclaimer */}
@@ -473,16 +518,18 @@ export default function KursvergleichTab({
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-6 text-center">
           <p className="text-2xl mb-2">👥</p>
           <p className="text-sm font-semibold text-amber-800">
-            Vergleich noch nicht verfügbar
+            {t("notEnoughUsers.title")}
           </p>
           <p className="mt-1 text-xs text-amber-700">
-            Für den Kursvergleich müssen mindestens {MIN_USERS_FOR_COMPARISON}{" "}
-            Teilnehmende jeweils 2 Tage eingereicht haben. Schau später nochmal
-            rein!
+            {t("notEnoughUsers.description", {
+              minUsers: MIN_USERS_FOR_COMPARISON,
+            })}
           </p>
           <p className="mt-2 text-xs text-amber-500">
-            Aktuell qualifiziert: {qualifyingUserCount} /{" "}
-            {MIN_USERS_FOR_COMPARISON} Personen
+            {t("notEnoughUsers.qualifying", {
+              count: qualifyingUserCount,
+              minUsers: MIN_USERS_FOR_COMPARISON,
+            })}
           </p>
         </div>
       )}
@@ -492,14 +539,26 @@ export default function KursvergleichTab({
           {/* 1. Focus topics — three compact cards */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {focusCards.map((m) => (
-              <MetricCard key={m.key} metric={m} />
+              <MetricCard
+                key={m.key}
+                metric={m}
+                youLabel={youLabel}
+                courseLabel={courseLabel}
+                verdictT={verdictT}
+              />
             ))}
           </div>
 
           {/* 2. Context — four compact cards */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {contextCards.map((m) => (
-              <MetricCard key={m.key} metric={m} />
+              <MetricCard
+                key={m.key}
+                metric={m}
+                youLabel={youLabel}
+                courseLabel={courseLabel}
+                verdictT={verdictT}
+              />
             ))}
           </div>
 
@@ -507,15 +566,15 @@ export default function KursvergleichTab({
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                Zeitverteilung im Kursvergleich
+                {t("categoryTitle")}
               </h3>
               <p className="text-[11px] text-slate-400">
-                Ø Stunden pro abgegebenem Tag je Lebensbereich
+                {t("categorySubtitle")}
               </p>
             </div>
             {sortedCategories.length === 0 ? (
               <p className="py-6 text-center text-sm text-slate-400">
-                Noch keine vergleichbaren Daten.
+                {t("noComparableData")}
               </p>
             ) : (
               <div className="grid grid-cols-1 gap-x-8 gap-y-3.5 lg:grid-cols-2">
@@ -524,6 +583,9 @@ export default function KursvergleichTab({
                     key={c.categoryId}
                     category={c}
                     scaleMax={categoryScaleMax}
+                    youLabel={youLabel}
+                    courseLabel={courseLabel}
+                    verdictT={verdictT}
                   />
                 ))}
               </div>
