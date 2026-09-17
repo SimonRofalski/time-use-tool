@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { getLocalizedName } from "@/lib/i18n/localized-name";
 import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
 import ZeitverteilungTab from "@/app/[locale]/(protected)/statistiken/ZeitverteilungTab";
 import type {
@@ -28,17 +31,49 @@ type RawEntry = {
   social_context_ids: number[];
 };
 
+// Lookup row shapes — mirrors app/[locale]/(protected)/statistiken/page.tsx
 type ActivityLookup = {
   activity_id: number;
   name: string;
+  name_en: string;
   subcategory_id: number;
 };
 type SubcategoryLookup = {
   subcategory_id: number;
   name: string;
+  name_en: string;
   category_id: number;
 };
-type CategoryLookup = { category_id: number; name: string };
+type CategoryLookup = { category_id: number; name: string; name_en: string };
+type DigitalMediaTypeLookup = {
+  digital_media_type_id: number;
+  name: string;
+  name_en: string;
+  code: string;
+};
+type SocialContextLookup = {
+  social_context_id: number;
+  name: string;
+  name_en: string;
+  code: string;
+};
+type LocationTransportLookup = {
+  location_transport_id: number;
+  name: string;
+  name_en: string;
+  code: string;
+};
+type SatisfactionLookup = {
+  satisfaction_id: number;
+  name: string;
+  name_en: string;
+  code: string;
+};
+
+// { name, code } pair used for id → lookup maps: `name` is already localized
+// at construction time, `code` is the language-neutral classification key
+// (see ActivitySelector.tsx's *_VISUAL_BY_CODE maps for the canonical meanings).
+type NamedCode = { name: string; code: string };
 
 type RawSnapshot = {
   entries: RawEntry[];
@@ -48,9 +83,9 @@ type RawSnapshot = {
   activities: ActivityLookup[];
   subcategories: SubcategoryLookup[];
   categories: CategoryLookup[];
-  digitalMediaById: Record<number, string>;
-  socialContextById: Record<number, string>;
-  locationById: Record<number, string>;
+  digitalMediaById: Record<number, NamedCode>;
+  socialContextById: Record<number, NamedCode>;
+  locationById: Record<number, NamedCode>;
   satisfactionRankById: Record<number, number>;
   maxSatisfactionRank: number;
 };
@@ -83,15 +118,6 @@ function normalizeDateOnly(value: string): string {
   return value.slice(0, 10);
 }
 
-function normalizeLabel(value: string): string {
-  return value
-    .toLowerCase()
-    .replaceAll("ä", "ae")
-    .replaceAll("ö", "oe")
-    .replaceAll("ü", "ue")
-    .replaceAll("ß", "ss");
-}
-
 function isWeekend(dateString: string): boolean {
   const normalized = dateString.slice(0, 10);
   const [year, month, day] = normalized.split("-").map(Number);
@@ -116,29 +142,26 @@ function getIsoWeekInfo(dateString: string): { key: string; label: string } {
   };
 }
 
-function isAloneContext(name: string): boolean {
-  const normalized = normalizeLabel(name);
-  return normalized.includes("allein") || normalized.includes("solo");
+// Code-based classification (language-neutral, safe across locales) — mirrors
+// statistiken/page.tsx exactly, since this component duplicates its aggregation
+// logic for admin per-user drill-down. Replaces the previous German-substring
+// matching, which broke once lookup names became locale-dependent.
+function isAloneContextCode(code: string): boolean {
+  return code === "1"; // Alleine
 }
 
-function isAtHomeLocation(name: string): boolean {
-  const normalized = normalizeLabel(name);
-  return (
-    normalized.includes("zu hause") ||
-    normalized.includes("zuhause") ||
-    normalized.includes("daheim") ||
-    normalized.includes("home")
-  );
+// Codes 11 (Zuhause) and 14 (Zuhause anderer Personen) both count as "at home" —
+// matches the previous substring match, which matched "zuhause" in both names.
+function isAtHomeLocationCode(code: string): boolean {
+  return code === "11" || code === "14";
 }
 
-function getSatisfactionRankFromName(name: string): number | null {
-  const normalized = normalizeLabel(name);
-  if (normalized.includes("sehr gut")) return 5;
-  if (normalized === "gut" || normalized.includes(" gut")) return 4;
-  if (normalized.includes("mittel")) return 3;
-  if (normalized.includes("sehr schlecht")) return 1;
-  if (normalized.includes("schlecht")) return 2;
-  return null;
+// Satisfaction codes run 1 (sehr gut) … 5 (sehr schlecht); the rank scale is
+// inverted (higher = better) to match the previous name-derived ranking.
+function getSatisfactionRankFromCode(code: string): number | null {
+  const n = Number(code);
+  if (!Number.isInteger(n) || n < 1 || n > 5) return null;
+  return 6 - n;
 }
 
 function formatAverageSatisfactionLabel(
@@ -162,11 +185,12 @@ function buildZeitverteilungData(
   activities: ActivityLookup[],
   subcategories: SubcategoryLookup[],
   categories: CategoryLookup[],
-  digitalMediaById: Record<number, string>,
-  socialContextById: Record<number, string>,
-  locationById: Record<number, string>,
+  digitalMediaById: Record<number, NamedCode>,
+  socialContextById: Record<number, NamedCode>,
+  locationById: Record<number, NamedCode>,
   satisfactionRankById: Record<number, number>,
   maxSatisfactionRank: number,
+  t: ReturnType<typeof useTranslations<"statistiken">>,
 ): {
   categoryRows: CategoryRow[];
   barData: DayBarData[];
@@ -184,9 +208,12 @@ function buildZeitverteilungData(
   const uncategorizedByDate: Record<string, number> = {};
   let uncategorizedTotal = 0;
 
-  const deviceMinutesByName: Record<string, number> = {};
-  const socialMinutesByName: Record<string, number> = {};
-  const locationMinutesByName: Record<string, number> = {};
+  // Keyed by the language-neutral `code` (or a stable fallback sentinel) so
+  // buckets stay consistent across locales; `name` inside each entry is the
+  // already-localized display name.
+  const deviceMinutesByCode: Record<string, { name: string; code: string; minutes: number }> = {};
+  const socialMinutesByCode: Record<string, { name: string; code: string; minutes: number }> = {};
+  const locationMinutesByCode: Record<string, { name: string; code: string; minutes: number }> = {};
 
   const activityMetaById: Record<
     number,
@@ -223,33 +250,67 @@ function buildZeitverteilungData(
     if (deviceTypeIds.length > 0) {
       const split = minutes / deviceTypeIds.length;
       for (const id of deviceTypeIds) {
-        const name = digitalMediaById[id] ?? `Gerät #${id}`;
-        deviceMinutesByName[name] = (deviceMinutesByName[name] ?? 0) + split;
+        const info = digitalMediaById[id];
+        const key = info?.code ?? `id-${id}`;
+        if (!deviceMinutesByCode[key]) {
+          deviceMinutesByCode[key] = {
+            name: info?.name ?? t("fallbackLabels.unknownDevice", { id }),
+            code: info?.code ?? "",
+            minutes: 0,
+          };
+        }
+        deviceMinutesByCode[key].minutes += split;
       }
     } else {
-      deviceMinutesByName["Ohne IT-Gerät"] =
-        (deviceMinutesByName["Ohne IT-Gerät"] ?? 0) + minutes;
+      const key = "__no_device__";
+      if (!deviceMinutesByCode[key]) {
+        // code "0" (Kein IT-Hilfsmittel) so it picks up the matching icon
+        deviceMinutesByCode[key] = { name: t("fallbackLabels.noDevice"), code: "0", minutes: 0 };
+      }
+      deviceMinutesByCode[key].minutes += minutes;
     }
 
     const contextIds = entry.social_context_ids;
     if (contextIds.length > 0) {
       const split = minutes / contextIds.length;
       for (const id of contextIds) {
-        const name = socialContextById[id] ?? `Kontext #${id}`;
-        socialMinutesByName[name] = (socialMinutesByName[name] ?? 0) + split;
+        const info = socialContextById[id];
+        const key = info?.code ?? `id-${id}`;
+        if (!socialMinutesByCode[key]) {
+          socialMinutesByCode[key] = {
+            name: info?.name ?? t("fallbackLabels.unknownContext", { id }),
+            code: info?.code ?? "",
+            minutes: 0,
+          };
+        }
+        socialMinutesByCode[key].minutes += split;
       }
     } else {
-      socialMinutesByName["Allein"] =
-        (socialMinutesByName["Allein"] ?? 0) + minutes;
+      // Kept as a distinct bucket from an explicit "Alleine" selection (code "1"),
+      // matching the previous behavior where the two used different label text.
+      const key = "__no_context__";
+      if (!socialMinutesByCode[key]) {
+        socialMinutesByCode[key] = { name: t("fallbackLabels.aloneFallback"), code: "1", minutes: 0 };
+      }
+      socialMinutesByCode[key].minutes += minutes;
     }
 
-    const locationName =
+    const locationInfo =
       entry.location_transport_id != null
-        ? (locationById[entry.location_transport_id] ??
-          `Ort #${entry.location_transport_id}`)
-        : "Unbekannt";
-    locationMinutesByName[locationName] =
-      (locationMinutesByName[locationName] ?? 0) + minutes;
+        ? locationById[entry.location_transport_id]
+        : undefined;
+    const locationKey = locationInfo?.code ?? "__unknown_location__";
+    if (!locationMinutesByCode[locationKey]) {
+      locationMinutesByCode[locationKey] = {
+        name: locationInfo?.name ?? t("fallbackLabels.unknownLocation"),
+        code: locationInfo?.code ?? "",
+        minutes: 0,
+      };
+    }
+    locationMinutesByCode[locationKey].minutes += minutes;
+    const isAtHomeForEntry = locationInfo
+      ? isAtHomeLocationCode(locationInfo.code)
+      : false;
 
     if (entry.satisfaction_id != null) {
       const rank = satisfactionRankById[entry.satisfaction_id];
@@ -301,15 +362,15 @@ function buildZeitverteilungData(
       activityMeta.withoutDevicesMinutes += minutes;
     }
 
-    const contextNames = contextIds.map((id) => socialContextById[id] ?? "");
-    const hasOtherPeople = contextNames.some((name) => !isAloneContext(name));
+    const contextCodes = contextIds.map((id) => socialContextById[id]?.code ?? "");
+    const hasOtherPeople = contextCodes.some((code) => !isAloneContextCode(code));
     if (hasOtherPeople) {
       activityMeta.withPeopleMinutes += minutes;
     } else {
       activityMeta.aloneMinutes += minutes;
     }
 
-    if (isAtHomeLocation(locationName)) {
+    if (isAtHomeForEntry) {
       activityMeta.atHomeMinutes += minutes;
     } else {
       activityMeta.elsewhereMinutes += minutes;
@@ -411,7 +472,7 @@ function buildZeitverteilungData(
   if (uncategorizedTotal > 0) {
     categoryRows.push({
       categoryId: 0,
-      name: "Ohne Zuordnung",
+      name: t("uncategorizedLabel"),
       totalMinutes: uncategorizedTotal,
       percentOfTotal:
         grandTotal > 0 ? (uncategorizedTotal / grandTotal) * 100 : 0,
@@ -444,16 +505,22 @@ function buildZeitverteilungData(
     return dayEntry;
   });
 
-  const toSortedItems = (obj: Record<string, number>) =>
-    Object.entries(obj)
-      .map(([name, minutes]) => ({ name, minutes: Math.round(minutes) }))
+  const toSortedItems = (
+    obj: Record<string, { name: string; code: string; minutes: number }>,
+  ) =>
+    Object.values(obj)
+      .map((item) => ({
+        name: item.name,
+        code: item.code,
+        minutes: Math.round(item.minutes),
+      }))
       .sort((a, b) => b.minutes - a.minutes)
       .slice(0, 8);
 
   const metaAggregates: MetaAggregates = {
-    devices: toSortedItems(deviceMinutesByName),
-    social: toSortedItems(socialMinutesByName),
-    locations: toSortedItems(locationMinutesByName),
+    devices: toSortedItems(deviceMinutesByCode),
+    social: toSortedItems(socialMinutesByCode),
+    locations: toSortedItems(locationMinutesByCode),
     avgSatisfactionLabel: formatAverageSatisfactionLabel(
       overallSatisfactionWeightedSum,
       overallSatisfactionWeight,
@@ -491,6 +558,9 @@ export default function UserStatsView({
   userId: string;
   courseId: number;
 }) {
+  const t = useTranslations("statistiken");
+  const tLocal = useTranslations("adminUserStatsView");
+  const locale = useLocale() as Locale;
   const supabase = getSupabaseBrowserClient();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -539,6 +609,7 @@ export default function UserStatsView({
       raw.locationById,
       raw.satisfactionRankById,
       raw.maxSatisfactionRank,
+      t,
     );
 
     setCategoryRows(result.categoryRows);
@@ -611,7 +682,7 @@ export default function UserStatsView({
         .eq("course_id", courseId)
         .single();
       if (!courseData) {
-        setError("Kursdaten konnten nicht geladen werden.");
+        setError(t("errors.courseDataLoadError"));
         setIsLoading(false);
         return;
       }
@@ -626,62 +697,90 @@ export default function UserStatsView({
       await Promise.all([
         supabase
           .from("category")
-          .select("category_id, name")
+          .select("category_id, name, name_en")
           .order("category_id"),
         supabase
           .from("subcategory")
-          .select("subcategory_id, name, category_id")
+          .select("subcategory_id, name, name_en, category_id")
           .order("subcategory_id"),
         supabase
           .from("activity")
-          .select("activity_id, name, subcategory_id")
+          .select("activity_id, name, name_en, subcategory_id")
           .order("activity_id"),
         supabase
           .from("digital_media_type")
-          .select("digital_media_type_id, name")
+          .select("digital_media_type_id, name, name_en, code")
           .order("digital_media_type_id"),
         supabase
           .from("social_context")
-          .select("social_context_id, name")
+          .select("social_context_id, name, name_en, code")
           .order("social_context_id"),
         supabase
           .from("location_transport")
-          .select("location_transport_id, name")
+          .select("location_transport_id, name, name_en, code")
           .order("location_transport_id"),
         supabase
           .from("satisfaction")
-          .select("satisfaction_id, name")
+          .select("satisfaction_id, name, name_en, code")
           .order("satisfaction_id"),
       ]);
 
     if (cats.error || subs.error || acts.error) {
-      setError("Stammdaten konnten nicht geladen werden.");
+      setError(t("errors.lookupDataLoadError"));
       setIsLoading(false);
       return;
     }
 
-    const categories: CategoryLookup[] = cats.data ?? [];
-    const subcategories: SubcategoryLookup[] = subs.data ?? [];
-    const activities: ActivityLookup[] = acts.data ?? [];
+    // Localize display names once, here, so every downstream consumer that
+    // reads `.name` (chart keys, table rows, etc.) gets the right locale
+    // without further changes.
+    const categories: CategoryLookup[] = (cats.data ?? []).map((c) => ({
+      ...c,
+      name: getLocalizedName(c, locale),
+    }));
+    const subcategories: SubcategoryLookup[] = (subs.data ?? []).map((s) => ({
+      ...s,
+      name: getLocalizedName(s, locale),
+    }));
+    const activities: ActivityLookup[] = (acts.data ?? []).map((a) => ({
+      ...a,
+      name: getLocalizedName(a, locale),
+    }));
+    const mediaTypeRows: DigitalMediaTypeLookup[] = mediaTypes.data ?? [];
+    const socialContextRows: SocialContextLookup[] = socialContexts.data ?? [];
+    const locationRows: LocationTransportLookup[] = locations.data ?? [];
+    const satisfactionRows: SatisfactionLookup[] = sats.data ?? [];
 
-    const digitalMediaById: Record<number, string> = {};
-    for (const item of mediaTypes.data ?? []) {
-      digitalMediaById[item.digital_media_type_id] = item.name;
+    const digitalMediaById: Record<number, NamedCode> = {};
+    for (const item of mediaTypeRows) {
+      digitalMediaById[item.digital_media_type_id] = {
+        name: getLocalizedName(item, locale),
+        code: item.code,
+      };
     }
-    const socialContextById: Record<number, string> = {};
-    for (const item of socialContexts.data ?? []) {
-      socialContextById[item.social_context_id] = item.name;
+    const socialContextById: Record<number, NamedCode> = {};
+    for (const item of socialContextRows) {
+      socialContextById[item.social_context_id] = {
+        name: getLocalizedName(item, locale),
+        code: item.code,
+      };
     }
-    const locationById: Record<number, string> = {};
-    for (const item of locations.data ?? []) {
-      locationById[item.location_transport_id] = item.name;
+    const locationById: Record<number, NamedCode> = {};
+    for (const item of locationRows) {
+      locationById[item.location_transport_id] = {
+        name: getLocalizedName(item, locale),
+        code: item.code,
+      };
     }
     const satisfactionRankById: Record<number, number> = {};
     let maxSatisfactionRank = 1;
-    (sats.data ?? []).forEach((item) => {
-      const rank = getSatisfactionRankFromName(item.name) ?? 1;
+    satisfactionRows.forEach((item, index) => {
+      const derivedRank = getSatisfactionRankFromCode(item.code);
+      const rank = derivedRank ?? index + 1;
       satisfactionRankById[item.satisfaction_id] = rank;
-      if (rank > maxSatisfactionRank) maxSatisfactionRank = rank;
+      if (rank > maxSatisfactionRank) {
+        maxSatisfactionRank = rank;
+      }
     });
 
     // Load user's days for this course
@@ -761,6 +860,7 @@ export default function UserStatsView({
       locationById,
       satisfactionRankById,
       maxSatisfactionRank,
+      t,
     );
 
     setCategoryRows(result.categoryRows);
@@ -785,9 +885,7 @@ export default function UserStatsView({
   }
 
   if (isLoading) {
-    return (
-      <p className="text-sm text-slate-500 py-4">Statistiken werden geladen…</p>
-    );
+    return <p className="text-sm text-slate-500 py-4">{t("loading")}</p>;
   }
 
   if (error) {
@@ -796,9 +894,7 @@ export default function UserStatsView({
 
   if (barData.length === 0) {
     return (
-      <p className="text-sm text-slate-500 py-4">
-        Dieser Nutzer hat noch keine Daten erfasst.
-      </p>
+      <p className="text-sm text-slate-500 py-4">{tLocal("noData")}</p>
     );
   }
 

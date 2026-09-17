@@ -5,6 +5,9 @@ import { ChevronLeft, ChevronRight, Download, Plus, X } from "lucide-react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
+import { getLocalizedName } from "@/lib/i18n/localized-name";
 import { CATEGORY_COLORS } from "@/app/[locale]/(protected)/zeiterfassung/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import ConfirmModal from "./ConfirmModal";
@@ -12,7 +15,6 @@ import UserStatsView from "./UserStatsView";
 import {
   type CoursePeriod,
   totalPeriodDays,
-  periodsDurationLabel,
   formatPeriodLabel,
   validatePeriodsNoOverlap,
 } from "@/lib/course-periods";
@@ -99,12 +101,15 @@ type ConfirmModalState = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+function formatDate(dateString: string, locale: string): string {
+  return new Date(dateString).toLocaleDateString(
+    locale === "en" ? "en-US" : "de-DE",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    },
+  );
 }
 
 function courseDurationDays(startDate: string, endDate: string): number {
@@ -116,9 +121,15 @@ function courseDurationDays(startDate: string, endDate: string): number {
   );
 }
 
-function courseDurationLabel(startDate: string, endDate: string): string {
+function courseDurationLabel(
+  startDate: string,
+  endDate: string,
+  locale: string,
+): string {
   const days = courseDurationDays(startDate, endDate);
-  return `${days} Tag${days !== 1 ? "e" : ""}`;
+  const dayLabel =
+    locale === "en" ? `day${days !== 1 ? "s" : ""}` : `Tag${days !== 1 ? "e" : ""}`;
+  return `${days} ${dayLabel}`;
 }
 
 function userDisplayName(user: EnrolledUser, isAnonymized: boolean): string {
@@ -146,6 +157,8 @@ function hexToRgbTuple(hex: string): [number, number, number] {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function KursuebersichtTab() {
+  const t = useTranslations("kursuebersicht");
+  const locale = useLocale() as Locale;
   const supabase = getSupabaseBrowserClient();
 
   const [subTab, setSubTab] = useState<"alle" | "neu">("alle");
@@ -220,7 +233,7 @@ export default function KursuebersichtTab() {
       .order("start_date", { ascending: false });
 
     if (courseErr || !courseData) {
-      setCoursesError("Kurse konnten nicht geladen werden.");
+      setCoursesError(t("errors.coursesLoadError"));
       setIsLoadingCourses(false);
       return;
     }
@@ -397,38 +410,46 @@ export default function KursuebersichtTab() {
       activityIds.length > 0
         ? supabase
             .from("activity")
-            .select("activity_id, name")
+            .select("activity_id, name, name_en")
             .in("activity_id", activityIds)
         : Promise.resolve({
-            data: [] as { activity_id: number; name: string }[],
+            data: [] as { activity_id: number; name: string; name_en: string }[],
           }),
       locationIds.length > 0
         ? supabase
             .from("location_transport")
-            .select("location_transport_id, name")
+            .select("location_transport_id, name, name_en")
             .in("location_transport_id", locationIds)
         : Promise.resolve({
-            data: [] as { location_transport_id: number; name: string }[],
+            data: [] as {
+              location_transport_id: number;
+              name: string;
+              name_en: string;
+            }[],
           }),
       satisfactionIds.length > 0
         ? supabase
             .from("satisfaction")
-            .select("satisfaction_id, name")
+            .select("satisfaction_id, name, name_en")
             .in("satisfaction_id", satisfactionIds)
         : Promise.resolve({
-            data: [] as { satisfaction_id: number; name: string }[],
+            data: [] as {
+              satisfaction_id: number;
+              name: string;
+              name_en: string;
+            }[],
           }),
     ]);
 
     const activityMap: Record<number, string> = {};
     for (const a of activitiesRes.data ?? [])
-      activityMap[a.activity_id] = a.name;
+      activityMap[a.activity_id] = getLocalizedName(a, locale);
     const locationMap: Record<number, string> = {};
     for (const l of locationsRes.data ?? [])
-      locationMap[l.location_transport_id] = l.name;
+      locationMap[l.location_transport_id] = getLocalizedName(l, locale);
     const satisfactionMap: Record<number, string> = {};
     for (const s of satisfactionsRes.data ?? [])
-      satisfactionMap[s.satisfaction_id] = s.name;
+      satisfactionMap[s.satisfaction_id] = getLocalizedName(s, locale);
 
     const entries: EntryRow[] = rawEntries.map((e) => ({
       entry_id: e.entry_id,
@@ -544,13 +565,15 @@ export default function KursuebersichtTab() {
       // Load all categories
       const { data: categories } = await supabase
         .from("category")
-        .select("category_id, name")
+        .select("category_id, name, name_en")
         .order("category_id");
 
       // Load activity → category mapping
       const { data: activities } = await supabase
         .from("activity")
-        .select("activity_id, name, subcategory:subcategory_id(category_id)");
+        .select(
+          "activity_id, name, name_en, subcategory:subcategory_id(category_id)",
+        );
 
       const [
         locationsRes,
@@ -560,12 +583,14 @@ export default function KursuebersichtTab() {
       ] = await Promise.all([
         supabase
           .from("location_transport")
-          .select("location_transport_id, name"),
-        supabase.from("social_context").select("social_context_id, name"),
+          .select("location_transport_id, name, name_en"),
+        supabase
+          .from("social_context")
+          .select("social_context_id, name, name_en"),
         supabase
           .from("digital_media_type")
-          .select("digital_media_type_id, name"),
-        supabase.from("satisfaction").select("satisfaction_id, name"),
+          .select("digital_media_type_id, name, name_en"),
+        supabase.from("satisfaction").select("satisfaction_id, name, name_en"),
       ]);
 
       const activityToCategoryId: Record<number, number> = {};
@@ -578,29 +603,38 @@ export default function KursuebersichtTab() {
             ? (a.subcategory as { category_id: number }).category_id
             : null;
         if (catId != null) activityToCategoryId[a.activity_id] = catId;
-        activityNameById[a.activity_id] = a.name;
+        activityNameById[a.activity_id] = getLocalizedName(a, locale);
       }
 
       const locationNameById: Record<number, string> = {};
       for (const l of locationsRes.data ?? []) {
-        locationNameById[l.location_transport_id] = l.name;
+        locationNameById[l.location_transport_id] = getLocalizedName(
+          l,
+          locale,
+        );
       }
       const socialContextNameById: Record<number, string> = {};
       for (const s of socialContextsRes.data ?? []) {
-        socialContextNameById[s.social_context_id] = s.name;
+        socialContextNameById[s.social_context_id] = getLocalizedName(
+          s,
+          locale,
+        );
       }
       const digitalMediaTypeNameById: Record<number, string> = {};
       for (const m of digitalMediaTypesRes.data ?? []) {
-        digitalMediaTypeNameById[m.digital_media_type_id] = m.name;
+        digitalMediaTypeNameById[m.digital_media_type_id] = getLocalizedName(
+          m,
+          locale,
+        );
       }
       const satisfactionNameById: Record<number, string> = {};
       for (const s of satisfactionsRes.data ?? []) {
-        satisfactionNameById[s.satisfaction_id] = s.name;
+        satisfactionNameById[s.satisfaction_id] = getLocalizedName(s, locale);
       }
 
       const categoryNameById: Record<number, string> = {};
       for (const c of categories ?? [])
-        categoryNameById[c.category_id] = c.name;
+        categoryNameById[c.category_id] = getLocalizedName(c, locale);
       const categoryIds = (categories ?? []).map((c) => c.category_id);
 
       // Load all days for this course
@@ -691,14 +725,17 @@ export default function KursuebersichtTab() {
 
         rows = courseUsers.map((u) => {
           const row: Record<string, string | number> = {
-            Vorname: u.firstName ?? "",
-            Nachname: u.lastName ?? "",
-            "Tage erfasst": submittedDaysByUser[u.userId] ?? 0,
+            [t("csvExport.firstName")]: u.firstName ?? "",
+            [t("csvExport.lastName")]: u.lastName ?? "",
+            [t("csvExport.daysRecorded")]: submittedDaysByUser[u.userId] ?? 0,
           };
           for (const catId of categoryIds) {
             const mins = minutesByUserCategory[u.userId]?.[catId] ?? 0;
-            row[`${categoryNameById[catId]} (h)`] =
-              Math.round((mins / 60) * 10) / 10;
+            row[
+              t("csvExport.categoryHoursColumn", {
+                category: categoryNameById[catId],
+              })
+            ] = Math.round((mins / 60) * 10) / 10;
           }
           return row;
         });
@@ -723,41 +760,48 @@ export default function KursuebersichtTab() {
                 ? activityToCategoryId[e.primary_activity_id]
                 : undefined;
             return {
-              Vorname: user?.firstName ?? "",
-              Nachname: user?.lastName ?? "",
-              Datum: dayDateMap[e.day_id]
-                ? formatDate(dayDateMap[e.day_id])
+              [t("csvExport.firstName")]: user?.firstName ?? "",
+              [t("csvExport.lastName")]: user?.lastName ?? "",
+              [t("csvExport.date")]: dayDateMap[e.day_id]
+                ? formatDate(dayDateMap[e.day_id], locale)
                 : "",
-              Start: e.start_time,
-              Ende: e.end_time,
-              "Dauer (min)": minutes,
-              "Dauer (h)": Math.round((minutes / 60) * 100) / 100,
-              Kategorie:
+              [t("csvExport.start")]: e.start_time,
+              [t("csvExport.end")]: e.end_time,
+              [t("csvExport.durationMin")]: minutes,
+              [t("csvExport.durationH")]:
+                Math.round((minutes / 60) * 100) / 100,
+              [t("csvExport.category")]:
                 categoryId != null ? (categoryNameById[categoryId] ?? "") : "",
-              Aktivitaet:
+              [t("csvExport.activity")]:
                 e.primary_activity_id != null
                   ? (activityNameById[e.primary_activity_id] ?? "")
                   : "",
-              Nebenaktivitaet:
+              [t("csvExport.secondaryActivity")]:
                 e.secondary_activity_id != null
                   ? (activityNameById[e.secondary_activity_id] ?? "")
                   : "",
-              "Digitale Medien genutzt": e.digital_media_used ? "Ja" : "Nein",
-              Medienarten: (e.time_entry_digital_media_type ?? [])
+              [t("csvExport.digitalMediaUsed")]: e.digital_media_used
+                ? t("csvExport.yes")
+                : t("csvExport.no"),
+              [t("csvExport.mediaTypes")]: (
+                e.time_entry_digital_media_type ?? []
+              )
                 .map((m) => m.digital_media_type_id)
                 .filter((id): id is number => typeof id === "number")
                 .map((id) => digitalMediaTypeNameById[id] ?? `#${id}`)
                 .join(", "),
-              "Ort / Transport":
+              [t("csvExport.locationTransport")]:
                 e.location_transport_id != null
                   ? (locationNameById[e.location_transport_id] ?? "")
                   : "",
-              "Sozialer Kontext": (e.time_entry_social_context ?? [])
+              [t("csvExport.socialContext")]: (
+                e.time_entry_social_context ?? []
+              )
                 .map((s) => s.social_context_id)
                 .filter((id): id is number => typeof id === "number")
                 .map((id) => socialContextNameById[id] ?? `#${id}`)
                 .join(", "),
-              Zufriedenheit:
+              [t("csvExport.satisfaction")]:
                 e.satisfaction_id != null
                   ? (satisfactionNameById[e.satisfaction_id] ?? "")
                   : "",
@@ -767,7 +811,11 @@ export default function KursuebersichtTab() {
 
       const headers = Object.keys(rows[0] ?? {});
       const safeCourseName = courseName.replace(/[^\w\- äöüÄÖÜß]/g, "").trim();
-      const modeSuffix = granularity === "aggregiert" ? "Aggregiert" : "Roh";
+      const modeSuffix =
+        granularity === "aggregiert"
+          ? t("csvExport.modeAggregated")
+          : t("csvExport.modeRaw");
+      const fileNamePrefix = `${safeCourseName}_${t("csvExport.sheetName")}_${modeSuffix}`;
 
       if (format === "csv") {
         const bom = "\uFEFF";
@@ -781,15 +829,15 @@ export default function KursuebersichtTab() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${safeCourseName}_Statistiken_${modeSuffix}.csv`;
+        a.download = `${fileNamePrefix}.csv`;
         a.click();
         URL.revokeObjectURL(url);
       } else {
         const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
         ws["!cols"] = headers.map((h) => ({ wch: Math.max(h.length, 14) }));
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Statistiken");
-        XLSX.writeFile(wb, `${safeCourseName}_Statistiken_${modeSuffix}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, t("csvExport.sheetName"));
+        XLSX.writeFile(wb, `${fileNamePrefix}.xlsx`);
       }
     } finally {
       setIsExporting(false);
@@ -807,12 +855,12 @@ export default function KursuebersichtTab() {
         await Promise.all([
           supabase
             .from("category")
-            .select("category_id, name")
+            .select("category_id, name, name_en")
             .order("category_id"),
           supabase
             .from("activity")
             .select(
-              "activity_id, name, subcategory:subcategory_id(category_id)",
+              "activity_id, name, name_en, subcategory:subcategory_id(category_id)",
             ),
           supabase
             .from("day")
@@ -822,18 +870,18 @@ export default function KursuebersichtTab() {
 
       const { data: digitalMediaTypes } = await supabase
         .from("digital_media_type")
-        .select("digital_media_type_id, name");
+        .select("digital_media_type_id, name, name_en");
 
       const categoryNameById: Record<number, string> = {};
       const categoryIds = (categories ?? []).map((c) => {
-        categoryNameById[c.category_id] = c.name;
+        categoryNameById[c.category_id] = getLocalizedName(c, locale);
         return c.category_id;
       });
 
       const activityNameById: Record<number, string> = {};
       const activityToCategoryId: Record<number, number> = {};
       for (const a of activities ?? []) {
-        activityNameById[a.activity_id] = a.name;
+        activityNameById[a.activity_id] = getLocalizedName(a, locale);
         const catId =
           a.subcategory &&
           typeof a.subcategory === "object" &&
@@ -845,7 +893,10 @@ export default function KursuebersichtTab() {
 
       const digitalMediaTypeNameById: Record<number, string> = {};
       for (const m of digitalMediaTypes ?? []) {
-        digitalMediaTypeNameById[m.digital_media_type_id] = m.name;
+        digitalMediaTypeNameById[m.digital_media_type_id] = getLocalizedName(
+          m,
+          locale,
+        );
       }
 
       const dayProfileMap: Record<number, string> = {};
@@ -932,13 +983,14 @@ export default function KursuebersichtTab() {
             .filter((id): id is number => typeof id === "number");
 
           if (mediaIds.length === 0) {
-            minutesByUserDevice[userId]["IT-Gerät (nicht spezifiziert)"] =
-              (minutesByUserDevice[userId]["IT-Gerät (nicht spezifiziert)"] ??
-                0) + mins;
+            const unspecifiedLabel = t("pdfExport.unspecifiedDevice");
+            minutesByUserDevice[userId][unspecifiedLabel] =
+              (minutesByUserDevice[userId][unspecifiedLabel] ?? 0) + mins;
           } else {
             for (const mediaId of mediaIds) {
               const name =
-                digitalMediaTypeNameById[mediaId] ?? `Gerät ${mediaId}`;
+                digitalMediaTypeNameById[mediaId] ??
+                t("pdfExport.deviceFallback", { id: mediaId });
               minutesByUserDevice[userId][name] =
                 (minutesByUserDevice[userId][name] ?? 0) + mins;
             }
@@ -950,9 +1002,7 @@ export default function KursuebersichtTab() {
         (u) => !u.isExcluded && (submittedDaysByUser[u.userId] ?? 0) > 0,
       );
       if (usersWithData.length === 0) {
-        window.alert(
-          "Keine abgegebenen Nutzerdaten für den PDF-Export gefunden.",
-        );
+        window.alert(t("errors.noSubmittedUserData"));
         return;
       }
 
@@ -968,7 +1018,9 @@ export default function KursuebersichtTab() {
 
       const safeCourseName = courseName.replace(/[^\w\- äöüÄÖÜß]/g, "").trim();
       const doc = new jsPDF({ unit: "mm", format: "a4" });
-      const generatedAt = new Date().toLocaleDateString("de-DE");
+      const generatedAt = new Date().toLocaleDateString(
+        locale === "en" ? "en-US" : "de-DE",
+      );
 
       const drawComparisonChart = (
         title: string,
@@ -985,7 +1037,7 @@ export default function KursuebersichtTab() {
         doc.setFontSize(8);
         doc.setFillColor(15, 118, 110);
         doc.rect(14, startY + 2, 3, 3, "F");
-        doc.text("Kursschnitt", 19, startY + 4.5);
+        doc.text(t("pdfExport.courseAverageLegend"), 19, startY + 4.5);
 
         const topRows = rows.slice(0, 5);
         const maxValue = Math.max(
@@ -1040,23 +1092,35 @@ export default function KursuebersichtTab() {
         );
 
         doc.setFontSize(14);
-        doc.text("Benutzer-Auswertung", 14, 16);
+        doc.text(t("pdfExport.userEvaluationTitle"), 14, 16);
         doc.setFontSize(10);
-        doc.text(`Kurs: ${courseName}`, 14, 23);
-        doc.text(`Teilnehmer: ${fullName}`, 14, 28);
-        doc.text(`Erstellt am: ${generatedAt}`, 14, 33);
+        doc.text(t("pdfExport.courseLabel", { name: courseName }), 14, 23);
+        doc.text(t("pdfExport.participantLabel", { name: fullName }), 14, 28);
+        doc.text(
+          t("pdfExport.createdAtLabel", { date: generatedAt }),
+          14,
+          33,
+        );
 
         doc.setFontSize(10);
-        doc.text(`Abgegebene Tage: ${submittedDays}`, 14, 40);
         doc.text(
-          `Gesamtstunden: ${Math.round((totalMinutes / 60) * 10) / 10}`,
+          t("pdfExport.submittedDaysLabel", { count: submittedDays }),
+          14,
+          40,
+        );
+        doc.text(
+          t("pdfExport.totalHoursLabel", {
+            hours: Math.round((totalMinutes / 60) * 10) / 10,
+          }),
           14,
           45,
         );
 
         const comparisonHoursData = categoryIds
           .map((catId) => ({
-            label: categoryNameById[catId] ?? `Kategorie ${catId}`,
+            label:
+              categoryNameById[catId] ??
+              t("pdfExport.categoryFallback", { id: catId }),
             userValue:
               Math.round(((userCategoryMinutes[catId] ?? 0) / 60) * 10) / 10,
             avgValue:
@@ -1067,7 +1131,7 @@ export default function KursuebersichtTab() {
           .sort((a, b) => b.userValue - a.userValue);
 
         const chartEndY = drawComparisonChart(
-          "Vergleich mit Kursschnitt",
+          t("pdfExport.comparisonChartTitle"),
           50,
           comparisonHoursData,
         );
@@ -1082,7 +1146,8 @@ export default function KursuebersichtTab() {
               Math.round((courseAvgMinutesByCategory[catId] / 60) * 10) / 10;
             const diff = Math.round((hours - avgHours) * 10) / 10;
             return [
-              categoryNameById[catId] ?? `Kategorie ${catId}`,
+              categoryNameById[catId] ??
+                t("pdfExport.categoryFallback", { id: catId }),
               String(hours),
               `${share}%`,
               String(avgHours),
@@ -1100,9 +1165,11 @@ export default function KursuebersichtTab() {
               totalMinutes > 0 ? Math.round((mins / totalMinutes) * 100) : 0;
             return [
               catId != null
-                ? (categoryNameById[catId] ?? `Kategorie ${catId}`)
-                : "Unbekannt",
-              activityNameById[actId] ?? `Aktivitaet ${activityId}`,
+                ? (categoryNameById[catId] ??
+                  t("pdfExport.categoryFallback", { id: catId }))
+                : t("pdfExport.unknownCategory"),
+              activityNameById[actId] ??
+                t("pdfExport.activityFallback", { id: activityId }),
               String(hours),
               `${share}%`,
             ];
@@ -1113,13 +1180,19 @@ export default function KursuebersichtTab() {
 
         autoTable(doc, {
           startY: chartEndY + 6,
-          head: [
-            ["Kategorie", "Stunden", "Anteil", "Kursschnitt (h)", "Differenz"],
-          ],
+          head: [t.raw("pdfExport.categoryTableHeaders") as string[]],
           body:
             categoryRows.length > 0
               ? categoryRows
-              : [["Keine erfassten Kategorien", "0", "0%", "0", "0"]],
+              : [
+                  [
+                    t("pdfExport.noCategoriesRecorded"),
+                    "0",
+                    "0%",
+                    "0",
+                    "0",
+                  ],
+                ],
           styles: { fontSize: 9 },
           headStyles: { fillColor: [71, 85, 105] },
         });
@@ -1128,15 +1201,15 @@ export default function KursuebersichtTab() {
           ((doc as unknown as { lastAutoTable?: { finalY?: number } })
             .lastAutoTable?.finalY ?? chartEndY + 6) + 6;
         doc.setFontSize(11);
-        doc.text("Top 5 Aktivitaeten", 14, afterCategoryTableY);
+        doc.text(t("pdfExport.top5ActivitiesTitle"), 14, afterCategoryTableY);
 
         autoTable(doc, {
           startY: afterCategoryTableY + 2,
-          head: [["Kategorie", "Aktivitaet", "Stunden", "Anteil"]],
+          head: [t.raw("pdfExport.activityTableHeaders") as string[]],
           body:
             topActivityRows.length > 0
               ? topActivityRows
-              : [["-", "Keine Aktivitaeten", "0", "0%"]],
+              : [["-", t("pdfExport.noActivitiesRecorded"), "0", "0%"]],
           styles: { fontSize: 8 },
           headStyles: { fillColor: [59, 130, 246] },
           columnStyles: {
@@ -1159,8 +1232,12 @@ export default function KursuebersichtTab() {
             ? Math.round((withoutItHours / totalItHours) * 100)
             : 0;
         const deviceSplitRows = [
-          ["Mit IT-Nutzung", String(withItHours), `${withItPercent}%`],
-          ["Ohne IT-Nutzung", String(withoutItHours), `${withoutItPercent}%`],
+          [t("pdfExport.withIt"), String(withItHours), `${withItPercent}%`],
+          [
+            t("pdfExport.withoutIt"),
+            String(withoutItHours),
+            `${withoutItPercent}%`,
+          ],
         ];
 
         const deviceRows = Object.entries(minutesByUserDevice[u.userId] ?? {})
@@ -1175,11 +1252,11 @@ export default function KursuebersichtTab() {
           ((doc as unknown as { lastAutoTable?: { finalY?: number } })
             .lastAutoTable?.finalY ?? afterCategoryTableY + 2) + 8;
         doc.setFontSize(11);
-        doc.text("Geräte-Nutzung", 14, afterActivityTableY);
+        doc.text(t("pdfExport.deviceUsageTitle"), 14, afterActivityTableY);
 
         autoTable(doc, {
           startY: afterActivityTableY + 2,
-          head: [["IT-Nutzung", "Stunden", "Anteil"]],
+          head: [t.raw("pdfExport.itUsageTableHeaders") as string[]],
           body: deviceSplitRows,
           styles: { fontSize: 9 },
           headStyles: { fillColor: [30, 64, 175] },
@@ -1189,21 +1266,21 @@ export default function KursuebersichtTab() {
           ((doc as unknown as { lastAutoTable?: { finalY?: number } })
             .lastAutoTable?.finalY ?? afterActivityTableY + 2) + 6;
         doc.setFontSize(11);
-        doc.text("Geräte innerhalb IT-Nutzung", 14, afterDeviceSplitY);
+        doc.text(t("pdfExport.devicesWithinItTitle"), 14, afterDeviceSplitY);
 
         autoTable(doc, {
           startY: afterDeviceSplitY + 2,
-          head: [["Geraet", "Stunden"]],
+          head: [t.raw("pdfExport.deviceTableHeaders") as string[]],
           body:
             deviceRows.length > 0
               ? deviceRows
-              : [["Keine detaillierten Gerätedaten", "0"]],
+              : [[t("pdfExport.noDetailedDeviceData"), "0"]],
           styles: { fontSize: 9 },
           headStyles: { fillColor: [51, 65, 85] },
         });
       });
 
-      doc.save(`${safeCourseName}_Benutzerauswertungen.pdf`);
+      doc.save(`${safeCourseName}_${t("pdfExport.filenameSuffix")}.pdf`);
     } finally {
       setIsExporting(false);
     }
@@ -1293,7 +1370,7 @@ export default function KursuebersichtTab() {
     setCreateSuccess(false);
 
     if (!newName.trim() || !newAccessCode.trim()) {
-      setCreateError("Bitte alle Felder ausfüllen.");
+      setCreateError(t("errors.fillAllFields"));
       setIsCreating(false);
       return;
     }
@@ -1301,12 +1378,12 @@ export default function KursuebersichtTab() {
     // Validate every period
     for (const p of newPeriods) {
       if (!p.start || !p.end) {
-        setCreateError("Bitte für jeden Zeitraum Start- und Enddatum angeben.");
+        setCreateError(t("errors.periodDatesRequired"));
         setIsCreating(false);
         return;
       }
       if (p.end < p.start) {
-        setCreateError("Das Enddatum muss nach dem Startdatum liegen.");
+        setCreateError(t("errors.periodEndBeforeStart"));
         setIsCreating(false);
         return;
       }
@@ -1315,6 +1392,7 @@ export default function KursuebersichtTab() {
     // Validate no overlaps between periods
     const overlapError = validatePeriodsNoOverlap(
       newPeriods.map((p) => ({ start_date: p.start, end_date: p.end })),
+      locale,
     );
     if (overlapError) {
       setCreateError(overlapError);
@@ -1348,7 +1426,7 @@ export default function KursuebersichtTab() {
 
     if (courseError || !courseInsert) {
       setCreateError(
-        "Kurs konnte nicht erstellt werden: " + (courseError?.message ?? ""),
+        t("errors.courseCreateError", { message: courseError?.message ?? "" }),
       );
       setIsCreating(false);
       return;
@@ -1367,7 +1445,7 @@ export default function KursuebersichtTab() {
 
     if (periodError) {
       setCreateError(
-        "Zeiträume konnten nicht gespeichert werden: " + periodError.message,
+        t("errors.periodsSaveError", { message: periodError.message }),
       );
       setIsCreating(false);
       return;
@@ -1391,7 +1469,7 @@ export default function KursuebersichtTab() {
           onClick={() => setView({ type: "list" })}
           className="hover:text-slate-800 transition-colors"
         >
-          Alle Kurse
+          {t("breadcrumb.allCourses")}
         </button>
         {view.type === "course" && (
           <>
@@ -1437,7 +1515,7 @@ export default function KursuebersichtTab() {
       <form onSubmit={handleCreateCourse} className="max-w-md space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Kursname
+            {t("newCourseForm.nameLabel")}
           </label>
           <input
             type="text"
@@ -1447,7 +1525,7 @@ export default function KursuebersichtTab() {
               setCreateError("");
               setCreateSuccess(false);
             }}
-            placeholder="z. B. Sommersemester 2026"
+            placeholder={t("newCourseForm.namePlaceholder")}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
@@ -1456,7 +1534,7 @@ export default function KursuebersichtTab() {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <label className="block text-sm font-medium text-slate-700">
-              Zeiträume
+              {t("newCourseForm.periodsLabel")}
             </label>
             <button
               type="button"
@@ -1468,7 +1546,7 @@ export default function KursuebersichtTab() {
               className="flex items-center gap-1 text-xs font-medium text-blue-600 transition-colors hover:text-blue-700"
             >
               <Plus size={13} />
-              Zeitraum hinzufügen
+              {t("newCourseForm.addPeriodButton")}
             </button>
           </div>
 
@@ -1478,8 +1556,8 @@ export default function KursuebersichtTab() {
                 <div className="flex-1">
                   <label className="block text-xs text-slate-500 mb-1">
                     {newPeriods.length > 1
-                      ? `Zeitraum ${i + 1} – Start`
-                      : "Startdatum"}
+                      ? t("newCourseForm.periodStartLabel", { index: i + 1 })
+                      : t("newCourseForm.startDateLabel")}
                   </label>
                   <input
                     type="date"
@@ -1497,7 +1575,9 @@ export default function KursuebersichtTab() {
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs text-slate-500 mb-1">
-                    {newPeriods.length > 1 ? `Ende` : "Enddatum"}
+                    {newPeriods.length > 1
+                      ? t("newCourseForm.periodEndLabel")
+                      : t("newCourseForm.endDateLabel")}
                   </label>
                   <input
                     type="date"
@@ -1522,7 +1602,7 @@ export default function KursuebersichtTab() {
                       setCreateSuccess(false);
                     }}
                     className="mb-0.5 rounded p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                    title="Zeitraum entfernen"
+                    title={t("newCourseForm.removePeriodTitle")}
                   >
                     <X size={14} />
                   </button>
@@ -1534,7 +1614,7 @@ export default function KursuebersichtTab() {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Zugangscode
+            {t("newCourseForm.accessCodeLabel")}
           </label>
           <input
             type="text"
@@ -1544,7 +1624,7 @@ export default function KursuebersichtTab() {
               setCreateError("");
               setCreateSuccess(false);
             }}
-            placeholder="z. B. SS2026"
+            placeholder={t("newCourseForm.accessCodePlaceholder")}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
@@ -1552,7 +1632,7 @@ export default function KursuebersichtTab() {
         {createError && <p className="text-sm text-red-600">{createError}</p>}
         {createSuccess && (
           <p className="text-sm text-green-600 font-medium">
-            Kurs wurde erfolgreich erstellt.
+            {t("newCourseForm.createSuccess")}
           </p>
         )}
 
@@ -1561,7 +1641,9 @@ export default function KursuebersichtTab() {
           disabled={isCreating}
           className="rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
-          {isCreating ? "Wird erstellt…" : "Kurs erstellen"}
+          {isCreating
+            ? t("newCourseForm.creatingButton")
+            : t("newCourseForm.createButton")}
         </button>
       </form>
     );
@@ -1569,12 +1651,12 @@ export default function KursuebersichtTab() {
 
   function renderCourseList() {
     if (isLoadingCourses)
-      return <p className="text-sm text-slate-500">Wird geladen…</p>;
+      return <p className="text-sm text-slate-500">{t("loading")}</p>;
     if (coursesError)
       return <p className="text-sm text-red-600">{coursesError}</p>;
     if (courses.length === 0) {
       return (
-        <p className="text-sm text-slate-500">Noch keine Kurse vorhanden.</p>
+        <p className="text-sm text-slate-500">{t("courseList.noCourses")}</p>
       );
     }
 
@@ -1624,21 +1706,26 @@ export default function KursuebersichtTab() {
                     {course.periods.length > 0 ? (
                       course.periods.map((p) => (
                         <p key={p.course_period_id} className="break-words">
-                          {formatPeriodLabel(p.start_date, p.end_date)}
+                          {formatPeriodLabel(p.start_date, p.end_date, locale)}
                         </p>
                       ))
                     ) : (
                       <p className="break-words">
-                        {formatDate(course.start_date)} –{" "}
-                        {formatDate(course.end_date)}
+                        {formatDate(course.start_date, locale)} –{" "}
+                        {formatDate(course.end_date, locale)}
                         {" · "}
                         {courseDurationLabel(
                           course.start_date,
                           course.end_date,
+                          locale,
                         )}
                       </p>
                     )}
-                    <p className="break-words">{course.userCount} Teilnehmer</p>
+                    <p className="break-words">
+                      {t("courseList.participantsLabel", {
+                        count: course.userCount,
+                      })}
+                    </p>
                   </div>
                 </button>
 
@@ -1646,16 +1733,16 @@ export default function KursuebersichtTab() {
                 <div className="flex flex-wrap items-center gap-1.5 sm:justify-end sm:gap-2">
                   {course.anonymized_at && (
                     <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 sm:px-2.5 sm:py-1 sm:text-xs">
-                      Anonymisiert
+                      {t("courseList.anonymizedBadge")}
                     </span>
                   )}
                   {course.comparison_enabled ? (
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 sm:px-2.5 sm:py-1 sm:text-xs">
-                      Kursvergleich frei
+                      {t("courseList.comparisonEnabledBadge")}
                     </span>
                   ) : (
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400 sm:px-2.5 sm:py-1 sm:text-xs">
-                      Kursvergleich gesperrt
+                      {t("courseList.comparisonDisabledBadge")}
                     </span>
                   )}
                 </div>
@@ -1665,7 +1752,7 @@ export default function KursuebersichtTab() {
               <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800 sm:mt-3 sm:pt-3">
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <span className="text-[11px] text-slate-400 dark:text-slate-500 sm:text-xs">
-                    Zugangscode:
+                    {t("courseList.accessCodeLabel")}
                   </span>
                   {isEditingCode ? (
                     <>
@@ -1691,14 +1778,14 @@ export default function KursuebersichtTab() {
                         }
                         className="text-[11px] font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 sm:text-xs"
                       >
-                        Speichern
+                        {t("courseList.saveButton")}
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingAccessCode(null)}
                         className="text-[11px] text-slate-400 hover:text-slate-600 sm:text-xs"
                       >
-                        Abbrechen
+                        {t("courseList.cancelButton")}
                       </button>
                     </>
                   ) : (
@@ -1716,7 +1803,7 @@ export default function KursuebersichtTab() {
                         }
                         className="text-[11px] text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300 sm:text-xs"
                       >
-                        Ändern
+                        {t("courseList.changeButton")}
                       </button>
                     </>
                   )}
@@ -1727,17 +1814,21 @@ export default function KursuebersichtTab() {
                     type="button"
                     onClick={() =>
                       setConfirmModal({
-                        title: `Kurs beenden`,
-                        message: `Soll der Kurs „${course.name}" wirklich beendet werden? Diese Aktion kann nicht rückgängig gemacht werden.`,
+                        title: t("courseList.endCourseConfirm.title"),
+                        message: t("courseList.endCourseConfirm.message", {
+                          name: course.name,
+                        }),
                         variant: "danger",
-                        confirmLabel: "Beenden",
+                        confirmLabel: t(
+                          "courseList.endCourseConfirm.confirmLabel",
+                        ),
                         onConfirm: () =>
                           void handleLockCourse(course.course_id),
                       })
                     }
                     className="rounded-lg border border-red-200 px-2.5 py-1 text-[11px] font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 sm:px-3 sm:py-1.5 sm:text-xs"
                   >
-                    Kurs beenden
+                    {t("courseList.endCourseButton")}
                   </button>
                 )}
               </div>
@@ -1762,7 +1853,7 @@ export default function KursuebersichtTab() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <ChevronLeft size={13} />
-            Zur Kursuebersicht
+            {t("courseDetail.backToOverviewButton")}
           </button>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1773,7 +1864,7 @@ export default function KursuebersichtTab() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
             >
               <Download size={13} />
-              Datenexport
+              {t("courseDetail.exportButton")}
             </button>
 
             <button
@@ -1791,8 +1882,8 @@ export default function KursuebersichtTab() {
               }`}
             >
               {isComparisonEnabled
-                ? "Kursvergleich sperren"
-                : "Kursvergleich freigeben"}
+                ? t("courseDetail.comparisonDisableButton")
+                : t("courseDetail.comparisonEnableButton")}
             </button>
 
             {!isAnonymized && (
@@ -1801,16 +1892,20 @@ export default function KursuebersichtTab() {
                 disabled={isAnonymizing}
                 onClick={() =>
                   setConfirmModal({
-                    title: "Kurs anonymisieren",
-                    message: `Alle Teilnehmer erhalten ein Alias (TN-0001, TN-0002, …). Realnamen und E-Mail-Adressen werden in der Admin-Ansicht durch Aliases ersetzt. Diese Aktion kann nicht rückgängig gemacht werden.`,
+                    title: t("courseDetail.anonymizeConfirm.title"),
+                    message: t("courseDetail.anonymizeConfirm.message"),
                     variant: "warning",
-                    confirmLabel: "Anonymisieren",
+                    confirmLabel: t(
+                      "courseDetail.anonymizeConfirm.confirmLabel",
+                    ),
                     onConfirm: () => void handleAnonymizeCourse(view.courseId),
                   })
                 }
                 className="rounded-lg border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-50 disabled:opacity-50 dark:border-violet-800 dark:text-violet-400 dark:hover:bg-violet-900/20"
               >
-                {isAnonymizing ? "Anonymisiere…" : "Kurs anonymisieren"}
+                {isAnonymizing
+                  ? t("courseDetail.anonymizingButton")
+                  : t("courseDetail.anonymizeButton")}
               </button>
             )}
           </div>
@@ -1822,10 +1917,10 @@ export default function KursuebersichtTab() {
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    Datenexport
+                    {t("exportModal.title")}
                   </h3>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Waehle Exporttyp und Dateiformat für diesen Kurs.
+                    {t("exportModal.subtitle")}
                   </p>
                 </div>
                 <button
@@ -1833,7 +1928,7 @@ export default function KursuebersichtTab() {
                   disabled={isExporting}
                   onClick={() => setIsExportModalOpen(false)}
                   className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                  aria-label="Exportdialog schliessen"
+                  aria-label={t("exportModal.closeAriaLabel")}
                 >
                   <X size={16} />
                 </button>
@@ -1842,7 +1937,7 @@ export default function KursuebersichtTab() {
               <div className="space-y-3">
                 <div>
                   <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                    Export für
+                    {t("exportModal.exportForLabel")}
                   </p>
                   <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
                     <button
@@ -1854,7 +1949,7 @@ export default function KursuebersichtTab() {
                           : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                       }`}
                     >
-                      Admin
+                      {t("exportModal.adminOption")}
                     </button>
                     <button
                       type="button"
@@ -1865,7 +1960,7 @@ export default function KursuebersichtTab() {
                           : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                       }`}
                     >
-                      Benutzer
+                      {t("exportModal.userOption")}
                     </button>
                   </div>
                 </div>
@@ -1874,7 +1969,7 @@ export default function KursuebersichtTab() {
                   <>
                     <div>
                       <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                        Inhalt
+                        {t("exportModal.contentLabel")}
                       </p>
                       <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
                         <button
@@ -1886,7 +1981,7 @@ export default function KursuebersichtTab() {
                               : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                           }`}
                         >
-                          Aggregiert
+                          {t("exportModal.aggregatedOption")}
                         </button>
                         <button
                           type="button"
@@ -1897,14 +1992,14 @@ export default function KursuebersichtTab() {
                               : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                           }`}
                         >
-                          Rohdaten
+                          {t("exportModal.rawOption")}
                         </button>
                       </div>
                     </div>
 
                     <div>
                       <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                        Format
+                        {t("exportModal.formatLabel")}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -1917,7 +2012,9 @@ export default function KursuebersichtTab() {
                           className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                         >
                           <Download size={13} />
-                          {isExporting ? "Exportiere..." : "CSV"}
+                          {isExporting
+                            ? t("exportModal.exportingLabel")
+                            : t("exportModal.csvButton")}
                         </button>
                         <button
                           type="button"
@@ -1929,7 +2026,9 @@ export default function KursuebersichtTab() {
                           className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                         >
                           <Download size={13} />
-                          {isExporting ? "Exportiere..." : "Excel"}
+                          {isExporting
+                            ? t("exportModal.exportingLabel")
+                            : t("exportModal.excelButton")}
                         </button>
                       </div>
                     </div>
@@ -1937,9 +2036,7 @@ export default function KursuebersichtTab() {
                 ) : (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/40">
                     <p className="text-xs text-slate-600 dark:text-slate-300">
-                      Erstellt ein PDF mit einer eigenen Auswertungsseite pro
-                      Teilnehmer (nur abgegebene Tage): Zeitverteilung,
-                      Top-Aktivitaeten und Vergleich mit dem Kursschnitt.
+                      {t("exportModal.userPdfDescription")}
                     </p>
                     <div className="mt-3">
                       <button
@@ -1952,7 +2049,9 @@ export default function KursuebersichtTab() {
                         className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                       >
                         <Download size={13} />
-                        {isExporting ? "Erstelle PDF..." : "PDF erstellen"}
+                        {isExporting
+                          ? t("exportModal.creatingPdfButton")
+                          : t("exportModal.createPdfButton")}
                       </button>
                     </div>
                   </div>
@@ -1963,10 +2062,10 @@ export default function KursuebersichtTab() {
         )}
 
         {isLoadingUsers ? (
-          <p className="text-sm text-slate-500">Wird geladen…</p>
+          <p className="text-sm text-slate-500">{t("loading")}</p>
         ) : courseUsers.length === 0 ? (
           <p className="text-sm text-slate-500">
-            Keine Teilnehmer in diesem Kurs.
+            {t("courseDetail.noParticipants")}
           </p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
@@ -1974,13 +2073,13 @@ export default function KursuebersichtTab() {
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Teilnehmer
+                    {t("courseDetail.table.participantColumn")}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Fortschritt
+                    {t("courseDetail.table.progressColumn")}
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Aktionen
+                    {t("courseDetail.table.actionsColumn")}
                   </th>
                 </tr>
               </thead>
@@ -2034,7 +2133,8 @@ export default function KursuebersichtTab() {
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                         {u.submittedDays}{" "}
                         <span className="text-slate-400 dark:text-slate-500">
-                          / {u.courseTotalDays} Tage
+                          / {u.courseTotalDays}{" "}
+                          {t("courseDetail.table.daysUnit")}
                         </span>
                       </td>
 
@@ -2047,18 +2147,32 @@ export default function KursuebersichtTab() {
                             onClick={() => {
                               if (u.isExcluded) {
                                 setConfirmModal({
-                                  title: "Ausschluss aufheben",
-                                  message: `Die Daten von ${displayLabel} werden wieder in den Statistiken berücksichtigt.`,
+                                  title: t(
+                                    "courseDetail.table.includeConfirm.title",
+                                  ),
+                                  message: t(
+                                    "courseDetail.table.includeConfirm.message",
+                                    { name: displayLabel },
+                                  ),
                                   variant: "default",
-                                  confirmLabel: "Aufheben",
+                                  confirmLabel: t(
+                                    "courseDetail.table.includeConfirm.confirmLabel",
+                                  ),
                                   onConfirm: () => void handleToggleExclude(u),
                                 });
                               } else {
                                 setConfirmModal({
-                                  title: "Aus Statistiken ausschliessen",
-                                  message: `Die Daten von ${displayLabel} werden aus allen Statistiken entfernt. Der Teilnehmer wird nicht informiert.`,
+                                  title: t(
+                                    "courseDetail.table.excludeConfirm.title",
+                                  ),
+                                  message: t(
+                                    "courseDetail.table.excludeConfirm.message",
+                                    { name: displayLabel },
+                                  ),
                                   variant: "warning",
-                                  confirmLabel: "Ausschliessen",
+                                  confirmLabel: t(
+                                    "courseDetail.table.excludeConfirm.confirmLabel",
+                                  ),
                                   onConfirm: () => void handleToggleExclude(u),
                                 });
                               }
@@ -2069,7 +2183,9 @@ export default function KursuebersichtTab() {
                                 : "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
                             }`}
                           >
-                            {u.isExcluded ? "Einschliessen" : "Ausschliessen"}
+                            {u.isExcluded
+                              ? t("courseDetail.table.includeButton")
+                              : t("courseDetail.table.excludeButton")}
                           </button>
 
                           {/* Kick user */}
@@ -2077,17 +2193,24 @@ export default function KursuebersichtTab() {
                             type="button"
                             onClick={() =>
                               setConfirmModal({
-                                title: "Teilnehmer entfernen",
-                                message: `Soll ${displayLabel} wirklich aus dem Kurs entfernt werden? Die Zeiteinträge bleiben erhalten.`,
+                                title: t(
+                                  "courseDetail.table.removeConfirm.title",
+                                ),
+                                message: t(
+                                  "courseDetail.table.removeConfirm.message",
+                                  { name: displayLabel },
+                                ),
                                 variant: "danger",
-                                confirmLabel: "Entfernen",
+                                confirmLabel: t(
+                                  "courseDetail.table.removeConfirm.confirmLabel",
+                                ),
                                 onConfirm: () =>
                                   void handleKickUser(u.userCourseId, u.userId),
                               })
                             }
                             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
                           >
-                            Entfernen
+                            {t("courseDetail.table.removeButton")}
                           </button>
                         </div>
                       </td>
@@ -2125,7 +2248,7 @@ export default function KursuebersichtTab() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <ChevronLeft size={13} />
-            Zurueck zum Kurs
+            {t("userDetail.backToCourseButton")}
           </button>
           <button
             type="button"
@@ -2133,7 +2256,7 @@ export default function KursuebersichtTab() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <ChevronLeft size={13} />
-            Zur Kursuebersicht
+            {t("userDetail.backToOverviewButton")}
           </button>
         </div>
 
@@ -2148,7 +2271,7 @@ export default function KursuebersichtTab() {
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
-            Tagesübersicht
+            {t("userDetail.dayOverviewTab")}
           </button>
           <button
             type="button"
@@ -2159,7 +2282,7 @@ export default function KursuebersichtTab() {
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
-            Zeitverteilung
+            {t("userDetail.timeDistributionTab")}
           </button>
         </div>
 
@@ -2175,12 +2298,10 @@ export default function KursuebersichtTab() {
   function renderUserDayList() {
     if (view.type !== "user") return null;
     if (isLoadingDays)
-      return <p className="text-sm text-slate-500">Wird geladen…</p>;
+      return <p className="text-sm text-slate-500">{t("loading")}</p>;
     if (userDays.length === 0) {
       return (
-        <p className="text-sm text-slate-500">
-          Dieser Nutzer hat noch keine Tage erfasst.
-        </p>
+        <p className="text-sm text-slate-500">{t("dayList.noDaysYet")}</p>
       );
     }
 
@@ -2203,20 +2324,23 @@ export default function KursuebersichtTab() {
               >
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                    {new Date(day.date).toLocaleDateString("de-DE", {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
+                    {new Date(day.date).toLocaleDateString(
+                      locale === "en" ? "en-US" : "de-DE",
+                      {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      },
+                    )}
                   </span>
                   {day.is_submitted ? (
                     <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      Abgeschlossen
+                      {t("dayList.submittedBadge")}
                     </span>
                   ) : (
                     <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                      In Bearbeitung
+                      {t("dayList.inProgressBadge")}
                     </span>
                   )}
                 </div>
@@ -2228,10 +2352,12 @@ export default function KursuebersichtTab() {
               {isExpanded && (
                 <div className="border-t border-slate-100 dark:border-slate-800">
                   {isLoadingEntries ? (
-                    <p className="px-4 py-3 text-sm text-slate-500">Lädt…</p>
+                    <p className="px-4 py-3 text-sm text-slate-500">
+                      {t("dayList.loadingEntries")}
+                    </p>
                   ) : !entries || entries.length === 0 ? (
                     <p className="px-4 py-3 text-sm text-slate-400">
-                      Keine Einträge für diesen Tag.
+                      {t("dayList.noEntriesForDay")}
                     </p>
                   ) : (
                     <div className="overflow-x-auto scrollbar-thin">
@@ -2239,11 +2365,11 @@ export default function KursuebersichtTab() {
                         <thead>
                           <tr className="border-b border-slate-100 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800/50">
                             {[
-                              "Zeit",
-                              "Haupttätigkeit",
-                              "Nebentätigkeit",
-                              "Ort / Transport",
-                              "Wohlbefinden",
+                              t("dayList.columns.time"),
+                              t("dayList.columns.mainActivity"),
+                              t("dayList.columns.secondaryActivity"),
+                              t("dayList.columns.location"),
+                              t("dayList.columns.wellbeing"),
                             ].map((h) => (
                               <th
                                 key={h}
@@ -2323,7 +2449,9 @@ export default function KursuebersichtTab() {
                   : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
               }`}
             >
-              {tab === "alle" ? "Alle Kurse" : "Neuer Kurs"}
+              {tab === "alle"
+                ? t("subTabs.alleKurse")
+                : t("subTabs.neuerKurs")}
             </button>
           ))}
         </div>

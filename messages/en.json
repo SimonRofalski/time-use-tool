@@ -218,5 +218,378 @@
       "editTitle": "Edit",
       "deleteTitle": "Delete"
     }
+  },
+  "statistiken": {
+    "loading": "Loading...",
+    "errors": {
+      "noCourseFound": "No course found.",
+      "courseDataLoadError": "Course data could not be loaded.",
+      "lookupDataLoadError": "Reference data could not be loaded."
+    },
+    "tabs": {
+      "zeitverteilung": "Time distribution",
+      "kursvergleich": "Course comparison"
+    },
+    "comparisonLocked": {
+      "title": "Course comparison isn't enabled yet",
+      "description": "Please ask your course instructor/admin to enable course comparison in the course overview."
+    },
+    "weekLabel": "CW {week}",
+    "uncategorizedLabel": "Unassigned",
+    "fallbackLabels": {
+      "unknownDevice": "Device #{id}",
+      "unknownContext": "Context #{id}",
+      "unknownLocation": "Unknown",
+      "noDevice": "No device",
+      "aloneFallback": "Alone"
+    },
+    "comparisonTopics": {
+      "schlaf": "Sleep",
+      "sport": "Sport & exercise",
+      "smartphone": "Smartphone"
+    },
+    "perDayUnit": "h/day",
+    "zeitverteilung": {
+      "dayFilter": {
+        "label": "Days",
+        "all": "All",
+        "weekdays": "Weekdays",
+        "weekend": "Weekend"
+      },
+      "weekFilter": {
+        "label": "CW",
+        "all": "All"
+      },
+      "chart": {
+        "title": "Daily time distribution",
+        "noDays": "No days available for the selected filter.",
+        "notSubmitted": "Not submitted yet"
+      },
+      "metaLists": {
+        "devicesTitle": "Device usage",
+        "devicesTitleAvg": "Device usage (avg/day)",
+        "socialTitle": "Social context",
+        "socialTitleAvg": "Social context (avg/day)",
+        "locationsTitle": "Locations & transport",
+        "locationsTitleAvg": "Locations & transport (avg/day)",
+        "noData": "No data",
+        "wellbeingTitle": "Avg. wellbeing",
+        "wellbeingSubtitle": "Time-weighted by entry duration"
+      },
+      "table": {
+        "title": "Time distribution by category",
+        "noEntries": "No submitted entries yet.",
+        "viewModeTotal": "Total",
+        "viewModeAvgPerDay": "Avg / day",
+        "showMeta": "Show meta variables",
+        "hideMeta": "Hide meta variables",
+        "columns": {
+          "category": "Category",
+          "time": "Time",
+          "timeAvg": "Avg / day",
+          "percent": "Share",
+          "itDevice": "IT device",
+          "social": "Social",
+          "location": "Location",
+          "satisfaction": "Avg. feeling"
+        },
+        "satisfactionColumnTitle": "Time-weighted average of the selected feeling levels within this row",
+        "pairLabels": {
+          "withIt": "with IT",
+          "withoutIt": "without IT",
+          "withOthers": "with others",
+          "alone": "alone",
+          "atHome": "home",
+          "elsewhere": "elsewhere"
+        }
+      }
+    },
+    "kursvergleich": {
+      "anonymousLabel": "Anonymous:",
+      "anonymousDescription": "In the comparison you see your blue dot and the dashed course-average line. Individual values of other participants are never shown.",
+      "positionText": {
+        "noEntries": "No entries of your own in this period",
+        "above": "You're above {percentile}% of the course group",
+        "below": "You're below {percentile}% of the course group"
+      },
+      "yourValue": "Your value",
+      "courseAverage": "Avg. course",
+      "topicSubtitle": "Average hours per day",
+      "metaCards": {
+        "itDevice": { "title": "IT device", "subtitle": "with / without" },
+        "social": { "title": "Social", "subtitle": "with others / alone" },
+        "location": { "title": "Location", "subtitle": "home / elsewhere" },
+        "wellbeing": { "title": "Wellbeing", "subtitle": "avg. time-weighted" },
+        "you": "You",
+        "course": "Course"
+      },
+      "legend": {
+        "courseAverage": "Dashed: avg. course",
+        "yourValue": "Blue: your value"
+      },
+      "notEnoughUsers": {
+        "title": "Comparison not available yet",
+        "description": "Course comparison needs at least {minUsers} participants with 2 submitted days each. Check back later!",
+        "qualifying": "Currently qualifying: {count} / {minUsers} people"
+      }
+    }
+  },
+  "common": {
+    "confirmButton": "Confirm",
+    "cancelButton": "Cancel"
+  },
+  "kursuebersicht": {
+    "subTabs": { "alleKurse": "All courses", "neuerKurs": "New course" },
+    "loading": "Loading…",
+    "errors": {
+      "coursesLoadError": "Courses could not be loaded.",
+      "fillAllFields": "Please fill in all fields.",
+      "periodDatesRequired": "Please provide a start and end date for every period.",
+      "periodEndBeforeStart": "The end date must be after the start date.",
+      "courseCreateError": "Course could not be created: {message}",
+      "periodsSaveError": "Periods could not be saved: {message}",
+      "noSubmittedUserData": "No submitted user data found for the PDF export."
+    },
+    "newCourseForm": {
+      "nameLabel": "Course name",
+      "namePlaceholder": "e.g. Summer semester 2026",
+      "periodsLabel": "Periods",
+      "addPeriodButton": "Add period",
+      "periodStartLabel": "Period {index} – start",
+      "startDateLabel": "Start date",
+      "periodEndLabel": "End",
+      "endDateLabel": "End date",
+      "removePeriodTitle": "Remove period",
+      "accessCodeLabel": "Access code",
+      "accessCodePlaceholder": "e.g. SS2026",
+      "createSuccess": "Course created successfully.",
+      "creatingButton": "Creating…",
+      "createButton": "Create course"
+    },
+    "breadcrumb": { "allCourses": "All courses" },
+    "courseList": {
+      "noCourses": "No courses yet.",
+      "participantsLabel": "{count, plural, one {# participant} other {# participants}}",
+      "anonymizedBadge": "Anonymized",
+      "comparisonEnabledBadge": "Comparison enabled",
+      "comparisonDisabledBadge": "Comparison locked",
+      "accessCodeLabel": "Access code:",
+      "saveButton": "Save",
+      "cancelButton": "Cancel",
+      "changeButton": "Change",
+      "endCourseButton": "End course",
+      "endCourseConfirm": {
+        "title": "End course",
+        "message": "Do you really want to end the course \"{name}\"? This action cannot be undone.",
+        "confirmLabel": "End"
+      }
+    },
+    "courseDetail": {
+      "backToOverviewButton": "Back to course overview",
+      "exportButton": "Data export",
+      "comparisonEnableButton": "Enable comparison",
+      "comparisonDisableButton": "Lock comparison",
+      "anonymizeButton": "Anonymize course",
+      "anonymizingButton": "Anonymizing…",
+      "anonymizeConfirm": {
+        "title": "Anonymize course",
+        "message": "All participants get an alias (TN-0001, TN-0002, …). Real names and email addresses are replaced by aliases in the admin view. This action cannot be undone.",
+        "confirmLabel": "Anonymize"
+      },
+      "noParticipants": "No participants in this course.",
+      "table": {
+        "participantColumn": "Participant",
+        "progressColumn": "Progress",
+        "actionsColumn": "Actions",
+        "daysUnit": "days",
+        "includeButton": "Include",
+        "excludeButton": "Exclude",
+        "includeConfirm": {
+          "title": "Lift exclusion",
+          "message": "{name}'s data will be included in the statistics again.",
+          "confirmLabel": "Lift"
+        },
+        "excludeConfirm": {
+          "title": "Exclude from statistics",
+          "message": "{name}'s data will be removed from all statistics. The participant will not be notified.",
+          "confirmLabel": "Exclude"
+        },
+        "removeButton": "Remove",
+        "removeConfirm": {
+          "title": "Remove participant",
+          "message": "Do you really want to remove {name} from the course? Their time entries are kept.",
+          "confirmLabel": "Remove"
+        }
+      }
+    },
+    "exportModal": {
+      "title": "Data export",
+      "subtitle": "Choose export type and file format for this course.",
+      "closeAriaLabel": "Close export dialog",
+      "exportForLabel": "Export for",
+      "adminOption": "Admin",
+      "userOption": "User",
+      "contentLabel": "Content",
+      "aggregatedOption": "Aggregated",
+      "rawOption": "Raw data",
+      "formatLabel": "Format",
+      "csvButton": "CSV",
+      "excelButton": "Excel",
+      "exportingLabel": "Exporting...",
+      "userPdfDescription": "Creates a PDF with a dedicated evaluation page per participant (submitted days only): time distribution, top activities, and comparison with the course average.",
+      "creatingPdfButton": "Creating PDF...",
+      "createPdfButton": "Create PDF"
+    },
+    "userDetail": {
+      "backToCourseButton": "Back to course",
+      "backToOverviewButton": "Back to course overview",
+      "dayOverviewTab": "Day overview",
+      "timeDistributionTab": "Time distribution"
+    },
+    "dayList": {
+      "noDaysYet": "This user hasn't recorded any days yet.",
+      "submittedBadge": "Completed",
+      "inProgressBadge": "In progress",
+      "loadingEntries": "Loading…",
+      "noEntriesForDay": "No entries for this day.",
+      "columns": {
+        "time": "Time",
+        "mainActivity": "Main activity",
+        "secondaryActivity": "Secondary activity",
+        "location": "Location / transport",
+        "wellbeing": "Wellbeing"
+      }
+    },
+    "pdfExport": {
+      "userEvaluationTitle": "User evaluation",
+      "courseLabel": "Course: {name}",
+      "participantLabel": "Participant: {name}",
+      "createdAtLabel": "Created on: {date}",
+      "submittedDaysLabel": "Submitted days: {count}",
+      "totalHoursLabel": "Total hours: {hours}",
+      "comparisonChartTitle": "Comparison with course average",
+      "courseAverageLegend": "Course average",
+      "categoryTableHeaders": ["Category", "Hours", "Share", "Course avg. (h)", "Difference"],
+      "noCategoriesRecorded": "No categories recorded",
+      "top5ActivitiesTitle": "Top 5 activities",
+      "activityTableHeaders": ["Category", "Activity", "Hours", "Share"],
+      "unknownCategory": "Unknown",
+      "noActivitiesRecorded": "No activities",
+      "deviceUsageTitle": "Device usage",
+      "itUsageTableHeaders": ["IT usage", "Hours", "Share"],
+      "withIt": "With IT usage",
+      "withoutIt": "Without IT usage",
+      "devicesWithinItTitle": "Devices within IT usage",
+      "deviceTableHeaders": ["Device", "Hours"],
+      "noDetailedDeviceData": "No detailed device data",
+      "unspecifiedDevice": "IT device (unspecified)",
+      "deviceFallback": "Device {id}",
+      "categoryFallback": "Category {id}",
+      "activityFallback": "Activity {id}",
+      "filenameSuffix": "UserEvaluations"
+    },
+    "csvExport": {
+      "firstName": "First name",
+      "lastName": "Last name",
+      "daysRecorded": "Days recorded",
+      "categoryHoursColumn": "{category} (h)",
+      "date": "Date",
+      "start": "Start",
+      "end": "End",
+      "durationMin": "Duration (min)",
+      "durationH": "Duration (h)",
+      "category": "Category",
+      "activity": "Activity",
+      "secondaryActivity": "Secondary activity",
+      "digitalMediaUsed": "Used digital media",
+      "yes": "Yes",
+      "no": "No",
+      "mediaTypes": "Media types",
+      "locationTransport": "Location / transport",
+      "socialContext": "Social context",
+      "satisfaction": "Satisfaction",
+      "sheetName": "Statistics",
+      "modeAggregated": "Aggregated",
+      "modeRaw": "Raw"
+    }
+  },
+  "nutzeruebersicht": {
+    "loading": "Loading…",
+    "loadError": "User data could not be loaded.",
+    "kpis": {
+      "activeUsers": "Active users",
+      "completedDays": "Completed days",
+      "completedDaysSubtitle": "Total across all users",
+      "avgCompletionRate": "Avg. completion rate",
+      "avgCompletionRateSubtitle": "Avg. across all users who started"
+    },
+    "searchPlaceholder": "Search users…",
+    "noUserFound": "No user found.",
+    "noActiveUsers": "No active users.",
+    "courseLabel": "Course",
+    "progressLabel": "Progress",
+    "progressDaysLabel": "{submitted} / {total} days",
+    "daysUnit": "days",
+    "noCoursePlaceholder": "–",
+    "includeButton": "Include",
+    "excludeButton": "Exclude",
+    "table": {
+      "user": "User",
+      "course": "Course",
+      "progress": "Progress",
+      "actions": "Actions"
+    },
+    "includeConfirm": {
+      "title": "Lift exclusion",
+      "message": "{name}'s data will again be included in all statistics.",
+      "confirmLabel": "Lift"
+    },
+    "excludeConfirm": {
+      "title": "Exclude user",
+      "message": "{name}'s data will be removed from all statistics. The user will not be notified.",
+      "confirmLabel": "Exclude"
+    }
+  },
+  "adminStatistiken": {
+    "loading": "Loading statistics…",
+    "loadError": "Statistics could not be loaded.",
+    "kpis": {
+      "totalUsers": "Total users",
+      "courses": "Courses",
+      "coursesSubtitle": "{active} active · {closed} completed",
+      "newEntries7d": "New entries (7 days)",
+      "totalEntries": "Total entries"
+    },
+    "activeUsersTrend": {
+      "title": "Active users — last 14 days",
+      "noActivity": "No activity in the last 14 days.",
+      "tooltipActiveUsers": "{count} active users"
+    },
+    "courseProgress": {
+      "title": "Course progress",
+      "noCourseData": "No course data available.",
+      "legendOpen": "Open",
+      "legendInProgress": "In progress",
+      "legendDone": "Completed"
+    },
+    "topActivities": {
+      "title": "Top 7 main activities",
+      "noEntries": "No entries yet.",
+      "tooltipEntries": "{count} entries",
+      "tooltipCount": "Count",
+      "fallbackActivity": "Activity #{id}"
+    },
+    "categoryDistribution": {
+      "title": "Activity categories — time distribution",
+      "noEntries": "No entries yet.",
+      "fallbackCategory": "Category #{id}"
+    },
+    "wellbeing": {
+      "title": "Wellbeing distribution",
+      "noEntries": "No entries yet."
+    }
+  },
+  "adminUserStatsView": {
+    "noData": "This user hasn't recorded any data yet."
   }
 }

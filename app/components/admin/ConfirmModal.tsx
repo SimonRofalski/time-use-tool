@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ConfirmModalProps = {
@@ -18,11 +20,14 @@ export default function ConfirmModal({
   title,
   message,
   variant = "default",
-  confirmLabel = "Bestätigen",
-  cancelLabel = "Abbrechen",
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const t = useTranslations("common");
+  const resolvedConfirmLabel = confirmLabel ?? t("confirmButton");
+  const resolvedCancelLabel = cancelLabel ?? t("cancelButton");
   const confirmClass =
     variant === "danger"
       ? "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
@@ -48,14 +53,14 @@ export default function ConfirmModal({
             onClick={onCancel}
             className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600"
           >
-            {cancelLabel}
+            {resolvedCancelLabel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 ${confirmClass}`}
           >
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </button>
         </div>
       </div>

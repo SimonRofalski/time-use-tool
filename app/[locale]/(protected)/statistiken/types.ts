@@ -43,6 +43,11 @@ export type ActivityMetaStats = {
 
 export type MetaAggregateItem = {
   name: string;
+  // Language-neutral lookup-table code, used to pick a stable icon regardless
+  // of display locale (see ActivitySelector.tsx's *_VISUAL_BY_CODE maps).
+  // Optional because UserStatsView.tsx (admin panel, not yet localized) builds
+  // these without a code — icon lookups there fall back to the default icon.
+  code?: string;
   minutes: number;
 };
 
@@ -72,8 +77,10 @@ export type ComparisonTopicKey = "schlaf" | "sport" | "smartphone";
 // Aggregated comparison data for one topic
 export type ComparisonTopic = {
   key: ComparisonTopicKey;
-  label: string; // German display name
-  unit: string; // e.g. "h/Tag"
+  // label/unit are translated for display in KursvergleichTab via `key` —
+  // these raw fields are kept for type completeness but not rendered directly.
+  label: string;
+  unit: string;
   // All participants' average hours/day (anonymous, used for distribution)
   allValues: number[];
   // The current user's average hours/day for this topic
