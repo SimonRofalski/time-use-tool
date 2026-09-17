@@ -1,0 +1,64 @@
+{
+  "settingsPage": {
+    "title": "Settings",
+    "description": "Settings have been moved to the panel in the top right. There you can switch night mode and view your account information."
+  },
+  "adminPage": {
+    "title": "Admin"
+  },
+  "resetPassword": {
+    "brand": "Time Use Tool",
+    "subtitle": "Set new password",
+    "invalidToken": "Invalid or expired recovery link. Please request a new one.",
+    "passwordMismatch": "Passwords don't match.",
+    "passwordTooShort": "Password must be at least 6 characters long.",
+    "samePasswordError": "Your new password must be different from the old one.",
+    "successMessage": "Password reset successfully!",
+    "newPasswordLabel": "New password",
+    "newPasswordPlaceholder": "At least 6 characters",
+    "confirmPasswordLabel": "Confirm password",
+    "confirmPasswordPlaceholder": "Repeat password",
+    "submitButton": "Reset password",
+    "submitButtonLoading": "Resetting...",
+    "checking": "Checking..."
+  },
+  "login": {
+    "brand": "Time Use Tool",
+    "modes": {
+      "signin": { "title": "Sign in", "submitLabel": "Sign in now" },
+      "signup": { "title": "Sign up", "submitLabel": "Create account" },
+      "forgotPassword": {
+        "title": "Reset password",
+        "submitLabel": "Start security questions"
+      }
+    },
+    "emailLabel": "Email",
+    "emailPlaceholder": "name@example.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "At least 6 characters",
+    "loadSecurityQuestionsButton": "Load security questions",
+    "checkAnswersButton": "Check answers",
+    "answerPlaceholder": "Answer",
+    "newPasswordLabel": "New password",
+    "confirmPasswordLabel": "Confirm password",
+    "confirmPasswordPlaceholder": "Repeat password",
+    "setNewPasswordButton": "Set new password",
+    "noAccountButton": "Don't have an account yet? Create one here",
+    "forgotPasswordButton": "Forgot password?",
+    "backToSigninButton": "Back to sign in",
+    "status": {
+      "emailRequired": "Please enter your email address.",
+      "emailInvalid": "Please enter a valid email address.",
+      "securityQuestionsLoadError": "Security questions could not be loaded.",
+      "accountCreated": "Account created. You can now sign in.",
+      "wrongCredentials": "Wrong password or email.",
+      "answerBothQuestions": "Please answer both security questions.",
+      "answersCheckError": "The answers could not be verified.",
+      "resetSessionExpired": "The reset process is no longer valid.",
+      "passwordMismatch": "Passwords don't match.",
+      "passwordTooShort": "Password must be at least 6 characters long.",
+      "passwordSetError": "The password could not be set.",
+      "passwordResetSuccess": "Password reset successfully. You can now sign in."
+    }
+  }
+}

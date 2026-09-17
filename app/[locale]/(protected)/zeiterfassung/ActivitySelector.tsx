@@ -81,6 +81,7 @@ type SubcategoryNode = {
 
 type CategoryNode = {
   category_id: number;
+  code: string;
   name: string;
   color: string;
   subcategories: SubcategoryNode[];
@@ -145,6 +146,7 @@ function buildActivityHierarchy(
 
       return {
         category_id: cat.category_id,
+        code: cat.code,
         name: cat.name,
         color,
         subcategories,
@@ -301,6 +303,19 @@ function findNameById<T extends Record<string, unknown>>(
   return typeof row.name === "string" ? row.name : null;
 }
 
+// Mirrors findNameById but returns the language-neutral `code` instead —
+// used to drive icon/grouping/sort logic so it doesn't depend on display language
+function findCodeById<T extends Record<string, unknown>>(
+  rows: T[],
+  idKey: keyof T,
+  idValue: number | null,
+): string | null {
+  if (idValue === null) return null;
+  const row = rows.find((item) => item[idKey] === idValue);
+  if (!row) return null;
+  return typeof row.code === "string" ? row.code : null;
+}
+
 type SelectedSlotGroup = {
   start: number;
   endExclusive: number;
@@ -374,102 +389,57 @@ function buildSelectedSlotGroups(
   return groups;
 }
 
-function normalizeLabel(value: string): string {
-  return value
-    .toLowerCase()
-    .replaceAll("ä", "ae")
-    .replaceAll("ö", "oe")
-    .replaceAll("ü", "ue")
-    .replaceAll("ß", "ss");
-}
+// Keyed by the language-neutral HETUS/BFS classification `code` (not the
+// display name, which becomes locale-dependent) so icons stay correct
+// regardless of UI language.
+const CATEGORY_VISUAL_BY_CODE: Record<string, CategoryVisual> = {
+  "0": {
+    primaryIcon: MoonStar,
+    secondaryIcon: UtensilsCrossed,
+    tertiaryIcon: HeartPulse,
+  }, // Persönliche Pflege
+  "1": { primaryIcon: Briefcase, secondaryIcon: Laptop, tertiaryIcon: Clock3 }, // Erwerbstätigkeit
+  "2": {
+    primaryIcon: GraduationCap,
+    secondaryIcon: BookOpen,
+    tertiaryIcon: Pencil,
+  }, // Studium / Ausbildung
+  "3": { primaryIcon: Home, secondaryIcon: CookingPot, tertiaryIcon: Baby }, // Haushalt und Familienarbeit
+  "4": {
+    primaryIcon: HandHeart,
+    secondaryIcon: Users,
+    tertiaryIcon: Calendar,
+  }, // Freiwilligenarbeit und Treffen
+  "5": {
+    primaryIcon: MessageCircle,
+    secondaryIcon: Music,
+    tertiaryIcon: Film,
+  }, // Soziales Leben und Unterhaltung
+  "6": { primaryIcon: Dumbbell, secondaryIcon: TreePine, tertiaryIcon: Bike }, // Sport und Aktivitäten im Freien
+  "7": {
+    primaryIcon: Palette,
+    secondaryIcon: Gamepad2,
+    tertiaryIcon: Scissors,
+  }, // Hobbys
+  "8": { primaryIcon: Tv, secondaryIcon: Newspaper, tertiaryIcon: Headphones }, // Massenmedien
+  "9": { primaryIcon: Bus, secondaryIcon: MapPin, tertiaryIcon: Timer }, // Wegezeiten und nicht spezifizierte Zeitnutzung
+};
 
-function getCategoryVisual(
-  categoryName: string,
-  index: number,
-): CategoryVisual {
-  const normalized = normalizeLabel(categoryName);
+// Fallback rotation for any category code not in the map above (defensive —
+// all 10 current categories are covered, this only matters if new ones are added)
+const DEFAULT_CATEGORY_VISUALS: CategoryVisual[] = [
+  { primaryIcon: BookOpen, secondaryIcon: Laptop, tertiaryIcon: Pencil },
+  { primaryIcon: Briefcase, secondaryIcon: Wrench, tertiaryIcon: Clock3 },
+  { primaryIcon: Home, secondaryIcon: ShoppingBag, tertiaryIcon: CookingPot },
+  { primaryIcon: Users, secondaryIcon: HeartPulse, tertiaryIcon: Music },
+  { primaryIcon: TreePine, secondaryIcon: Sparkles, tertiaryIcon: Bike },
+];
 
-  if (normalized.includes("persoenliche pflege")) {
-    return {
-      primaryIcon: MoonStar,
-      secondaryIcon: UtensilsCrossed,
-      tertiaryIcon: HeartPulse,
-    };
-  }
-  if (normalized.includes("erwerbstaetigkeit")) {
-    return {
-      primaryIcon: Briefcase,
-      secondaryIcon: Laptop,
-      tertiaryIcon: Clock3,
-    };
-  }
-  if (normalized.includes("studium") || normalized.includes("ausbildung")) {
-    return {
-      primaryIcon: GraduationCap,
-      secondaryIcon: BookOpen,
-      tertiaryIcon: Pencil,
-    };
-  }
-  if (
-    normalized.includes("haushalt") ||
-    normalized.includes("familienarbeit")
-  ) {
-    return { primaryIcon: Home, secondaryIcon: CookingPot, tertiaryIcon: Baby };
-  }
-  if (
-    normalized.includes("freiwilligenarbeit") ||
-    normalized.includes("treffen")
-  ) {
-    return {
-      primaryIcon: HandHeart,
-      secondaryIcon: Users,
-      tertiaryIcon: Calendar,
-    };
-  }
-  if (normalized.includes("soziales") || normalized.includes("unterhaltung")) {
-    return {
-      primaryIcon: MessageCircle,
-      secondaryIcon: Music,
-      tertiaryIcon: Film,
-    };
-  }
-  if (normalized.includes("sport") || normalized.includes("im freien")) {
-    return {
-      primaryIcon: Dumbbell,
-      secondaryIcon: TreePine,
-      tertiaryIcon: Bike,
-    };
-  }
-  if (normalized.includes("hobbys")) {
-    return {
-      primaryIcon: Palette,
-      secondaryIcon: Gamepad2,
-      tertiaryIcon: Scissors,
-    };
-  }
-  if (normalized.includes("massenmedien")) {
-    return {
-      primaryIcon: Tv,
-      secondaryIcon: Newspaper,
-      tertiaryIcon: Headphones,
-    };
-  }
-  if (
-    normalized.includes("wegezeiten") ||
-    normalized.includes("nicht spezifizierte")
-  ) {
-    return { primaryIcon: Bus, secondaryIcon: MapPin, tertiaryIcon: Timer };
-  }
-
-  const defaultVisuals: CategoryVisual[] = [
-    { primaryIcon: BookOpen, secondaryIcon: Laptop, tertiaryIcon: Pencil },
-    { primaryIcon: Briefcase, secondaryIcon: Wrench, tertiaryIcon: Clock3 },
-    { primaryIcon: Home, secondaryIcon: ShoppingBag, tertiaryIcon: CookingPot },
-    { primaryIcon: Users, secondaryIcon: HeartPulse, tertiaryIcon: Music },
-    { primaryIcon: TreePine, secondaryIcon: Sparkles, tertiaryIcon: Bike },
-  ];
-
-  return defaultVisuals[index % defaultVisuals.length];
+function getCategoryVisual(categoryCode: string, index: number): CategoryVisual {
+  return (
+    CATEGORY_VISUAL_BY_CODE[categoryCode] ??
+    DEFAULT_CATEGORY_VISUALS[index % DEFAULT_CATEGORY_VISUALS.length]
+  );
 }
 
 function countActivities(subcategories: SubcategoryNode[]): number {
@@ -581,7 +551,7 @@ function ActivityList({
         {!isSearching && !activeCategory && hierarchy.length > 0 && (
           <div className="grid grid-cols-2 gap-2">
             {hierarchy.map((category, index) => {
-              const visual = getCategoryVisual(category.name, index);
+              const visual = getCategoryVisual(category.code, index);
               const PrimaryIcon = visual.primaryIcon;
               const SecondaryIcon = visual.secondaryIcon;
               const TertiaryIcon = visual.tertiaryIcon;
@@ -952,62 +922,53 @@ export default function ActivitySelector({
     );
   }
 
+  // Device-type visuals keyed by `code`: 0=Kein IT-Hilfsmittel, 9=Unbekannt
+  const DIGITAL_MEDIA_TYPE_VISUAL_BY_CODE: Record<
+    string,
+    { icon: LucideIcon; chipClass: string }
+  > = {
+    "1": { icon: Smartphone, chipClass: "bg-cyan-50 text-cyan-700 ring-cyan-100" },
+    "2": {
+      icon: Laptop,
+      chipClass: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+    },
+    "3": {
+      icon: Tablet,
+      chipClass: "bg-violet-50 text-violet-700 ring-violet-100",
+    },
+    "4": { icon: Tv, chipClass: "bg-orange-50 text-orange-700 ring-orange-100" },
+    "5": {
+      icon: Gamepad2,
+      chipClass: "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-100",
+    },
+    "6": {
+      icon: Watch,
+      chipClass: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    },
+  };
+
+  const DEFAULT_DIGITAL_MEDIA_TYPE_VISUAL = {
+    icon: HelpCircle,
+    chipClass: "bg-slate-100 text-slate-700 ring-slate-200",
+  };
+
   // Step 4 (conditional): which type of device was used?
-  function getDigitalMediaTypeVisual(typeName: string): {
+  // Helper: map a digital_media_type `code` to icon + color
+  function getDigitalMediaTypeVisual(code: string): {
     icon: LucideIcon;
     chipClass: string;
   } {
-    const normalized = normalizeLabel(typeName);
-
-    if (normalized.includes("smartphone")) {
-      return {
-        icon: Smartphone,
-        chipClass: "bg-cyan-50 text-cyan-700 ring-cyan-100",
-      };
-    }
-    if (normalized.includes("computer") || normalized.includes("laptop")) {
-      return {
-        icon: Laptop,
-        chipClass: "bg-indigo-50 text-indigo-700 ring-indigo-100",
-      };
-    }
-    if (normalized.includes("tablet")) {
-      return {
-        icon: Tablet,
-        chipClass: "bg-violet-50 text-violet-700 ring-violet-100",
-      };
-    }
-    if (normalized.includes("tv") || normalized.includes("streaming")) {
-      return {
-        icon: Tv,
-        chipClass: "bg-orange-50 text-orange-700 ring-orange-100",
-      };
-    }
-    if (normalized.includes("spielkonsole") || normalized.includes("konsole")) {
-      return {
-        icon: Gamepad2,
-        chipClass: "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-100",
-      };
-    }
-    if (normalized.includes("smartwatch") || normalized.includes("wearable")) {
-      return {
-        icon: Watch,
-        chipClass: "bg-emerald-50 text-emerald-700 ring-emerald-100",
-      };
-    }
-
-    return {
-      icon: HelpCircle,
-      chipClass: "bg-slate-100 text-slate-700 ring-slate-200",
-    };
+    return (
+      DIGITAL_MEDIA_TYPE_VISUAL_BY_CODE[code] ??
+      DEFAULT_DIGITAL_MEDIA_TYPE_VISUAL
+    );
   }
 
   function renderDigitalMediaTypeStep() {
-    const filteredTypes = lookupData.digitalMediaTypes.filter((type) => {
-      const normalized = normalizeLabel(type.name);
-      // "Kein IT-Hilfsmittel" is redundant because previous step already asks this.
-      return !normalized.includes("kein it") && !normalized.includes("ohne it");
-    });
+    // code "0" = "Kein IT-Hilfsmittel", redundant because the previous step already asks this.
+    const filteredTypes = lookupData.digitalMediaTypes.filter(
+      (type) => type.code !== "0",
+    );
 
     const selectedIds = new Set(pendingEntry.digital_media_type_ids);
     const isContinueDisabled = selectedIds.size === 0;
@@ -1040,7 +1001,7 @@ export default function ActivitySelector({
           {filteredTypes.map((type) => {
             const isSelected = selectedIds.has(type.digital_media_type_id);
             const { icon: IconComponent, chipClass } =
-              getDigitalMediaTypeVisual(type.name);
+              getDigitalMediaTypeVisual(type.code);
 
             return (
               <button
@@ -1095,164 +1056,119 @@ export default function ActivitySelector({
     );
   }
 
-  // Helper: map location name to appropriate icon and category
-  function getLocationMappings(locName: string): {
+  // Location/transport visuals keyed by the language-neutral `code` column
+  // (verified against the current data to reproduce the previous name-matching
+  // logic exactly — see codes 29 and 0, which fall through to the DEFAULT bucket)
+  const LOCATION_MAPPING_BY_CODE: Record<
+    string,
+    {
+      icon: LucideIcon;
+      secondaryIcon?: LucideIcon;
+      category: string;
+      chipClass: string;
+    }
+  > = {
+    "10": {
+      icon: MapPin,
+      category: "Orte",
+      chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+    }, // Nicht spezifizierter Ort (keine Reise)
+    "11": {
+      icon: Home,
+      category: "Orte",
+      chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
+    }, // Zuhause
+    "12": {
+      icon: Hotel,
+      category: "Orte",
+      chipClass: "bg-cyan-50 text-cyan-600 ring-cyan-100",
+    }, // Wochenendhaus oder Ferienwohnung
+    "13": {
+      icon: Briefcase,
+      category: "Orte",
+      chipClass: "bg-amber-50 text-amber-600 ring-amber-100",
+    }, // Arbeitsplatz
+    "14": {
+      icon: Home,
+      secondaryIcon: UserRound,
+      category: "Orte",
+      chipClass: "bg-violet-50 text-violet-600 ring-violet-100",
+    }, // Zuhause anderer Personen
+    "15": {
+      icon: UtensilsCrossed,
+      category: "Orte",
+      chipClass: "bg-rose-50 text-rose-600 ring-rose-100",
+    }, // Restaurant, Café oder Bar
+    "16": {
+      icon: ShoppingBag,
+      category: "Orte",
+      chipClass: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+    }, // Einkaufszentrum, Markt oder andere Geschäfte
+    "17": {
+      icon: Hotel,
+      category: "Orte",
+      chipClass: "bg-sky-50 text-sky-600 ring-sky-100",
+    }, // Hotel, Pension oder Campingplatz
+    "18": {
+      icon: GraduationCap,
+      category: "Orte",
+      chipClass: "bg-indigo-50 text-indigo-600 ring-indigo-100",
+    }, // Schule/Universität
+    "19": {
+      icon: MapPin,
+      category: "Orte",
+      chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+    }, // Anderer spezifizierter Ort (keine Reise) — hidden from the picker, see renderLocationStep
+    "20": {
+      icon: MapPin,
+      category: "Private Verkehrsmittel",
+      chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+    }, // Nicht spezifizierter Transportmodus
+    "21": {
+      icon: Footprints,
+      category: "Private Verkehrsmittel",
+      chipClass: "bg-green-50 text-green-600 ring-green-100",
+    }, // Zu Fuss
+    "22": {
+      icon: Bike,
+      category: "Private Verkehrsmittel",
+      chipClass: "bg-lime-50 text-lime-600 ring-lime-100",
+    }, // Fahrrad
+    "23": {
+      icon: Gauge,
+      category: "Private Verkehrsmittel",
+      chipClass: "bg-orange-50 text-orange-600 ring-orange-100",
+    }, // Moped, Motorrad oder Motorboot
+    "24": {
+      icon: Car,
+      category: "Private Verkehrsmittel",
+      chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
+    }, // Pkw / Auto
+    "31": {
+      icon: Bus,
+      category: "Öffentlicher Verkehr",
+      chipClass: "bg-teal-50 text-teal-600 ring-teal-100",
+    }, // Öffentlicher Verkehr
+  };
+
+  const DEFAULT_LOCATION_MAPPING = {
+    icon: MapPin,
+    category: "Sonstiges",
+    chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+  };
+
+  // Helper: map a location_transport `code` to its icon/category/style
+  function getLocationMappings(code: string): {
     icon: LucideIcon;
     secondaryIcon?: LucideIcon;
     category: string;
     chipClass: string;
   } {
-    const normalized = locName.toLowerCase();
-
-    // LOCATIONS (Orte)
-    // Must check "zuhause anderer" BEFORE the generic "zuhause" check
-    if (
-      normalized.includes("anderer person") ||
-      normalized.includes("zuhause anderer")
-    )
-      return {
-        icon: Home,
-        secondaryIcon: UserRound,
-        category: "Orte",
-        chipClass: "bg-violet-50 text-violet-600 ring-violet-100",
-      };
-    if (normalized.includes("zuhause") || normalized.includes("zu hause"))
-      return {
-        icon: Home,
-        category: "Orte",
-        chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
-      };
-    if (
-      normalized.includes("wochenendhaus") ||
-      normalized.includes("ferienwohnung")
-    )
-      return {
-        icon: Hotel,
-        category: "Orte",
-        chipClass: "bg-cyan-50 text-cyan-600 ring-cyan-100",
-      };
-    if (normalized.includes("arbeitsplatz"))
-      return {
-        icon: Briefcase,
-        category: "Orte",
-        chipClass: "bg-amber-50 text-amber-600 ring-amber-100",
-      };
-    if (
-      normalized.includes("restaurant") ||
-      normalized.includes("café") ||
-      normalized.includes("cafe") ||
-      normalized.includes("bar")
-    )
-      return {
-        icon: UtensilsCrossed,
-        category: "Orte",
-        chipClass: "bg-rose-50 text-rose-600 ring-rose-100",
-      };
-    if (
-      normalized.includes("einkaufs") ||
-      normalized.includes("markt") ||
-      normalized.includes("geschäfte")
-    )
-      return {
-        icon: ShoppingBag,
-        category: "Orte",
-        chipClass: "bg-emerald-50 text-emerald-600 ring-emerald-100",
-      };
-    if (normalized.includes("hotel") || normalized.includes("camping"))
-      return {
-        icon: Hotel,
-        category: "Orte",
-        chipClass: "bg-sky-50 text-sky-600 ring-sky-100",
-      };
-    if (
-      normalized.includes("schule") ||
-      normalized.includes("universität") ||
-      normalized.includes("universitaet")
-    )
-      return {
-        icon: GraduationCap,
-        category: "Orte",
-        chipClass: "bg-indigo-50 text-indigo-600 ring-indigo-100",
-      };
-    if (
-      normalized.includes("spezifizierter ort") &&
-      !normalized.includes("transport")
-    )
-      return {
-        icon: MapPin,
-        category: "Orte",
-        chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
-      };
-
-    // PRIVATE TRANSPORT (Private Verkehrsmittel)
-    if (normalized.includes("zu fuß") || normalized.includes("zu fuss"))
-      return {
-        icon: Footprints,
-        category: "Private Verkehrsmittel",
-        chipClass: "bg-green-50 text-green-600 ring-green-100",
-      };
-    if (normalized.includes("fahrrad"))
-      return {
-        icon: Bike,
-        category: "Private Verkehrsmittel",
-        chipClass: "bg-lime-50 text-lime-600 ring-lime-100",
-      };
-    if (
-      normalized.includes("moped") ||
-      normalized.includes("motorrad") ||
-      normalized.includes("motorboot")
-    )
-      return {
-        icon: Gauge,
-        category: "Private Verkehrsmittel",
-        chipClass: "bg-orange-50 text-orange-600 ring-orange-100",
-      };
-    if (normalized.includes("pkw") || normalized.includes("auto"))
-      return {
-        icon: Car,
-        category: "Private Verkehrsmittel",
-        chipClass: "bg-blue-50 text-blue-600 ring-blue-100",
-      };
-    if (
-      normalized.includes("spezifizierter transportmodus") &&
-      !normalized.includes("öffentlich")
-    )
-      return {
-        icon: MapPin,
-        category: "Private Verkehrsmittel",
-        chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
-      };
-
-    // PUBLIC TRANSPORT (Öffentlicher Verkehr)
-    if (
-      normalized.includes("öffentlich") ||
-      normalized.includes("oeffentlich") ||
-      normalized.includes("zug") ||
-      normalized.includes("train") ||
-      normalized.includes("bahn") ||
-      normalized.includes("tram")
-    )
-      return {
-        icon: Bus,
-        category: "Öffentlicher Verkehr",
-        chipClass: "bg-teal-50 text-teal-600 ring-teal-100",
-      };
-
-    // DEFAULT (fallback, shouldn't really happen)
-    return {
-      icon: MapPin,
-      category: "Sonstiges",
-      chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
-    };
+    return LOCATION_MAPPING_BY_CODE[code] ?? DEFAULT_LOCATION_MAPPING;
   }
 
-  // Helper: categorize locations/transport by ID range and assign icons
-  function getLocationIcon(locId: number, locName: string): LucideIcon {
-    return getLocationMappings(locName).icon;
-  }
-
-  function getLocationCategory(locId: number, locName: string): string {
-    return getLocationMappings(locName).category;
+  function getLocationCategory(code: string): string {
+    return getLocationMappings(code).category;
   }
 
   // Step 5: where was the user? (categorized with icons)
@@ -1267,12 +1183,11 @@ export default function ActivitySelector({
     ];
 
     for (const loc of lookupData.locationTransports) {
-      const normalizedName = normalizeLabel(loc.name);
-      // Hide this option on request
-      if (normalizedName.includes("anderer spezifizierter ort (keine reise)")) {
+      // Hide "Anderer spezifizierter Ort (keine Reise)" on request
+      if (loc.code === "19") {
         continue;
       }
-      const cat = getLocationCategory(loc.location_transport_id, loc.name);
+      const cat = getLocationCategory(loc.code);
       if (!grouped.has(cat)) grouped.set(cat, []);
       grouped.get(cat)!.push(loc);
     }
@@ -1300,7 +1215,7 @@ export default function ActivitySelector({
                     icon: IconComponent,
                     secondaryIcon: SecondaryIcon,
                     chipClass,
-                  } = getLocationMappings(loc.name);
+                  } = getLocationMappings(loc.code);
 
                   return (
                     <button
@@ -1339,50 +1254,35 @@ export default function ActivitySelector({
     );
   }
 
-  // Helper: map social context name to icon + color
-  function getSocialContextVisual(name: string): {
+  // Social-context visuals keyed by `code` (verified against current data —
+  // codes 3/4/5 land on the "Home" household bucket, not the "child" one the
+  // German name might suggest, because "Haushaltsmitglied" matches first)
+  const SOCIAL_CONTEXT_VISUAL_BY_CODE: Record<
+    string,
+    { icon: LucideIcon; chipClass: string }
+  > = {
+    "1": { icon: UserX, chipClass: "bg-slate-100 text-slate-500 ring-slate-200" }, // Alleine
+    "2": { icon: Heart, chipClass: "bg-amber-50 text-amber-600 ring-amber-100" }, // Partner / Ehepartner
+    "3": { icon: Home, chipClass: "bg-amber-50 text-amber-600 ring-amber-100" }, // Eltern
+    "4": { icon: Home, chipClass: "bg-amber-50 text-amber-600 ring-amber-100" }, // Haushaltsmitglied bis 9 Jahre
+    "5": { icon: Home, chipClass: "bg-amber-50 text-amber-600 ring-amber-100" }, // Andere Haushaltsmitglieder
+    "6": {
+      icon: UserCheck,
+      chipClass: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+    }, // Andere bekannte Personen
+  };
+
+  const DEFAULT_SOCIAL_CONTEXT_VISUAL = {
+    icon: Users,
+    chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
+  };
+
+  // Helper: map a social_context `code` to icon + color
+  function getSocialContextVisual(code: string): {
     icon: LucideIcon;
     chipClass: string;
   } {
-    const n = normalizeLabel(name);
-    if (n.includes("alleine") || n.includes("allein"))
-      return {
-        icon: UserX,
-        chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
-      };
-    if (
-      n.includes("partner") ||
-      n.includes("ehepartner") ||
-      n.includes("haushalt") ||
-      n.includes("haushaltsmitglied") ||
-      n.includes("familie") ||
-      n.includes("eltern") ||
-      n.includes("mutter") ||
-      n.includes("vater")
-    )
-      return {
-        icon: n.includes("partner") || n.includes("ehepartner") ? Heart : Home,
-        chipClass: "bg-amber-50 text-amber-600 ring-amber-100",
-      };
-    if (n.includes("bis 9") || n.includes("kind") || n.includes("baby"))
-      return {
-        icon: Baby,
-        chipClass: "bg-pink-50 text-pink-500 ring-pink-100",
-      };
-    if (
-      n.includes("freunde") ||
-      n.includes("kollegen") ||
-      n.includes("bekannte") ||
-      n.includes("andere bekannte")
-    )
-      return {
-        icon: UserCheck,
-        chipClass: "bg-emerald-50 text-emerald-600 ring-emerald-100",
-      };
-    return {
-      icon: Users,
-      chipClass: "bg-slate-100 text-slate-500 ring-slate-200",
-    };
+    return SOCIAL_CONTEXT_VISUAL_BY_CODE[code] ?? DEFAULT_SOCIAL_CONTEXT_VISUAL;
   }
 
   // Step 6: who was the user with? (multiple choice — needs explicit confirm)
@@ -1422,7 +1322,7 @@ export default function ActivitySelector({
           {lookupData.socialContexts.map((ctx) => {
             const isSelected = selectedIds.has(ctx.social_context_id);
             const { icon: IconComponent, chipClass } = getSocialContextVisual(
-              ctx.name,
+              ctx.code,
             );
             return (
               <button
@@ -1475,45 +1375,45 @@ export default function ActivitySelector({
     );
   }
 
-  // Helper: map satisfaction name to emoji
-  function getSmileyForSatisfaction(satisfactionName: string): string {
-    const normalized = satisfactionName.toLowerCase();
-    if (normalized.includes("sehr gut")) return "😄";
-    if (normalized.includes("gut")) return "🙂";
-    if (
-      normalized.includes("mittelmäßig") ||
-      normalized.includes("mittelmaessig")
-    )
-      return "😐";
-    if (normalized.includes("schlecht") && !normalized.includes("sehr"))
-      return "😟";
-    if (normalized.includes("sehr schlecht")) return "😢";
-    return "😐";
+  // Satisfaction scale keyed by `code`: 1=sehr gut … 5=sehr schlecht
+  const SATISFACTION_EMOJI_BY_CODE: Record<string, string> = {
+    "1": "😄",
+    "2": "🙂",
+    "3": "😐",
+    "4": "😟",
+    "5": "😢",
+  };
+
+  const SATISFACTION_SORT_RANK_BY_CODE: Record<string, number> = {
+    "1": 4,
+    "2": 3,
+    "3": 2,
+    "4": 1,
+    "5": 0,
+  };
+
+  // Helper: map a satisfaction `code` to emoji
+  function getSmileyForSatisfaction(code: string): string {
+    return SATISFACTION_EMOJI_BY_CODE[code] ?? "😐";
   }
 
-  // Returns a sort rank for satisfaction names: sehr schlecht=0 … sehr gut=4
-  function getSatisfactionSortRank(name: string): number {
-    const n = name.toLowerCase();
-    if (n.includes("sehr schlecht")) return 0;
-    if (n.includes("schlecht")) return 1;
-    if (n.includes("mittelmäßig") || n.includes("mittelmaessig")) return 2;
-    if (n.includes("sehr gut")) return 4;
-    if (n.includes("gut")) return 3;
-    return 2;
+  // Returns a sort rank for a satisfaction `code`: sehr schlecht=0 … sehr gut=4
+  function getSatisfactionSortRank(code: string): number {
+    return SATISFACTION_SORT_RANK_BY_CODE[code] ?? 2;
   }
 
   // Step 7 (final): how did the user feel? (emoji grid with labels below)
   function renderSatisfactionStep() {
     const sortedSatisfactions = [...lookupData.satisfactions].sort(
       (a, b) =>
-        getSatisfactionSortRank(a.name) - getSatisfactionSortRank(b.name),
+        getSatisfactionSortRank(a.code) - getSatisfactionSortRank(b.code),
     );
     return (
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
         {sortedSatisfactions.map((sat) => {
           const isSelected =
             pendingEntry.satisfaction_id === sat.satisfaction_id;
-          const emoji = getSmileyForSatisfaction(sat.name);
+          const emoji = getSmileyForSatisfaction(sat.code);
           return (
             <button
               key={sat.satisfaction_id}
@@ -1859,7 +1759,17 @@ export default function ActivitySelector({
                     "location_transport_id",
                     group.entry.location_transport_id,
                   );
+                  const rowLocationCode = findCodeById(
+                    lookupData.locationTransports,
+                    "location_transport_id",
+                    group.entry.location_transport_id,
+                  );
                   const rowSatisfaction = findNameById(
+                    lookupData.satisfactions,
+                    "satisfaction_id",
+                    group.entry.satisfaction_id,
+                  );
+                  const rowSatisfactionCode = findCodeById(
                     lookupData.satisfactions,
                     "satisfaction_id",
                     group.entry.satisfaction_id,
@@ -1872,7 +1782,7 @@ export default function ActivitySelector({
                     )
                     .map((item) => ({
                       name: item.name,
-                      ...getDigitalMediaTypeVisual(item.name),
+                      ...getDigitalMediaTypeVisual(item.code),
                     }));
                   const rowSocialItems = lookupData.socialContexts
                     .filter((sc) =>
@@ -1882,7 +1792,7 @@ export default function ActivitySelector({
                     )
                     .map((sc) => ({
                       name: sc.name,
-                      ...getSocialContextVisual(sc.name),
+                      ...getSocialContextVisual(sc.code),
                     }));
 
                   // Primary category: index → color + visual icons
@@ -1892,7 +1802,7 @@ export default function ActivitySelector({
                       )
                     : -1;
                   const rowPriVisual = rowPrimaryCategory
-                    ? getCategoryVisual(rowPrimaryCategory.name, rowPriCatIdx)
+                    ? getCategoryVisual(rowPrimaryCategory.code, rowPriCatIdx)
                     : null;
                   const rowPriColor =
                     rowPriCatIdx >= 0
@@ -1909,7 +1819,7 @@ export default function ActivitySelector({
                       )
                     : -1;
                   const rowSecVisual = rowSecondaryCategory
-                    ? getCategoryVisual(rowSecondaryCategory.name, rowSecCatIdx)
+                    ? getCategoryVisual(rowSecondaryCategory.code, rowSecCatIdx)
                     : null;
                   const rowSecColor =
                     rowSecCatIdx >= 0
@@ -1918,14 +1828,14 @@ export default function ActivitySelector({
                   const RowSecActIcon = rowSecVisual?.primaryIcon ?? null;
 
                   // Location
-                  const rowLocVisual = rowLocationName
-                    ? getLocationMappings(rowLocationName)
+                  const rowLocVisual = rowLocationCode
+                    ? getLocationMappings(rowLocationCode)
                     : null;
                   const RowLocIcon = rowLocVisual?.icon ?? null;
 
                   // Satisfaction emoji
-                  const rowSatisfactionEmoji = rowSatisfaction
-                    ? getSmileyForSatisfaction(rowSatisfaction)
+                  const rowSatisfactionEmoji = rowSatisfactionCode
+                    ? getSmileyForSatisfaction(rowSatisfactionCode)
                     : null;
 
                   return (
