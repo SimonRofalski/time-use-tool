@@ -100,5 +100,23 @@
     "nutzeruebersichtTitle": "User overview",
     "statistikenTitle": "Statistics",
     "confirmDiscardProfileEdit": "Your profile edits haven't been saved yet. Really close?"
+  },
+  "erfassteZeit": {
+    "loadingAriaLabel": "Loading",
+    "loadingCarouselLabel": "Loading…",
+    "dayCountLabel": "{count, plural, one {# day} other {# days}}",
+    "status": {
+      "abgeschlossen": "Completed",
+      "inBearbeitung": "In progress",
+      "nichtBegonnen": "Not started",
+      "nichtVerfuegbar": "Not yet available"
+    },
+    "errors": {
+      "userLoadError": "User could not be loaded.",
+      "noCourseFound": "No course found. Please contact your administrator.",
+      "courseInfoLoadError": "Course information could not be loaded.",
+      "daysLoadError": "Days could not be loaded.",
+      "entriesLoadError": "Entries could not be loaded."
+    }
   }
 }
