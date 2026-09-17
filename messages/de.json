@@ -695,5 +695,32 @@
     "savedMessage": "Sicherheitsfragen wurden gespeichert.",
     "saveButton": "Sicherheitsfragen speichern",
     "savingButton": "Wird gespeichert..."
+  },
+  "apiErrors": {
+    "passwordResetComplete": {
+      "invalidRequest": "Ungültige Anfrage.",
+      "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein.",
+      "invalidOrExpiredLink": "Der Reset-Link ist ungültig oder abgelaufen."
+    },
+    "passwordResetSecurityQuestions": {
+      "emailRequired": "Bitte gib eine E-Mail-Adresse ein.",
+      "accountNotFound": "Für diese E-Mail konnte kein Konto gefunden werden.",
+      "loadError": "Sicherheitsfragen konnten nicht geladen werden.",
+      "notTwoQuestionsSet": "Für dieses Konto sind noch keine zwei Sicherheitsfragen hinterlegt. Bitte wende dich an einen Admin."
+    },
+    "passwordResetVerify": {
+      "answerBothRequired": "Bitte beantworte beide Sicherheitsfragen.",
+      "checkFailed": "Sicherheitsfragen konnten nicht geprüft werden.",
+      "answersDontMatch": "Die Antworten stimmen nicht mit den hinterlegten Angaben überein.",
+      "resetPrepareFailed": "Reset konnte nicht vorbereitet werden."
+    },
+    "securityQuestions": {
+      "notAuthenticated": "Nicht angemeldet.",
+      "loadError": "Sicherheitsfragen konnten nicht geladen werden.",
+      "invalidRequest": "Ungültige Anfrage. Bitte versuche es erneut.",
+      "needTwoQuestions": "Bitte gib genau zwei Sicherheitsfragen an.",
+      "needTwoDifferentQuestions": "Bitte gib zwei unterschiedliche Fragen mit Antwort an.",
+      "internalError": "Interner Fehler beim Speichern der Sicherheitsfragen."
+    }
   }
 }

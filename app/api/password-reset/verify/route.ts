@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getTranslations } from "next-intl/server";
 import {
   createResetChallengeToken,
   getResetChallengeExpirationDate,
@@ -6,6 +7,7 @@ import {
   verifySecurityAnswer,
 } from "@/lib/security-questions-server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin-client";
+import { getApiLocale } from "@/lib/i18n/api-locale";
 
 type VerifyBody = {
   profileId?: string;
@@ -13,11 +15,15 @@ type VerifyBody = {
 };
 
 export async function POST(request: NextRequest) {
+  const t = await getTranslations({
+    locale: getApiLocale(request),
+    namespace: "apiErrors.passwordResetVerify",
+  });
   const body = (await request.json()) as VerifyBody;
 
   if (!body.profileId || !body.answers || body.answers.length !== 2) {
     return NextResponse.json(
-      { error: "Bitte beantworte beide Sicherheitsfragen." },
+      { error: t("answerBothRequired") },
       { status: 400 },
     );
   }
@@ -30,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   if (storedError || (storedRows?.length ?? 0) !== 2) {
     return NextResponse.json(
-      { error: "Sicherheitsfragen konnten nicht geprüft werden." },
+      { error: t("checkFailed") },
       { status: 400 },
     );
   }
@@ -46,10 +52,7 @@ export async function POST(request: NextRequest) {
 
   if (!allAnswersMatch) {
     return NextResponse.json(
-      {
-        error:
-          "Die Antworten stimmen nicht mit den hinterlegten Angaben überein.",
-      },
+      { error: t("answersDontMatch") },
       { status: 401 },
     );
   }
@@ -73,7 +76,7 @@ export async function POST(request: NextRequest) {
 
   if (insertError) {
     return NextResponse.json(
-      { error: "Reset konnte nicht vorbereitet werden." },
+      { error: t("resetPrepareFailed") },
       { status: 500 },
     );
   }
