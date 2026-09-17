@@ -71,17 +71,23 @@ export function periodsDurationLabel(
   return `${days} Tag${days !== 1 ? "e" : ""}`;
 }
 
-// Formats a single period's date range for display in German locale.
-// e.g. "23.03.2026 – 05.04.2026 · 14 Tage"
-export function formatPeriodLabel(startDate: string, endDate: string): string {
+// Formats a single period's date range for display.
+// e.g. "23.03.2026 – 05.04.2026 · 14 Tage" (de) / "03/23/2026 – 04/05/2026 · 14 days" (en)
+export function formatPeriodLabel(
+  startDate: string,
+  endDate: string,
+  locale: "de" | "en" = "de",
+): string {
   const days = generateDateRange(startDate, endDate).length;
   const fmt = (d: string) =>
-    new Date(d).toLocaleDateString("de-DE", {
+    new Date(d).toLocaleDateString(locale === "en" ? "en-US" : "de-DE", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
-  return `${fmt(startDate)} – ${fmt(endDate)} · ${days} Tag${days !== 1 ? "e" : ""}`;
+  const dayLabel =
+    locale === "en" ? `day${days !== 1 ? "s" : ""}` : `Tag${days !== 1 ? "e" : ""}`;
+  return `${fmt(startDate)} – ${fmt(endDate)} · ${days} ${dayLabel}`;
 }
 
 // Validates that a list of periods contain no overlapping date ranges.

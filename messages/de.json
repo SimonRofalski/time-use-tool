@@ -100,5 +100,23 @@
     "nutzeruebersichtTitle": "Nutzerübersicht",
     "statistikenTitle": "Statistiken",
     "confirmDiscardProfileEdit": "Die Profilbearbeitung ist noch nicht gespeichert. Wirklich schliessen?"
+  },
+  "erfassteZeit": {
+    "loadingAriaLabel": "Wird geladen",
+    "loadingCarouselLabel": "Wird geladen…",
+    "dayCountLabel": "{count, plural, one {# Tag} other {# Tage}}",
+    "status": {
+      "abgeschlossen": "Abgeschlossen",
+      "inBearbeitung": "In Bearbeitung",
+      "nichtBegonnen": "Nicht begonnen",
+      "nichtVerfuegbar": "Noch nicht verfügbar"
+    },
+    "errors": {
+      "userLoadError": "Benutzer konnte nicht geladen werden.",
+      "noCourseFound": "Kein Kurs gefunden. Bitte wende dich an deinen Administrator.",
+      "courseInfoLoadError": "Kursinformationen konnten nicht geladen werden.",
+      "daysLoadError": "Tage konnten nicht geladen werden.",
+      "entriesLoadError": "Einträge konnten nicht geladen werden."
+    }
   }
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import {
   formatPeriodLabel,
@@ -60,6 +61,8 @@ type CourseSummary = {
   periods: CoursePeriodInfo[];
 };
 
+type ErfassteZeitTranslate = ReturnType<typeof useTranslations<"erfassteZeit">>;
+
 function getLocalIsoDate(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -92,28 +95,20 @@ function getDayStatus(
   return "nicht_begonnen";
 }
 
-// Formats an ISO date string into a German long-form date
-// e.g. "2026-03-28" → "Samstag, 28. März 2026"
-function formatDateGerman(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("de-DE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
 // Returns a compact two-part date label for carousel cards
 // e.g. "2026-03-28" → { weekday: "Sa.", dayMonth: "28. Mär." }
-function formatDateCompact(dateString: string): {
+function formatDateCompact(
+  dateString: string,
+  locale: string,
+): {
   weekday: string;
   dayMonth: string;
 } {
   const date = new Date(dateString);
+  const intlLocale = locale === "en" ? "en-US" : "de-DE";
   return {
-    weekday: date.toLocaleDateString("de-DE", { weekday: "short" }),
-    dayMonth: date.toLocaleDateString("de-DE", {
+    weekday: date.toLocaleDateString(intlLocale, { weekday: "short" }),
+    dayMonth: date.toLocaleDateString(intlLocale, {
       day: "numeric",
       month: "short",
     }),
@@ -165,17 +160,17 @@ function getStatusColors(status: DayStatus): {
   }
 }
 
-// Returns the German display label for a day status
-function getStatusLabel(status: DayStatus): string {
+// Returns the translated display label for a day status
+function getStatusLabel(status: DayStatus, t: ErfassteZeitTranslate): string {
   switch (status) {
     case "nicht_verfuegbar":
-      return "Noch nicht verfügbar";
+      return t("status.nichtVerfuegbar");
     case "nicht_begonnen":
-      return "Nicht begonnen";
+      return t("status.nichtBegonnen");
     case "in_bearbeitung":
-      return "In Bearbeitung";
+      return t("status.inBearbeitung");
     case "abgeschlossen":
-      return "Abgeschlossen";
+      return t("status.abgeschlossen");
   }
 }
 
@@ -189,13 +184,15 @@ function DayCarouselCard({
   day: CourseDay;
   onClick: () => void;
 }) {
+  const t = useTranslations("erfassteZeit");
+  const locale = useLocale();
   const colors = getStatusColors(day.status);
   const isAvailable = day.status !== "nicht_verfuegbar";
   const completionPercentage = Math.min(
     Math.round((day.entryCount / TOTAL_ENTRIES_PER_DAY) * 100),
     100,
   );
-  const { weekday, dayMonth } = formatDateCompact(day.date);
+  const { weekday, dayMonth } = formatDateCompact(day.date, locale);
 
   return (
     <div
@@ -217,7 +214,7 @@ function DayCarouselCard({
       <span
         className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${colors.labelBg} ${colors.labelText}`}
       >
-        {getStatusLabel(day.status)}
+        {getStatusLabel(day.status, t)}
       </span>
 
       {/* Progress bar */}
@@ -252,6 +249,7 @@ function DayCarousel({
   onDayClick: (date: string) => void;
   label?: string;
 }) {
+  const t = useTranslations("erfassteZeit");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -259,7 +257,7 @@ function DayCarousel({
       {/* Header row: period date range + day count */}
       <div className="mb-3 flex items-center">
         <p className="text-sm font-medium text-slate-600">
-          {label ?? `${days.length} Tage`}
+          {label ?? t("dayCountLabel", { count: days.length })}
         </p>
       </div>
 
@@ -295,6 +293,7 @@ function DayCarousel({
 // SummaryBar: three summary containers at the bottom of the page
 // Only counts days up to and including today (future days are excluded)
 function SummaryBar({ days }: { days: CourseDay[] }) {
+  const t = useTranslations("erfassteZeit");
   // Exclude future days from the summary counts
   const pastAndTodayDays = days.filter(
     (day) => day.status !== "nicht_verfuegbar",
@@ -318,7 +317,7 @@ function SummaryBar({ days }: { days: CourseDay[] }) {
       <div className="w-full rounded-lg border border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/20 px-3 py-2.5 text-center sm:w-[220px]">
         <p className="text-xl font-bold text-green-600 dark:text-green-400">{completedCount}</p>
         <p className="mt-0.5 text-xs font-medium text-green-700 dark:text-green-300">
-          Abgeschlossen
+          {t("status.abgeschlossen")}
         </p>
       </div>
 
@@ -326,7 +325,7 @@ function SummaryBar({ days }: { days: CourseDay[] }) {
       <div className="w-full rounded-lg border border-orange-200 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-900/20 px-3 py-2.5 text-center sm:w-[220px]">
         <p className="text-xl font-bold text-orange-500 dark:text-orange-400">{inProgressCount}</p>
         <p className="mt-0.5 text-xs font-medium text-orange-700 dark:text-orange-300">
-          In Bearbeitung
+          {t("status.inBearbeitung")}
         </p>
       </div>
 
@@ -334,7 +333,7 @@ function SummaryBar({ days }: { days: CourseDay[] }) {
       <div className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2.5 text-center sm:w-[220px]">
         <p className="text-xl font-bold text-slate-500 dark:text-slate-300">{notStartedCount}</p>
         <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-          Nicht begonnen
+          {t("status.nichtBegonnen")}
         </p>
       </div>
     </div>
@@ -344,6 +343,8 @@ function SummaryBar({ days }: { days: CourseDay[] }) {
 // ─── Main Page Component ──────────────────────────────────────────────────────
 
 export default function ErfassteZeitPage() {
+  const t = useTranslations("erfassteZeit");
+  const locale = useLocale();
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
 
@@ -399,7 +400,7 @@ export default function ErfassteZeitPage() {
     // Step 1: get the currently logged-in user
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) {
-      setErrorMessage("Benutzer konnte nicht geladen werden.");
+      setErrorMessage(t("errors.userLoadError"));
       setIsLoading(false);
       return;
     }
@@ -413,9 +414,7 @@ export default function ErfassteZeitPage() {
       .single();
 
     if (userCourseError || !userCourseData) {
-      setErrorMessage(
-        "Kein Kurs gefunden. Bitte wende dich an deinen Administrator.",
-      );
+      setErrorMessage(t("errors.noCourseFound"));
       setIsLoading(false);
       return;
     }
@@ -445,13 +444,13 @@ export default function ErfassteZeitPage() {
     ]);
 
     if (courseError || !courseData) {
-      setErrorMessage("Kursinformationen konnten nicht geladen werden.");
+      setErrorMessage(t("errors.courseInfoLoadError"));
       setIsLoading(false);
       return;
     }
 
     if (dayError) {
-      setErrorMessage("Tage konnten nicht geladen werden.");
+      setErrorMessage(t("errors.daysLoadError"));
       setIsLoading(false);
       return;
     }
@@ -496,7 +495,7 @@ export default function ErfassteZeitPage() {
         .in("day_id", dayIds);
 
       if (entryError) {
-        setErrorMessage("Einträge konnten nicht geladen werden.");
+        setErrorMessage(t("errors.entriesLoadError"));
         setIsLoading(false);
         return;
       }
@@ -552,25 +551,25 @@ export default function ErfassteZeitPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4" aria-busy="true" aria-label="Wird geladen">
+      <div className="space-y-4" aria-busy="true" aria-label={t("loadingAriaLabel")}>
         {/* Skeleton SummaryBar */}
         <div className="flex flex-wrap items-stretch gap-2">
           <div className="w-full rounded-lg border border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/20 px-3 py-2.5 text-center sm:w-[220px]">
             <div className="mx-auto h-7 w-8 animate-pulse rounded bg-green-200 dark:bg-green-800/50" />
             <p className="mt-0.5 text-xs font-medium text-green-700 dark:text-green-400">
-              Abgeschlossen
+              {t("status.abgeschlossen")}
             </p>
           </div>
           <div className="w-full rounded-lg border border-orange-200 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-900/20 px-3 py-2.5 text-center sm:w-[220px]">
             <div className="mx-auto h-7 w-8 animate-pulse rounded bg-orange-200 dark:bg-orange-800/50" />
             <p className="mt-0.5 text-xs font-medium text-orange-700 dark:text-orange-400">
-              In Bearbeitung
+              {t("status.inBearbeitung")}
             </p>
           </div>
           <div className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2.5 text-center sm:w-[220px]">
             <div className="mx-auto h-7 w-8 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
             <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-              Nicht begonnen
+              {t("status.nichtBegonnen")}
             </p>
           </div>
         </div>
@@ -578,7 +577,7 @@ export default function ErfassteZeitPage() {
         {/* Skeleton carousel section */}
         <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
           <div className="mb-3 flex items-center">
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Wird geladen…</p>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{t("loadingCarouselLabel")}</p>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:hidden">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -644,7 +643,11 @@ export default function ErfassteZeitPage() {
           <DayCarousel
             days={periodDays}
             onDayClick={handleDayClick}
-            label={formatPeriodLabel(period.start_date, period.end_date)}
+            label={formatPeriodLabel(
+              period.start_date,
+              period.end_date,
+              locale === "en" ? "en" : "de",
+            )}
           />
         </section>
       ))}
