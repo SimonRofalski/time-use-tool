@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { totalPeriodDays } from "@/lib/course-periods";
 import ConfirmModal from "./ConfirmModal";
 
@@ -150,16 +151,23 @@ export default function NutzeruebersichtTab() {
       }
     }
 
-    // All day records to compute per-user submitted counts and the KPI
-    const { data: allDays } = await supabase
-      .from("day")
-      .select("profiles_id, is_submitted");
+    // All day records to compute per-user submitted counts and the KPI (paged)
+    const allDays = await fetchAllRows<{
+      profiles_id: string;
+      is_submitted: boolean;
+    }>((from, to) =>
+      supabase
+        .from("day")
+        .select("profiles_id, is_submitted")
+        .order("day_id")
+        .range(from, to),
+    );
 
     const submittedByUser: Record<string, number> = {};
     const totalDaysByUser: Record<string, number> = {};
     let totalSubmittedDays = 0;
 
-    for (const d of allDays ?? []) {
+    for (const d of allDays) {
       totalDaysByUser[d.profiles_id] =
         (totalDaysByUser[d.profiles_id] ?? 0) + 1;
       if (d.is_submitted) {

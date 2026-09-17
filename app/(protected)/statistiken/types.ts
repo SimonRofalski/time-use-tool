@@ -80,6 +80,25 @@ export type ComparisonTopic = {
   userValue: number;
 };
 
+// Per-category comparison: the user's Ø h/Tag vs. all qualifying participants
+export type CategoryComparison = {
+  categoryId: number;
+  name: string;
+  allValues: number[]; // anonymous Ø h/Tag of every qualifying participant
+  userValue: number; // the current user's Ø h/Tag
+};
+
+// Generic "you vs. course" metric, rendered as paired bars in the Kursvergleich
+export type ComparisonMetric = {
+  key: string;
+  label: string;
+  description?: string; // short explanation under the label
+  unit: "h/Tag" | "%" | "Punkte";
+  scaleMax?: number; // fixed bar scale (100 for %, max rank for wellbeing); omit → max of values
+  allValues: number[]; // anonymous per-participant values
+  userValue: number;
+};
+
 export type ComparisonPairPercent = {
   leftPercent: number;
   rightPercent: number;

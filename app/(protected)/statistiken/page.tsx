@@ -2,15 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { FileDown } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
 import ZeitverteilungTab from "./ZeitverteilungTab";
 import KursvergleichTab from "./KursvergleichTab";
+import { generatePersonalReportPdf } from "./export-pdf";
 import type {
   CategoryRow,
   SubcategoryRow,
   ActivityRow,
   DayBarData,
+  CategoryComparison,
+  ComparisonMetric,
   ComparisonTopic,
   ComparisonMetaStats,
   MetaAggregates,
@@ -677,7 +682,17 @@ export default function StatistikenPage() {
   );
   const [comparisonMetaStats, setComparisonMetaStats] =
     useState<ComparisonMetaStats | null>(null);
+  const [categoryComparison, setCategoryComparison] = useState<
+    CategoryComparison[]
+  >([]);
+  const [contextMetrics, setContextMetrics] = useState<ComparisonMetric[]>([]);
   const [qualifyingUserCount, setQualifyingUserCount] = useState(0);
+
+  // Header info for the personal PDF export
+  const [courseName, setCourseName] = useState("");
+  const [participantName, setParticipantName] = useState("");
+  const [participantId, setParticipantId] = useState("");
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   // Tracks the last time data was loaded to avoid unnecessary reloads on tab switch
   const lastLoadTimeRef = useRef<number>(0);
@@ -796,8 +811,46 @@ export default function StatistikenPage() {
     if (filteredUsers.length < 3) {
       setComparisonTopics([]);
       setComparisonMetaStats(null);
+      setCategoryComparison([]);
+      setContextMetrics([]);
       return;
     }
+
+    // activity_id → category_id (needed for the per-category comparison)
+    const lookups = rawDataRef.current;
+    const activityToCategory: Record<number, number> = {};
+    if (lookups) {
+      const subToCat: Record<number, number> = {};
+      for (const sub of lookups.subcategories)
+        subToCat[sub.subcategory_id] = sub.category_id;
+      for (const act of lookups.activities) {
+        const catId = subToCat[act.subcategory_id];
+        if (catId != null) activityToCategory[act.activity_id] = catId;
+      }
+    }
+    // Ø h/Tag per category for one participant's entries over `dayCount` days
+    const hoursPerDayByCategory = (
+      entries: RawEntry[],
+      dayIdSet: Set<number>,
+    ): Record<number, number> => {
+      const minutes: Record<number, number> = {};
+      for (const entry of entries) {
+        if (!dayIdSet.has(entry.day_id)) continue;
+        if (entry.primary_activity_id == null) continue;
+        const catId = activityToCategory[entry.primary_activity_id];
+        if (catId == null) continue;
+        minutes[catId] =
+          (minutes[catId] ?? 0) +
+          calculateMinutes(entry.start_time, entry.end_time);
+      }
+      const result: Record<number, number> = {};
+      const days = dayIdSet.size;
+      for (const [catId, mins] of Object.entries(minutes)) {
+        result[Number(catId)] = days > 0 ? mins / 60 / days : 0;
+      }
+      return result;
+    };
+    const courseCategoryValues: Record<number, number[]> = {};
 
     const sleepValues: number[] = [];
     const sportValues: number[] = [];
@@ -811,6 +864,12 @@ export default function StatistikenPage() {
     let courseElsewhere = 0;
     let courseSatisfactionWeightedSum = 0;
     let courseSatisfactionWeight = 0;
+
+    // Per-participant context values (anonymous) for the paired-bar comparison
+    const deviceShareValues: number[] = [];
+    const socialShareValues: number[] = [];
+    const homeShareValues: number[] = [];
+    const wellbeingValues: number[] = [];
 
     for (const [profileId, dayIds] of filteredUsers) {
       const dayIdSet = new Set(dayIds);
@@ -826,13 +885,31 @@ export default function StatistikenPage() {
       );
       smartphoneValues.push(calcSmartphoneHoursPerDay(userEntries, dayIdSet));
 
+      const perCategory = hoursPerDayByCategory(userEntries, dayIdSet);
+      for (const cat of lookups?.categories ?? []) {
+        if (!courseCategoryValues[cat.category_id])
+          courseCategoryValues[cat.category_id] = [];
+        courseCategoryValues[cat.category_id].push(
+          perCategory[cat.category_id] ?? 0,
+        );
+      }
+
+      let uWithDevice = 0;
+      let uWithoutDevice = 0;
+      let uWithOthers = 0;
+      let uAlone = 0;
+      let uAtHome = 0;
+      let uElsewhere = 0;
+      let uSatSum = 0;
+      let uSatWeight = 0;
+
       for (const entry of userEntries) {
         const minutes = calculateMinutes(entry.start_time, entry.end_time);
 
         if (entry.digital_media_type_ids.length > 0) {
-          courseWithDevice += minutes;
+          uWithDevice += minutes;
         } else {
-          courseWithoutDevice += minutes;
+          uWithoutDevice += minutes;
         }
 
         const hasOtherPeople = entry.social_context_ids.some((id) => {
@@ -840,9 +917,9 @@ export default function StatistikenPage() {
           return !isAloneContext(name);
         });
         if (hasOtherPeople) {
-          courseWithOthers += minutes;
+          uWithOthers += minutes;
         } else {
-          courseAlone += minutes;
+          uAlone += minutes;
         }
 
         const locationName =
@@ -850,19 +927,35 @@ export default function StatistikenPage() {
             ? (raw.locationById[entry.location_transport_id] ?? "")
             : "";
         if (isAtHomeLocation(locationName)) {
-          courseAtHome += minutes;
+          uAtHome += minutes;
         } else {
-          courseElsewhere += minutes;
+          uElsewhere += minutes;
         }
 
         if (entry.satisfaction_id != null) {
           const rank = raw.satisfactionRankById[entry.satisfaction_id];
           if (rank != null) {
-            courseSatisfactionWeightedSum += rank * minutes;
-            courseSatisfactionWeight += minutes;
+            uSatSum += rank * minutes;
+            uSatWeight += minutes;
           }
         }
       }
+
+      courseWithDevice += uWithDevice;
+      courseWithoutDevice += uWithoutDevice;
+      courseWithOthers += uWithOthers;
+      courseAlone += uAlone;
+      courseAtHome += uAtHome;
+      courseElsewhere += uElsewhere;
+      courseSatisfactionWeightedSum += uSatSum;
+      courseSatisfactionWeight += uSatWeight;
+
+      const share = (part: number, total: number) =>
+        total > 0 ? (part / total) * 100 : 0;
+      deviceShareValues.push(share(uWithDevice, uWithDevice + uWithoutDevice));
+      socialShareValues.push(share(uWithOthers, uWithOthers + uAlone));
+      homeShareValues.push(share(uAtHome, uAtHome + uElsewhere));
+      if (uSatWeight > 0) wellbeingValues.push(uSatSum / uSatWeight);
     }
 
     const myFilteredSubmittedDayIds = new Set(
@@ -962,6 +1055,68 @@ export default function StatistikenPage() {
       },
     ]);
 
+    const myCategoryValues = hoursPerDayByCategory(
+      raw.myEntries,
+      myFilteredSubmittedDayIds,
+    );
+    setCategoryComparison(
+      (lookups?.categories ?? [])
+        .map((cat) => ({
+          categoryId: cat.category_id,
+          name: cat.name,
+          allValues: courseCategoryValues[cat.category_id] ?? [],
+          userValue: myCategoryValues[cat.category_id] ?? 0,
+        }))
+        // Skip categories nobody in the course used in this period
+        .filter(
+          (c) => c.userValue > 0 || c.allValues.some((v) => v > 0),
+        ),
+    );
+
+    const myShare = (part: number, total: number) =>
+      total > 0 ? (part / total) * 100 : 0;
+    setContextMetrics([
+      {
+        key: "itDevice",
+        label: "Zeit mit IT-Gerät",
+        description: "Anteil der Zeit mit Smartphone, Laptop & Co.",
+        unit: "%",
+        scaleMax: 100,
+        allValues: deviceShareValues,
+        userValue: myShare(myWithDevice, myWithDevice + myWithoutDevice),
+      },
+      {
+        key: "social",
+        label: "Zeit mit anderen",
+        description: "Anteil der Zeit in Gesellschaft statt allein",
+        unit: "%",
+        scaleMax: 100,
+        allValues: socialShareValues,
+        userValue: myShare(myWithOthers, myWithOthers + myAlone),
+      },
+      {
+        key: "location",
+        label: "Zeit zuhause",
+        description: "Anteil der Zeit zuhause statt anderswo",
+        unit: "%",
+        scaleMax: 100,
+        allValues: homeShareValues,
+        userValue: myShare(myAtHome, myAtHome + myElsewhere),
+      },
+      {
+        key: "wellbeing",
+        label: "Wohlbefinden",
+        description: `Ø zeitgewichtet, Skala 1–${raw.maxSatisfactionRank}`,
+        unit: "Punkte",
+        scaleMax: raw.maxSatisfactionRank,
+        allValues: wellbeingValues,
+        userValue:
+          mySatisfactionWeight > 0
+            ? mySatisfactionWeightedSum / mySatisfactionWeight
+            : 0,
+      },
+    ]);
+
     setComparisonMetaStats({
       itDevice: {
         user: pairPercent(myWithDevice, myWithoutDevice),
@@ -1004,6 +1159,7 @@ export default function StatistikenPage() {
       return;
     }
     const userId = authData.user.id;
+    setParticipantId(userId);
 
     // Step 2: get course enrollment
     const { data: userCourse } = await supabase
@@ -1018,12 +1174,28 @@ export default function StatistikenPage() {
     }
     const courseId = userCourse.course_id;
 
-    const { data: courseSettings } = await supabase
-      .from("course")
-      .select("comparison_enabled")
-      .eq("course_id", courseId)
-      .single();
+    const [{ data: courseSettings }, { data: myProfile }] = await Promise.all([
+      supabase
+        .from("course")
+        .select("name, comparison_enabled")
+        .eq("course_id", courseId)
+        .single(),
+      supabase
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", userId)
+        .maybeSingle(),
+    ]);
     setIsCourseComparisonEnabled(courseSettings?.comparison_enabled === true);
+    setCourseName(courseSettings?.name ?? "");
+    setParticipantName(
+      [myProfile?.first_name, myProfile?.last_name]
+        .map((v) => (v ?? "").trim())
+        .filter(Boolean)
+        .join(" ") ||
+        authData.user.email ||
+        "",
+    );
 
     // Step 3: load course date range via periods; fallback to legacy columns
     const { data: periodsData } = await supabase
@@ -1143,19 +1315,28 @@ export default function StatistikenPage() {
       allMyDays.filter((d) => d.is_submitted).map((d) => d.day_id),
     );
 
-    // Step 6: load all time entries for this user's day records.
-    // Some legacy rows have entries but missing is_submitted/is_complete flags.
-    const allMyDayIds = allMyDays.map((d) => d.day_id);
+    // Step 6: load the time entries of this user's SUBMITTED days.
+    // Only submitted days count — the same basis as the Kursvergleich, the PDF
+    // and the admin export. Days still "in Bearbeitung" are partially filled and
+    // would distort totals and per-day averages; they show as grey placeholders.
+    // Paged: a fully tracked day has 144 entries, Supabase caps responses at 1000.
+    const allMyDayIds = allMyDays
+      .filter((d) => d.is_submitted)
+      .map((d) => d.day_id);
     let allMyEntries: RawEntry[] = [];
 
     if (allMyDayIds.length > 0) {
-      const { data: entryData } = await supabase
-        .from("time_entry")
-        .select(
-          "entry_id, day_id, start_time, end_time, primary_activity_id, location_transport_id, satisfaction_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
-        )
-        .in("day_id", allMyDayIds);
-      allMyEntries = (entryData ?? []).map((row: any) => ({
+      const entryData = await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("time_entry")
+          .select(
+            "entry_id, day_id, start_time, end_time, primary_activity_id, location_transport_id, satisfaction_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
+          )
+          .in("day_id", allMyDayIds)
+          .order("entry_id")
+          .range(from, to),
+      );
+      allMyEntries = entryData.map((row: any) => ({
         entry_id: row.entry_id,
         day_id: row.day_id,
         start_time: row.start_time,
@@ -1172,10 +1353,7 @@ export default function StatistikenPage() {
       }));
     }
 
-    const dayIdsWithEntries = new Set(allMyEntries.map((e) => e.day_id));
-    const trackedDays = allMyDays.filter(
-      (d) => d.is_submitted || d.is_complete || dayIdsWithEntries.has(d.day_id),
-    );
+    const trackedDays = allMyDays.filter((d) => d.is_submitted);
     const trackedDayIds = new Set(trackedDays.map((d) => d.day_id));
 
     const myDayIdToDate: Record<number, string> = {};
@@ -1238,26 +1416,20 @@ export default function StatistikenPage() {
     // Derive participant IDs from submitted day records instead of user_course.
     // This avoids a self-referential RLS policy on user_course and naturally limits
     // the comparison pool to users who have actually submitted at least one day.
-    const { data: allSubmittedDays } = await supabase
-      .from("day")
-      .select("profiles_id")
-      .eq("course_id", courseId)
-      .eq("is_submitted", true);
-
-    // De-duplicate: one entry per unique participant
-    const allParticipantIds = [
-      ...new Set(
-        (allSubmittedDays ?? []).map((d: any) => d.profiles_id as string),
-      ),
-    ];
-
-    // Load submitted days for all participants
-    const { data: allDays } = await supabase
-      .from("day")
-      .select("day_id, profiles_id, date")
-      .eq("course_id", courseId)
-      .eq("is_submitted", true)
-      .in("profiles_id", allParticipantIds);
+    // Load submitted days for all participants (paged — grows with course size)
+    const allDays = await fetchAllRows<{
+      day_id: number;
+      profiles_id: string;
+      date: string;
+    }>((from, to) =>
+      supabase
+        .from("day")
+        .select("day_id, profiles_id, date")
+        .eq("course_id", courseId)
+        .eq("is_submitted", true)
+        .order("day_id")
+        .range(from, to),
+    );
 
     // Group submitted day IDs by user and filter to users with ≥ MIN_DAYS_FOR_COMPARISON
     const submittedDaysByUser: Record<string, number[]> = {};
@@ -1287,14 +1459,25 @@ export default function StatistikenPage() {
         ([, dayIds]) => dayIds,
       );
 
-      const { data: allEntries } = await supabase
-        .from("time_entry")
-        .select(
-          "entry_id, day_id, start_time, end_time, primary_activity_id, location_transport_id, satisfaction_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
-        )
-        .in("day_id", allQualifyingDayIds);
+      // Paged in chunks of day ids: the pool easily exceeds the 1000-row cap
+      // (21 submitted days = 3024 entries), and long id lists keep URLs short.
+      const allEntries: any[] = [];
+      for (let i = 0; i < allQualifyingDayIds.length; i += 200) {
+        const ids = allQualifyingDayIds.slice(i, i + 200);
+        const batch = await fetchAllRows<any>((from, to) =>
+          supabase
+            .from("time_entry")
+            .select(
+              "entry_id, day_id, start_time, end_time, primary_activity_id, location_transport_id, satisfaction_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
+            )
+            .in("day_id", ids)
+            .order("entry_id")
+            .range(from, to),
+        );
+        allEntries.push(...batch);
+      }
 
-      const rawAllEntries: RawEntry[] = (allEntries ?? []).map((row: any) => ({
+      const rawAllEntries: RawEntry[] = allEntries.map((row: any) => ({
         entry_id: row.entry_id,
         day_id: row.day_id,
         start_time: row.start_time,
@@ -1327,6 +1510,8 @@ export default function StatistikenPage() {
       rawComparisonRef.current = null;
       setComparisonTopics([]);
       setComparisonMetaStats(null);
+      setCategoryComparison([]);
+      setContextMetrics([]);
       setQualifyingUserCount(
         courseSettings?.comparison_enabled === true
           ? qualifyingUsers.length
@@ -1393,6 +1578,45 @@ export default function StatistikenPage() {
     );
   }
 
+  // ── Personal PDF export ─────────────────────────────────────────────────────
+
+  function buildFilterLabel(): string {
+    const parts: string[] = [];
+    if (dayFilter === "werktage") parts.push("nur Werktage");
+    else if (dayFilter === "wochenende") parts.push("nur Wochenende");
+    if (selectedWeeks.length > 0) {
+      const labels = weekOptions
+        .filter((w) => selectedWeeks.includes(w.key))
+        .map((w) => w.label);
+      parts.push(labels.join(", "));
+    }
+    return parts.length > 0 ? parts.join(" · ") : "Alle Kurstage";
+  }
+
+  async function handleExportPdf() {
+    setIsExportingPdf(true);
+    try {
+      await generatePersonalReportPdf({
+        courseName,
+        participantName,
+        participantId,
+        filterLabel: buildFilterLabel(),
+        barData,
+        categoryRows,
+        metaAggregates,
+        comparison: {
+          enabled: isCourseComparisonEnabled,
+          qualifyingUserCount,
+          topics: comparisonTopics,
+          metaStats: comparisonMetaStats,
+          categories: categoryComparison,
+        },
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   if (isLoading) {
@@ -1410,6 +1634,20 @@ export default function StatistikenPage() {
       </div>
     );
   }
+
+  // Rendered inside the filter bar of both tabs (next to Tage / KW)
+  const exportButton = (
+    <button
+      type="button"
+      disabled={isExportingPdf}
+      onClick={() => void handleExportPdf()}
+      title="Persönliche Auswertung als PDF herunterladen"
+      className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/15"
+    >
+      <FileDown size={13} />
+      {isExportingPdf ? "PDF…" : "PDF"}
+    </button>
+  );
 
   return (
     <div className="space-y-5">
@@ -1456,11 +1694,13 @@ export default function StatistikenPage() {
           onSetDayFilter={handleSetDayFilter}
           onToggleCategory={handleToggleCategory}
           onToggleSubcategory={handleToggleSubcategory}
+          actions={exportButton}
         />
       ) : isCourseComparisonEnabled ? (
         <KursvergleichTab
           topics={comparisonTopics}
-          metaStats={comparisonMetaStats}
+          categoryComparison={categoryComparison}
+          contextMetrics={contextMetrics}
           qualifyingUserCount={qualifyingUserCount}
           selectedWeeks={selectedWeeks}
           weekOptions={weekOptions}
@@ -1468,6 +1708,7 @@ export default function StatistikenPage() {
           onToggleWeek={handleToggleWeek}
           onClearWeeks={handleClearWeeks}
           onSetDayFilter={handleSetDayFilter}
+          actions={exportButton}
         />
       ) : (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-6 text-center">
