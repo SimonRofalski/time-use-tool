@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 type SecurityQuestionOptionRow = {
@@ -34,6 +35,8 @@ export default function SecurityQuestionsForm({
   allowEditToggle = false,
   onSaved,
 }: SecurityQuestionsFormProps) {
+  const t = useTranslations("securityQuestionsForm");
+  const tCommon = useTranslations("common");
   const supabase = getSupabaseBrowserClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -65,7 +68,7 @@ export default function SecurityQuestionsForm({
       ]);
 
     if (optionError || !optionRows) {
-      setSaveError("Sicherheitsfragen konnten nicht geladen werden.");
+      setSaveError(t("loadQuestionsError"));
       setLoading(false);
       return;
     }
@@ -75,7 +78,7 @@ export default function SecurityQuestionsForm({
     setOptions(optionRows);
 
     if (!currentUser) {
-      setSaveError("Nutzer konnte nicht geladen werden.");
+      setSaveError(t("userLoadError"));
       setLoading(false);
       return;
     }
@@ -87,7 +90,7 @@ export default function SecurityQuestionsForm({
       .order("created_at", { ascending: true });
 
     if (existingError) {
-      setSaveError("Sicherheitsfragen konnten nicht geladen werden.");
+      setSaveError(t("loadQuestionsError"));
       setLoading(false);
       return;
     }
@@ -126,16 +129,12 @@ export default function SecurityQuestionsForm({
     setSaveError(null);
 
     if (!isComplete) {
-      setSaveError(
-        "Bitte wähle zwei Fragen und gib beide Antworten an.",
-      );
+      setSaveError(t("incompleteError"));
       return;
     }
 
     if (hasDuplicateQuestion) {
-      setSaveError(
-        "Bitte wähle zwei unterschiedliche Sicherheitsfragen aus.",
-      );
+      setSaveError(t("duplicateQuestionError"));
       return;
     }
 
@@ -149,7 +148,7 @@ export default function SecurityQuestionsForm({
       } = await supabase.auth.getSession();
 
       if (!currentUser) {
-        setSaveError("Nutzer konnte nicht geladen werden.");
+        setSaveError(t("userLoadError"));
         return;
       }
 
@@ -178,13 +177,13 @@ export default function SecurityQuestionsForm({
       try {
         result = (await response.json()) as { error?: string };
       } catch {
-        result = { error: "Unerwartete Serverantwort beim Speichern." };
+        result = { error: t("unexpectedServerResponse") };
       }
 
       if (!response.ok) {
         setSaveError(
           result.error ??
-            `Sicherheitsfragen konnten nicht gespeichert werden (Status ${response.status}).`,
+            t("saveFailedWithStatus", { status: response.status }),
         );
         return;
       }
@@ -202,10 +201,7 @@ export default function SecurityQuestionsForm({
       };
 
       if (!verifyResponse.ok || verifyResult.hasCompleted !== true) {
-        setSaveError(
-          verifyResult.error ??
-            "Speichern wurde ausgeführt, konnte aber nicht bestätigt werden. Bitte erneut versuchen.",
-        );
+        setSaveError(verifyResult.error ?? t("verifyFailedError"));
         return;
       }
 
@@ -224,9 +220,7 @@ export default function SecurityQuestionsForm({
       await onSaved?.();
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Netzwerkfehler beim Speichern der Sicherheitsfragen.";
+        error instanceof Error ? error.message : t("networkError");
       setSaveError(message);
     } finally {
       setSaving(false);
@@ -236,7 +230,7 @@ export default function SecurityQuestionsForm({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-sm text-slate-500">
-        Sicherheitsfragen werden geladen…
+        {t("loading")}
       </div>
     );
   }
@@ -249,17 +243,14 @@ export default function SecurityQuestionsForm({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Sicherheitsfragen
+              {t("title")}
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Wähle zwei unterschiedliche Fragen aus und beantworte
-              sie möglichst mit einem kurzen Wort.
+              {t("description")}
             </p>
             {existingRows.length === 2 && (
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                Sicherheitsfragen sind hinterlegt. Antworten werden aus
-                Sicherheitsgründen nicht angezeigt und müssen bei einer Änderung
-                neu eingegeben werden.
+                {t("alreadySetHint")}
               </p>
             )}
           </div>
@@ -272,7 +263,7 @@ export default function SecurityQuestionsForm({
               }}
               className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800"
             >
-              {isEditing ? "Abbrechen" : "Bearbeiten"}
+              {isEditing ? tCommon("cancelButton") : t("editButton")}
             </button>
           )}
         </div>
@@ -284,7 +275,7 @@ export default function SecurityQuestionsForm({
               className="grid gap-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-800 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]"
             >
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Frage {index + 1}
+                {t("questionLabel", { index: index + 1 })}
                 <select
                   value={row.questionId}
                   onChange={(event) => {
@@ -301,7 +292,7 @@ export default function SecurityQuestionsForm({
                   disabled={!canEdit}
                   className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-800"
                 >
-                  <option value="">Bitte auswählen</option>
+                  <option value="">{t("selectPlaceholder")}</option>
                   {options.map((option) => (
                     <option
                       key={option.security_question_id}
@@ -320,7 +311,7 @@ export default function SecurityQuestionsForm({
               </label>
 
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Antwort
+                {t("answerLabel")}
                 <input
                   type="text"
                   value={row.answer}
@@ -340,8 +331,8 @@ export default function SecurityQuestionsForm({
                   className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-800"
                   placeholder={
                     canEdit
-                      ? "Kurze Antwort"
-                      : "Aus Sicherheitsgründen ausgeblendet"
+                      ? t("answerPlaceholderEditable")
+                      : t("answerPlaceholderHidden")
                   }
                 />
               </label>
@@ -356,7 +347,7 @@ export default function SecurityQuestionsForm({
 
           {saved && (
             <p className="text-sm text-green-600 dark:text-green-400">
-              Sicherheitsfragen wurden gespeichert.
+              {t("savedMessage")}
             </p>
           )}
 
@@ -367,7 +358,7 @@ export default function SecurityQuestionsForm({
                 disabled={saving}
                 className="rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
-                {saving ? "Wird gespeichert..." : "Sicherheitsfragen speichern"}
+                {saving ? t("savingButton") : t("saveButton")}
               </button>
             </div>
           )}

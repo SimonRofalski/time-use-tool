@@ -92,6 +92,10 @@
     "settingsPanelDescription": "Darstellung und Kontoinformationen anpassen.",
     "darkModeTitle": "Darkmode",
     "darkModeDescription": "Schaltet zwischen heller und dunkler Darstellung um.",
+    "languageTitle": "Sprache",
+    "languageDescription": "Wähle die Sprache der Benutzeroberfläche.",
+    "languageDe": "Deutsch",
+    "languageEn": "English",
     "accountSectionTitle": "Konto",
     "userIdLabel": "User ID",
     "lastLoginLabel": "Letztes Login",
@@ -591,5 +595,105 @@
   },
   "adminUserStatsView": {
     "noData": "Dieser Nutzer hat noch keine Daten erfasst."
+  },
+  "profileDetailsForm": {
+    "loadingProfile": "Profil wird geladen…",
+    "noResultsFound": "Keine Treffer",
+    "title": "Profil",
+    "subtitle": "Deine persönlichen Angaben",
+    "popupHint": "Die wichtigsten Kontodaten findest du zusätzlich im Profil-Popup oben rechts.",
+    "savedMessage": "Profil gespeichert!",
+    "editButton": "Bearbeiten",
+    "saveButton": "Speichern",
+    "savingButton": "Speichern...",
+    "saveProfileButton": "Profil speichern",
+    "genericSaveError": "Fehler beim Speichern: {message}",
+    "unknownError": "Unbekannter Fehler",
+    "missingFieldsError": "Bitte fülle alle Pflichtfelder aus.",
+    "fillOrSelectHint": "Bitte ausfüllen oder auswählen.",
+    "accountBar": {
+      "nameLabel": "Name:",
+      "emailLabel": "Email:",
+      "userIdLabel": "User ID:",
+      "roleLabel": "Rolle:",
+      "lastLoginLabel": "Letzter Login:",
+      "roleAdmin": "Admin",
+      "roleUser": "User"
+    },
+    "fields": {
+      "firstName": { "label": "Vorname", "placeholder": "z.B. Max" },
+      "lastName": { "label": "Nachname", "placeholder": "z.B. Mustermann" },
+      "gender": { "label": "Geschlecht" },
+      "age": { "label": "Alter", "placeholder": "z.b. 32" },
+      "maritalStatus": { "label": "Zivilstand / Familienstand" },
+      "partnerInHousehold": {
+        "label": "Lebt ein/e Partner/in im selben Haushalt?",
+        "yes": "Ja",
+        "no": "Nein"
+      },
+      "childrenInHousehold": { "label": "Anzahl Kinder im Haushalt" },
+      "educationLevel": { "label": "Höchster abgeschlossener Bildungsabschluss" },
+      "employmentStatus": {
+        "label": "Aktueller Erwerbsstatus",
+        "helper": "Mehrfachauswahl möglich, maximal 2 Antworten."
+      },
+      "occupationalStatus": { "label": "Stellung im Beruf" },
+      "weeklyWorkHours": {
+        "label": "Übliche Wochenarbeitszeit",
+        "placeholder": "z.B. 40"
+      },
+      "mainWorkplace": { "label": "Hauptarbeitsort" },
+      "nationality": {
+        "label": "Staatsangehörigkeit",
+        "searchPlaceholder": "Staatsangehörigkeit suchen…"
+      },
+      "region": {
+        "label": "Region / Wohnort",
+        "searchPlaceholder": "Region suchen…"
+      },
+      "healthStatus": { "label": "Allgemeiner Gesundheitszustand" },
+      "urbanity": { "label": "Urbanität" }
+    }
+  },
+  "enrollmentModal": {
+    "loadCoursesError": "Kurse konnten nicht geladen werden.",
+    "selectCourseError": "Bitte wähle einen Kurs aus.",
+    "enterAccessCodeError": "Bitte gib den Zugangscode ein.",
+    "courseLoadRetryError": "Kurs konnte nicht geladen werden. Bitte versuche es erneut.",
+    "invalidAccessCodeError": "Ungültiger Zugangscode. Bitte versuche es erneut.",
+    "enrollFailedError": "Einschreibung fehlgeschlagen. Bitte versuche es erneut.",
+    "title": "Kurs beitreten",
+    "description": "Du bist noch keinem Kurs zugewiesen. Wähle einen Kurs aus und gib den Zugangscode ein, um fortzufahren.",
+    "loading": "Wird geladen...",
+    "noCoursesAvailable": "Derzeit sind keine Kurse verfügbar. Bitte wende dich an deinen Administrator.",
+    "selectCourseLabel": "Kurs auswählen",
+    "accessCodeLabel": "Zugangscode",
+    "accessCodePlaceholder": "Zugangscode eingeben",
+    "submitButton": "Kurs beitreten",
+    "submittingButton": "Wird eingeschrieben...",
+    "backToLoginButton": "Zurück zum Login"
+  },
+  "securityQuestionsForm": {
+    "loadQuestionsError": "Sicherheitsfragen konnten nicht geladen werden.",
+    "userLoadError": "Nutzer konnte nicht geladen werden.",
+    "incompleteError": "Bitte wähle zwei Fragen und gib beide Antworten an.",
+    "duplicateQuestionError": "Bitte wähle zwei unterschiedliche Sicherheitsfragen aus.",
+    "unexpectedServerResponse": "Unerwartete Serverantwort beim Speichern.",
+    "saveFailedWithStatus": "Sicherheitsfragen konnten nicht gespeichert werden (Status {status}).",
+    "verifyFailedError": "Speichern wurde ausgeführt, konnte aber nicht bestätigt werden. Bitte erneut versuchen.",
+    "networkError": "Netzwerkfehler beim Speichern der Sicherheitsfragen.",
+    "loading": "Sicherheitsfragen werden geladen…",
+    "title": "Sicherheitsfragen",
+    "description": "Wähle zwei unterschiedliche Fragen aus und beantworte sie möglichst mit einem kurzen Wort.",
+    "alreadySetHint": "Sicherheitsfragen sind hinterlegt. Antworten werden aus Sicherheitsgründen nicht angezeigt und müssen bei einer Änderung neu eingegeben werden.",
+    "editButton": "Bearbeiten",
+    "questionLabel": "Frage {index}",
+    "selectPlaceholder": "Bitte auswählen",
+    "answerLabel": "Antwort",
+    "answerPlaceholderEditable": "Kurze Antwort",
+    "answerPlaceholderHidden": "Aus Sicherheitsgründen ausgeblendet",
+    "savedMessage": "Sicherheitsfragen wurden gespeichert.",
+    "saveButton": "Sicherheitsfragen speichern",
+    "savingButton": "Wird gespeichert..."
   }
 }

@@ -92,6 +92,10 @@
     "settingsPanelDescription": "Adjust appearance and account information.",
     "darkModeTitle": "Dark mode",
     "darkModeDescription": "Switches between light and dark appearance.",
+    "languageTitle": "Language",
+    "languageDescription": "Choose the language of the user interface.",
+    "languageDe": "Deutsch",
+    "languageEn": "English",
     "accountSectionTitle": "Account",
     "userIdLabel": "User ID",
     "lastLoginLabel": "Last login",
@@ -591,5 +595,105 @@
   },
   "adminUserStatsView": {
     "noData": "This user hasn't recorded any data yet."
+  },
+  "profileDetailsForm": {
+    "loadingProfile": "Loading profile…",
+    "noResultsFound": "No matches",
+    "title": "Profile",
+    "subtitle": "Your personal details",
+    "popupHint": "You'll also find the most important account info in the profile popup in the top right.",
+    "savedMessage": "Profile saved!",
+    "editButton": "Edit",
+    "saveButton": "Save",
+    "savingButton": "Saving...",
+    "saveProfileButton": "Save profile",
+    "genericSaveError": "Error while saving: {message}",
+    "unknownError": "Unknown error",
+    "missingFieldsError": "Please fill in all required fields.",
+    "fillOrSelectHint": "Please fill in or select an option.",
+    "accountBar": {
+      "nameLabel": "Name:",
+      "emailLabel": "Email:",
+      "userIdLabel": "User ID:",
+      "roleLabel": "Role:",
+      "lastLoginLabel": "Last login:",
+      "roleAdmin": "Admin",
+      "roleUser": "User"
+    },
+    "fields": {
+      "firstName": { "label": "First name", "placeholder": "e.g. Max" },
+      "lastName": { "label": "Last name", "placeholder": "e.g. Sample" },
+      "gender": { "label": "Gender" },
+      "age": { "label": "Age", "placeholder": "e.g. 32" },
+      "maritalStatus": { "label": "Marital / family status" },
+      "partnerInHousehold": {
+        "label": "Does a partner live in the same household?",
+        "yes": "Yes",
+        "no": "No"
+      },
+      "childrenInHousehold": { "label": "Number of children in the household" },
+      "educationLevel": { "label": "Highest completed education level" },
+      "employmentStatus": {
+        "label": "Current employment status",
+        "helper": "Multiple selection possible, maximum 2 answers."
+      },
+      "occupationalStatus": { "label": "Position at work" },
+      "weeklyWorkHours": {
+        "label": "Usual weekly working hours",
+        "placeholder": "e.g. 40"
+      },
+      "mainWorkplace": { "label": "Main place of work" },
+      "nationality": {
+        "label": "Nationality",
+        "searchPlaceholder": "Search nationality…"
+      },
+      "region": {
+        "label": "Region / place of residence",
+        "searchPlaceholder": "Search region…"
+      },
+      "healthStatus": { "label": "General health status" },
+      "urbanity": { "label": "Urbanity" }
+    }
+  },
+  "enrollmentModal": {
+    "loadCoursesError": "Courses could not be loaded.",
+    "selectCourseError": "Please select a course.",
+    "enterAccessCodeError": "Please enter the access code.",
+    "courseLoadRetryError": "Course could not be loaded. Please try again.",
+    "invalidAccessCodeError": "Invalid access code. Please try again.",
+    "enrollFailedError": "Enrollment failed. Please try again.",
+    "title": "Join a course",
+    "description": "You're not assigned to a course yet. Choose a course and enter the access code to continue.",
+    "loading": "Loading...",
+    "noCoursesAvailable": "No courses are currently available. Please contact your administrator.",
+    "selectCourseLabel": "Select course",
+    "accessCodeLabel": "Access code",
+    "accessCodePlaceholder": "Enter access code",
+    "submitButton": "Join course",
+    "submittingButton": "Enrolling...",
+    "backToLoginButton": "Back to login"
+  },
+  "securityQuestionsForm": {
+    "loadQuestionsError": "Security questions could not be loaded.",
+    "userLoadError": "User could not be loaded.",
+    "incompleteError": "Please select two questions and provide both answers.",
+    "duplicateQuestionError": "Please select two different security questions.",
+    "unexpectedServerResponse": "Unexpected server response while saving.",
+    "saveFailedWithStatus": "Security questions could not be saved (status {status}).",
+    "verifyFailedError": "Save was performed but could not be confirmed. Please try again.",
+    "networkError": "Network error while saving security questions.",
+    "loading": "Loading security questions…",
+    "title": "Security questions",
+    "description": "Choose two different questions and answer them as briefly as possible.",
+    "alreadySetHint": "Security questions are on file. Answers aren't shown for security reasons and must be re-entered to make a change.",
+    "editButton": "Edit",
+    "questionLabel": "Question {index}",
+    "selectPlaceholder": "Please select",
+    "answerLabel": "Answer",
+    "answerPlaceholderEditable": "Short answer",
+    "answerPlaceholderHidden": "Hidden for security reasons",
+    "savedMessage": "Security questions have been saved.",
+    "saveButton": "Save security questions",
+    "savingButton": "Saving..."
   }
 }
