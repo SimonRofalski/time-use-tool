@@ -25,8 +25,14 @@
   "login": {
     "brand": "Time Use Tool",
     "modes": {
-      "signin": { "title": "Anmeldung", "submitLabel": "Jetzt anmelden" },
-      "signup": { "title": "Registrieren", "submitLabel": "Account erstellen" },
+      "signin": {
+        "title": "Anmeldung",
+        "submitLabel": "Jetzt anmelden"
+      },
+      "signup": {
+        "title": "Registrieren",
+        "submitLabel": "Account erstellen"
+      },
       "forgotPassword": {
         "title": "Passwort zurücksetzen",
         "submitLabel": "Sicherheitsfragen starten"
@@ -309,33 +315,147 @@
       }
     },
     "kursvergleich": {
-      "anonymousLabel": "Anonym:",
-      "anonymousDescription": "Im Vergleich siehst du deinen blauen Punkt und die gestrichelte Kurs-Durchschnittslinie. Einzelwerte anderer Teilnehmender werden nicht angezeigt.",
-      "positionText": {
-        "noEntries": "Keine eigenen Einträge in diesem Zeitraum",
-        "above": "Du liegst über {percentile}% der Kursgruppe",
-        "below": "Du liegst unter {percentile}% der Kursgruppe"
+      "readingAid": "Ø Kurs · «über X % der Gruppe» = so viele Teilnehmende liegen unter deinem Wert · anonym, keine Einzelwerte anderer Personen",
+      "you": "du",
+      "youShort": "Du",
+      "courseShort": "Kurs",
+      "focusSubtitle": "Ø Stunden pro abgegebenem Tag",
+      "categoryTitle": "Zeitverteilung im Kursvergleich",
+      "categorySubtitle": "Ø Stunden pro abgegebenem Tag je Lebensbereich",
+      "noComparableData": "Noch keine vergleichbaren Daten.",
+      "contextMetrics": {
+        "itDevice": {
+          "label": "Zeit mit IT-Gerät",
+          "description": "Anteil der Zeit mit Smartphone, Laptop & Co."
+        },
+        "social": {
+          "label": "Zeit mit anderen",
+          "description": "Anteil der Zeit in Gesellschaft statt allein"
+        },
+        "location": {
+          "label": "Zeit zuhause",
+          "description": "Anteil der Zeit zuhause statt anderswo"
+        },
+        "wellbeing": {
+          "label": "Wohlbefinden",
+          "description": "Ø zeitgewichtet, Skala 1–{max}"
+        }
       },
-      "yourValue": "Dein Wert",
-      "courseAverage": "Ø Kurs",
-      "topicSubtitle": "Durchschnittliche Stunden pro Tag",
-      "metaCards": {
-        "itDevice": { "title": "IT-Gerät", "subtitle": "mit / ohne" },
-        "social": { "title": "Sozial", "subtitle": "mit anderen / allein" },
-        "location": { "title": "Ort", "subtitle": "zuhause / anderswo" },
-        "wellbeing": { "title": "Wohlbefinden", "subtitle": "Ø zeitgewichtet" },
-        "you": "Du",
-        "course": "Kurs"
-      },
-      "legend": {
-        "courseAverage": "Gestrichelt: Ø Kurs",
-        "yourValue": "Blau: dein Wert"
+      "wellbeingSubtitle": "du: {you} · Kurs: {course} · Skala 1–{max}",
+      "verdict": {
+        "noOwnData": "keine eigenen Daten",
+        "inAverage": "im Kursschnitt",
+        "hoursDiff": "{sign}{value} h/Tag ggü. Kurs",
+        "hoursDiffShort": "{sign}{value} h/Tag",
+        "percentDiff": "{sign}{value} %-Pkt. ggü. Kurs",
+        "pointsDiff": "{sign}{value} Pkt. ggü. Kurs",
+        "above": "über {percentile}% der Gruppe",
+        "highest": "höchster Wert der Gruppe",
+        "lowest": "tiefster Wert der Gruppe",
+        "percentDiffShort": "{sign}{value} %-Pkt.",
+        "pointsDiffShort": "{sign}{value} Pkt."
       },
       "notEnoughUsers": {
         "title": "Vergleich noch nicht verfügbar",
         "description": "Für den Kursvergleich müssen mindestens {minUsers} Teilnehmende jeweils 2 Tage eingereicht haben. Schau später nochmal rein!",
         "qualifying": "Aktuell qualifiziert: {count} / {minUsers} Personen"
       }
+    },
+    "satisfactionLevels": {
+      "1": "sehr schlecht",
+      "2": "schlecht",
+      "3": "mittelmässig",
+      "4": "gut",
+      "5": "sehr gut"
+    },
+    "pdf": {
+      "button": "PDF",
+      "buttonBusy": "PDF…",
+      "buttonTitle": "Persönliche Auswertung als PDF herunterladen",
+      "filter": {
+        "allDays": "Alle Kurstage",
+        "weekdaysOnly": "nur Werktage",
+        "weekendOnly": "nur Wochenende"
+      },
+      "title": "Persönliche Zeitnutzungs-Auswertung",
+      "courseLine": "Kurs: {name}",
+      "participantLine": "Teilnehmer:in: {name}",
+      "participantIdLine": "Teilnehmer-ID: {id}",
+      "periodLine": "Zeitraum: {filter} · Erstellt am {date}",
+      "privacyNote": "Diese Auswertung enthält ausschliesslich deine eigenen Zeitnutzungsdaten. Kurswerte sind Durchschnitte über mindestens drei anonyme Teilnehmende; Einzelwerte anderer Personen sind nicht enthalten. Die Teilnehmer-ID dient dir als Referenz.",
+      "kpi": {
+        "submittedDays": "Abgegebene Tage",
+        "submittedDaysHint": "im gewählten Zeitraum",
+        "trackedTime": "Erfasste Zeit",
+        "trackedTimeHint": "Ø {hours} h pro Tag",
+        "wellbeing": "Ø Wohlbefinden",
+        "wellbeingHint": "zeitgewichtet",
+        "itShare": "Zeit mit IT-Gerät",
+        "itShareHint": "Anteil der erfassten Zeit"
+      },
+      "daily": {
+        "title": "Tägliche Zeitverteilung",
+        "subtitle": "Stunden pro Kurstag nach Kategorie · grau: Tag nicht abgegeben",
+        "noDays": "Keine Tage für den gewählten Zeitraum vorhanden."
+      },
+      "categories": {
+        "title": "Zeitverteilung nach Kategorie",
+        "subtitleWithCourse": "Ø Stunden pro abgegebenem Tag · farbig: du · grau: Ø Kurs",
+        "subtitle": "Ø Stunden pro abgegebenem Tag",
+        "noEntries": "Noch keine Zeiteinträge vorhanden.",
+        "colCategory": "Kategorie",
+        "colBars": "Ø h/Tag (du / Kurs)",
+        "colBarsSolo": "Ø h/Tag",
+        "colPerDay": "Ø / Tag",
+        "colCourse": "Ø Kurs",
+        "colDiff": "Differenz",
+        "colPosition": "Einordnung",
+        "colTotal": "Gesamt",
+        "colShare": "Anteil"
+      },
+      "comparison": {
+        "title": "Kursvergleich – wo stehst du?",
+        "subtitle": "Vergleich mit {count} anonymen Teilnehmenden (je mind. 2 abgegebene Tage) · blau: dein Wert · gestrichelt: Ø Kurs",
+        "notEnabled": "Der Kursvergleich ist für diesen Kurs (noch) nicht freigeschaltet.",
+        "notEnough": "Noch nicht verfügbar: mindestens 3 Teilnehmende mit je 2 abgegebenen Tagen nötig (aktuell {count}).",
+        "yourValue": "Dein Wert {value} {unit}",
+        "courseValue": "Ø Kurs {value} {unit}",
+        "positionAbove": "Du liegst über {percentile}% der Kursgruppe",
+        "positionBelow": "Du liegst unter {percentile}% der Kursgruppe",
+        "positionNone": "Keine eigenen Einträge in diesem Zeitraum",
+        "colMetric": "Merkmal",
+        "colYou": "Du",
+        "colCourse": "Ø Kurs",
+        "itDevice": "IT-Gerät (mit / ohne)",
+        "social": "Sozial (mit anderen / allein)",
+        "location": "Ort (zuhause / anderswo)",
+        "wellbeing": "Wohlbefinden (Ø, zeitgewichtet)"
+      },
+      "context": {
+        "title": "Kontext deiner Zeit",
+        "subtitle": "Womit, mit wem und wo du deine erfasste Zeit verbracht hast (Anteil an der Gesamtzeit)",
+        "devices": "Geräte-Nutzung",
+        "social": "Sozialer Kontext",
+        "locations": "Orte & Transport"
+      },
+      "activities": {
+        "title": "Deine Top-Aktivitäten",
+        "subtitle": "Die 12 Tätigkeiten mit der meisten Zeit · Wohlbefinden zeitgewichtet · IT: Anteil der Zeit mit Gerät",
+        "colCategory": "Kategorie",
+        "colActivity": "Aktivität",
+        "colTime": "Zeit",
+        "colShare": "Anteil",
+        "colWellbeing": "Ø Wohlbefinden",
+        "colIt": "IT"
+      },
+      "footer": "Time Use Tool · Persönliche Auswertung · Nur eigene Daten und anonyme Kursdurchschnitte",
+      "page": "Seite {page} / {total}",
+      "fileName": "Zeitnutzung",
+      "diffAverage": "im Kursschnitt",
+      "diffHours": "{sign}{value} h/Tag",
+      "minutesShort": "{minutes} min",
+      "hoursShort": "{hours} h",
+      "hoursMinutes": "{hours} h {minutes} min"
     }
   },
   "common": {
@@ -343,7 +463,10 @@
     "cancelButton": "Abbrechen"
   },
   "kursuebersicht": {
-    "subTabs": { "alleKurse": "Alle Kurse", "neuerKurs": "Neuer Kurs" },
+    "subTabs": {
+      "alleKurse": "Alle Kurse",
+      "neuerKurs": "Neuer Kurs"
+    },
     "loading": "Wird geladen…",
     "errors": {
       "coursesLoadError": "Kurse konnten nicht geladen werden.",
@@ -351,8 +474,7 @@
       "periodDatesRequired": "Bitte für jeden Zeitraum Start- und Enddatum angeben.",
       "periodEndBeforeStart": "Das Enddatum muss nach dem Startdatum liegen.",
       "courseCreateError": "Kurs konnte nicht erstellt werden: {message}",
-      "periodsSaveError": "Zeiträume konnten nicht gespeichert werden: {message}",
-      "noSubmittedUserData": "Keine abgegebenen Nutzerdaten für den PDF-Export gefunden."
+      "periodsSaveError": "Zeiträume konnten nicht gespeichert werden: {message}"
     },
     "newCourseForm": {
       "nameLabel": "Kursname",
@@ -370,7 +492,9 @@
       "creatingButton": "Wird erstellt…",
       "createButton": "Kurs erstellen"
     },
-    "breadcrumb": { "allCourses": "Alle Kurse" },
+    "breadcrumb": {
+      "allCourses": "Alle Kurse"
+    },
     "courseList": {
       "noCourses": "Noch keine Kurse vorhanden.",
       "participantsLabel": "{count, plural, one {# Teilnehmer} other {# Teilnehmer}}",
@@ -389,7 +513,7 @@
       }
     },
     "courseDetail": {
-      "backToOverviewButton": "Zur Kursuebersicht",
+      "backToOverviewButton": "Zur Kursübersicht",
       "exportButton": "Datenexport",
       "comparisonEnableButton": "Kursvergleich freigeben",
       "comparisonDisableButton": "Kursvergleich sperren",
@@ -427,70 +551,34 @@
       }
     },
     "exportModal": {
-      "title": "Datenexport",
-      "subtitle": "Waehle Exporttyp und Dateiformat für diesen Kurs.",
+      "title": "Datenexport (anonymisiert)",
+      "subtitle": "Wähle Inhalt und Dateiformat für diesen Kurs.",
       "closeAriaLabel": "Exportdialog schliessen",
-      "exportForLabel": "Export für",
-      "adminOption": "Admin",
-      "userOption": "Benutzer",
+      "privacyNote": "Der Export enthält keine Namen, E-Mails, IDs, Aliase oder Datumsangaben. Die Zeilen sind zufällig gemischt und können keiner Person zugeordnet werden. Ausgeschlossene Teilnehmende und nicht abgegebene Tage werden nicht berücksichtigt. Mindestens 3 Teilnehmende mit Daten sind nötig.",
       "contentLabel": "Inhalt",
       "aggregatedOption": "Aggregiert",
       "rawOption": "Rohdaten",
+      "aggregatedDescription": "Eine anonyme Zeile pro Teilnehmer:in mit Ø Stunden pro abgegebenem Tag je Kategorie, plus Kursdurchschnitt.",
+      "rawDescription": "Eine Zeile pro Zeiteintrag (Start, Ende, Tätigkeit, Ort, Kontext, Wohlbefinden) – ohne Personen- oder Tagesbezug.",
       "formatLabel": "Format",
       "csvButton": "CSV",
       "excelButton": "Excel",
       "exportingLabel": "Exportiere...",
-      "userPdfDescription": "Erstellt ein PDF mit einer eigenen Auswertungsseite pro Teilnehmer (nur abgegebene Tage): Zeitverteilung, Top-Aktivitaeten und Vergleich mit dem Kursschnitt.",
-      "creatingPdfButton": "Erstelle PDF...",
-      "createPdfButton": "PDF erstellen"
+      "exportError": "Export konnte nicht erstellt werden."
     },
     "userDetail": {
-      "backToCourseButton": "Zurueck zum Kurs",
-      "backToOverviewButton": "Zur Kursuebersicht",
-      "dayOverviewTab": "Tagesübersicht",
-      "timeDistributionTab": "Zeitverteilung"
+      "backToCourseButton": "Zurück zum Kurs",
+      "backToOverviewButton": "Zur Kursübersicht",
+      "loading": "Wird geladen…",
+      "daysCompleted": "/ {total} Tage abgeschlossen",
+      "privacyNote": "Pro Person ist nur ersichtlich, ob die Eingabe eines Tages abgeschlossen wurde. Zeitnutzungsdaten sind für Admins nur aggregiert und ohne Personenbezug einsehbar (Statistiken, Datenexport)."
     },
     "dayList": {
-      "noDaysYet": "Dieser Nutzer hat noch keine Tage erfasst.",
-      "submittedBadge": "Abgeschlossen",
-      "inProgressBadge": "In Bearbeitung",
-      "loadingEntries": "Lädt…",
-      "noEntriesForDay": "Keine Einträge für diesen Tag.",
-      "columns": {
-        "time": "Zeit",
-        "mainActivity": "Haupttätigkeit",
-        "secondaryActivity": "Nebentätigkeit",
-        "location": "Ort / Transport",
-        "wellbeing": "Wohlbefinden"
-      }
-    },
-    "pdfExport": {
-      "userEvaluationTitle": "Benutzer-Auswertung",
-      "courseLabel": "Kurs: {name}",
-      "participantLabel": "Teilnehmer: {name}",
-      "createdAtLabel": "Erstellt am: {date}",
-      "submittedDaysLabel": "Abgegebene Tage: {count}",
-      "totalHoursLabel": "Gesamtstunden: {hours}",
-      "comparisonChartTitle": "Vergleich mit Kursschnitt",
-      "courseAverageLegend": "Kursschnitt",
-      "categoryTableHeaders": ["Kategorie", "Stunden", "Anteil", "Kursschnitt (h)", "Differenz"],
-      "noCategoriesRecorded": "Keine erfassten Kategorien",
-      "top5ActivitiesTitle": "Top 5 Aktivitaeten",
-      "activityTableHeaders": ["Kategorie", "Aktivitaet", "Stunden", "Anteil"],
-      "unknownCategory": "Unbekannt",
-      "noActivitiesRecorded": "Keine Aktivitaeten",
-      "deviceUsageTitle": "Geräte-Nutzung",
-      "itUsageTableHeaders": ["IT-Nutzung", "Stunden", "Anteil"],
-      "withIt": "Mit IT-Nutzung",
-      "withoutIt": "Ohne IT-Nutzung",
-      "devicesWithinItTitle": "Geräte innerhalb IT-Nutzung",
-      "deviceTableHeaders": ["Geraet", "Stunden"],
-      "noDetailedDeviceData": "Keine detaillierten Gerätedaten",
-      "unspecifiedDevice": "IT-Gerät (nicht spezifiziert)",
-      "deviceFallback": "Gerät {id}",
-      "categoryFallback": "Kategorie {id}",
-      "activityFallback": "Aktivitaet {id}",
-      "filenameSuffix": "Benutzerauswertungen"
+      "noCourseDays": "Für diesen Kurs sind keine Kurstage hinterlegt.",
+      "colDay": "Kurstag",
+      "colCompleted": "Abgeschlossen",
+      "yes": "Ja",
+      "no": "Nein"
     },
     "csvExport": {
       "firstName": "Vorname",
@@ -593,9 +681,6 @@
       "noEntries": "Noch keine Einträge vorhanden."
     }
   },
-  "adminUserStatsView": {
-    "noData": "Dieser Nutzer hat noch keine Daten erfasst."
-  },
   "profileDetailsForm": {
     "loadingProfile": "Profil wird geladen…",
     "noResultsFound": "Keine Treffer",
@@ -621,28 +706,49 @@
       "roleUser": "User"
     },
     "fields": {
-      "firstName": { "label": "Vorname", "placeholder": "z.B. Max" },
-      "lastName": { "label": "Nachname", "placeholder": "z.B. Mustermann" },
-      "gender": { "label": "Geschlecht" },
-      "age": { "label": "Alter", "placeholder": "z.b. 32" },
-      "maritalStatus": { "label": "Zivilstand / Familienstand" },
+      "firstName": {
+        "label": "Vorname",
+        "placeholder": "z.B. Max"
+      },
+      "lastName": {
+        "label": "Nachname",
+        "placeholder": "z.B. Mustermann"
+      },
+      "gender": {
+        "label": "Geschlecht"
+      },
+      "age": {
+        "label": "Alter",
+        "placeholder": "z.b. 32"
+      },
+      "maritalStatus": {
+        "label": "Zivilstand / Familienstand"
+      },
       "partnerInHousehold": {
         "label": "Lebt ein/e Partner/in im selben Haushalt?",
         "yes": "Ja",
         "no": "Nein"
       },
-      "childrenInHousehold": { "label": "Anzahl Kinder im Haushalt" },
-      "educationLevel": { "label": "Höchster abgeschlossener Bildungsabschluss" },
+      "childrenInHousehold": {
+        "label": "Anzahl Kinder im Haushalt"
+      },
+      "educationLevel": {
+        "label": "Höchster abgeschlossener Bildungsabschluss"
+      },
       "employmentStatus": {
         "label": "Aktueller Erwerbsstatus",
         "helper": "Mehrfachauswahl möglich, maximal 2 Antworten."
       },
-      "occupationalStatus": { "label": "Stellung im Beruf" },
+      "occupationalStatus": {
+        "label": "Stellung im Beruf"
+      },
       "weeklyWorkHours": {
         "label": "Übliche Wochenarbeitszeit",
         "placeholder": "z.B. 40"
       },
-      "mainWorkplace": { "label": "Hauptarbeitsort" },
+      "mainWorkplace": {
+        "label": "Hauptarbeitsort"
+      },
       "nationality": {
         "label": "Staatsangehörigkeit",
         "searchPlaceholder": "Staatsangehörigkeit suchen…"
@@ -651,8 +757,12 @@
         "label": "Region / Wohnort",
         "searchPlaceholder": "Region suchen…"
       },
-      "healthStatus": { "label": "Allgemeiner Gesundheitszustand" },
-      "urbanity": { "label": "Urbanität" }
+      "healthStatus": {
+        "label": "Allgemeiner Gesundheitszustand"
+      },
+      "urbanity": {
+        "label": "Urbanität"
+      }
     }
   },
   "enrollmentModal": {
@@ -721,6 +831,36 @@
       "needTwoQuestions": "Bitte gib genau zwei Sicherheitsfragen an.",
       "needTwoDifferentQuestions": "Bitte gib zwei unterschiedliche Fragen mit Antwort an.",
       "internalError": "Interner Fehler beim Speichern der Sicherheitsfragen."
+    },
+    "courseExport": {
+      "invalidRequest": "Ungültige Anfrage.",
+      "courseNotFound": "Kurs nicht gefunden.",
+      "tooFewParticipants": "Export nicht möglich: Mindestens {minimum} Teilnehmende mit abgegebenen Tagen sind nötig, damit einzelne Zeilen nicht einer Person zugeordnet werden können (aktuell {participants}).",
+      "exportFailed": "Export konnte nicht erstellt werden.",
+      "columns": {
+        "rowLabel": "Zeile",
+        "anonymousParticipant": "Teilnehmer:in (anonym)",
+        "courseAverage": "Kursdurchschnitt",
+        "hoursPerDaySuffix": "(h/Tag)",
+        "totalTracked": "Erfasst gesamt (h/Tag)",
+        "start": "Start",
+        "end": "Ende",
+        "durationMinutes": "Dauer (min)",
+        "durationHours": "Dauer (h)",
+        "category": "Kategorie",
+        "activity": "Aktivität",
+        "secondaryActivity": "Nebenaktivität",
+        "digitalMediaUsed": "Digitale Medien genutzt",
+        "mediaTypes": "Medienarten",
+        "locationTransport": "Ort / Transport",
+        "socialContext": "Sozialer Kontext",
+        "wellbeing": "Zufriedenheit",
+        "yes": "Ja",
+        "no": "Nein"
+      }
+    },
+    "adminStatistics": {
+      "loadFailed": "Statistiken konnten nicht geladen werden."
     }
   }
 }

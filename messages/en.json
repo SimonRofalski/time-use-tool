@@ -25,8 +25,14 @@
   "login": {
     "brand": "Time Use Tool",
     "modes": {
-      "signin": { "title": "Sign in", "submitLabel": "Sign in now" },
-      "signup": { "title": "Sign up", "submitLabel": "Create account" },
+      "signin": {
+        "title": "Sign in",
+        "submitLabel": "Sign in now"
+      },
+      "signup": {
+        "title": "Sign up",
+        "submitLabel": "Create account"
+      },
       "forgotPassword": {
         "title": "Reset password",
         "submitLabel": "Start security questions"
@@ -309,33 +315,147 @@
       }
     },
     "kursvergleich": {
-      "anonymousLabel": "Anonymous:",
-      "anonymousDescription": "In the comparison you see your blue dot and the dashed course-average line. Individual values of other participants are never shown.",
-      "positionText": {
-        "noEntries": "No entries of your own in this period",
-        "above": "You're above {percentile}% of the course group",
-        "below": "You're below {percentile}% of the course group"
+      "readingAid": "Ø course · “above X% of the group” = that share of participants is below your value · anonymous, no individual values of other people",
+      "you": "you",
+      "youShort": "You",
+      "courseShort": "Course",
+      "focusSubtitle": "Ø hours per submitted day",
+      "categoryTitle": "Time distribution vs. course",
+      "categorySubtitle": "Ø hours per submitted day per life area",
+      "noComparableData": "No comparable data yet.",
+      "contextMetrics": {
+        "itDevice": {
+          "label": "Time with IT device",
+          "description": "Share of time with smartphone, laptop etc."
+        },
+        "social": {
+          "label": "Time with others",
+          "description": "Share of time in company rather than alone"
+        },
+        "location": {
+          "label": "Time at home",
+          "description": "Share of time at home rather than elsewhere"
+        },
+        "wellbeing": {
+          "label": "Well-being",
+          "description": "Ø time-weighted, scale 1–{max}"
+        }
       },
-      "yourValue": "Your value",
-      "courseAverage": "Avg. course",
-      "topicSubtitle": "Average hours per day",
-      "metaCards": {
-        "itDevice": { "title": "IT device", "subtitle": "with / without" },
-        "social": { "title": "Social", "subtitle": "with others / alone" },
-        "location": { "title": "Location", "subtitle": "home / elsewhere" },
-        "wellbeing": { "title": "Wellbeing", "subtitle": "avg. time-weighted" },
-        "you": "You",
-        "course": "Course"
-      },
-      "legend": {
-        "courseAverage": "Dashed: avg. course",
-        "yourValue": "Blue: your value"
+      "wellbeingSubtitle": "you: {you} · course: {course} · scale 1–{max}",
+      "verdict": {
+        "noOwnData": "no own data",
+        "inAverage": "course average",
+        "hoursDiff": "{sign}{value} h/day vs. course",
+        "hoursDiffShort": "{sign}{value} h/day",
+        "percentDiff": "{sign}{value} pp vs. course",
+        "pointsDiff": "{sign}{value} pts vs. course",
+        "above": "above {percentile}% of the group",
+        "highest": "highest value in the group",
+        "lowest": "lowest value in the group",
+        "percentDiffShort": "{sign}{value} pp",
+        "pointsDiffShort": "{sign}{value} pts"
       },
       "notEnoughUsers": {
         "title": "Comparison not available yet",
-        "description": "Course comparison needs at least {minUsers} participants with 2 submitted days each. Check back later!",
+        "description": "The course comparison needs at least {minUsers} participants with 2 submitted days each. Check back later!",
         "qualifying": "Currently qualifying: {count} / {minUsers} people"
       }
+    },
+    "satisfactionLevels": {
+      "1": "very bad",
+      "2": "bad",
+      "3": "average",
+      "4": "good",
+      "5": "very good"
+    },
+    "pdf": {
+      "button": "PDF",
+      "buttonBusy": "PDF…",
+      "buttonTitle": "Download personal report as PDF",
+      "filter": {
+        "allDays": "All course days",
+        "weekdaysOnly": "weekdays only",
+        "weekendOnly": "weekend only"
+      },
+      "title": "Personal Time Use Report",
+      "courseLine": "Course: {name}",
+      "participantLine": "Participant: {name}",
+      "participantIdLine": "Participant ID: {id}",
+      "periodLine": "Period: {filter} · Created on {date}",
+      "privacyNote": "This report contains only your own time use data. Course values are averages over at least three anonymous participants; individual values of other people are not included. The participant ID is a reference for you.",
+      "kpi": {
+        "submittedDays": "Submitted days",
+        "submittedDaysHint": "in the selected period",
+        "trackedTime": "Tracked time",
+        "trackedTimeHint": "Ø {hours} h per day",
+        "wellbeing": "Ø well-being",
+        "wellbeingHint": "time-weighted",
+        "itShare": "Time with IT device",
+        "itShareHint": "share of tracked time"
+      },
+      "daily": {
+        "title": "Daily time distribution",
+        "subtitle": "Hours per course day by category · grey: day not submitted",
+        "noDays": "No days in the selected period."
+      },
+      "categories": {
+        "title": "Time distribution by category",
+        "subtitleWithCourse": "Ø hours per submitted day · colour: you · grey: Ø course",
+        "subtitle": "Ø hours per submitted day",
+        "noEntries": "No time entries yet.",
+        "colCategory": "Category",
+        "colBars": "Ø h/day (you / course)",
+        "colBarsSolo": "Ø h/day",
+        "colPerDay": "Ø / day",
+        "colCourse": "Ø course",
+        "colDiff": "Difference",
+        "colPosition": "Position",
+        "colTotal": "Total",
+        "colShare": "Share"
+      },
+      "comparison": {
+        "title": "Course comparison – where do you stand?",
+        "subtitle": "Compared with {count} anonymous participants (at least 2 submitted days each) · blue: your value · dashed: Ø course",
+        "notEnabled": "The course comparison is not (yet) enabled for this course.",
+        "notEnough": "Not available yet: at least 3 participants with 2 submitted days each are needed (currently {count}).",
+        "yourValue": "Your value {value} {unit}",
+        "courseValue": "Ø course {value} {unit}",
+        "positionAbove": "You are above {percentile}% of the course group",
+        "positionBelow": "You are below {percentile}% of the course group",
+        "positionNone": "No own entries in this period",
+        "colMetric": "Metric",
+        "colYou": "You",
+        "colCourse": "Ø course",
+        "itDevice": "IT device (with / without)",
+        "social": "Social (with others / alone)",
+        "location": "Place (at home / elsewhere)",
+        "wellbeing": "Well-being (Ø, time-weighted)"
+      },
+      "context": {
+        "title": "Context of your time",
+        "subtitle": "With what, with whom and where you spent your tracked time (share of total time)",
+        "devices": "Device use",
+        "social": "Social context",
+        "locations": "Places & transport"
+      },
+      "activities": {
+        "title": "Your top activities",
+        "subtitle": "The 12 activities with the most time · well-being time-weighted · IT: share of time with a device",
+        "colCategory": "Category",
+        "colActivity": "Activity",
+        "colTime": "Time",
+        "colShare": "Share",
+        "colWellbeing": "Ø well-being",
+        "colIt": "IT"
+      },
+      "footer": "Time Use Tool · Personal report · Own data and anonymous course averages only",
+      "page": "Page {page} / {total}",
+      "fileName": "TimeUse",
+      "diffAverage": "course average",
+      "diffHours": "{sign}{value} h/day",
+      "minutesShort": "{minutes} min",
+      "hoursShort": "{hours} h",
+      "hoursMinutes": "{hours} h {minutes} min"
     }
   },
   "common": {
@@ -343,7 +463,10 @@
     "cancelButton": "Cancel"
   },
   "kursuebersicht": {
-    "subTabs": { "alleKurse": "All courses", "neuerKurs": "New course" },
+    "subTabs": {
+      "alleKurse": "All courses",
+      "neuerKurs": "New course"
+    },
     "loading": "Loading…",
     "errors": {
       "coursesLoadError": "Courses could not be loaded.",
@@ -351,8 +474,7 @@
       "periodDatesRequired": "Please provide a start and end date for every period.",
       "periodEndBeforeStart": "The end date must be after the start date.",
       "courseCreateError": "Course could not be created: {message}",
-      "periodsSaveError": "Periods could not be saved: {message}",
-      "noSubmittedUserData": "No submitted user data found for the PDF export."
+      "periodsSaveError": "Periods could not be saved: {message}"
     },
     "newCourseForm": {
       "nameLabel": "Course name",
@@ -370,7 +492,9 @@
       "creatingButton": "Creating…",
       "createButton": "Create course"
     },
-    "breadcrumb": { "allCourses": "All courses" },
+    "breadcrumb": {
+      "allCourses": "All courses"
+    },
     "courseList": {
       "noCourses": "No courses yet.",
       "participantsLabel": "{count, plural, one {# participant} other {# participants}}",
@@ -427,70 +551,34 @@
       }
     },
     "exportModal": {
-      "title": "Data export",
-      "subtitle": "Choose export type and file format for this course.",
+      "title": "Data export (anonymised)",
+      "subtitle": "Choose content and file format for this course.",
       "closeAriaLabel": "Close export dialog",
-      "exportForLabel": "Export for",
-      "adminOption": "Admin",
-      "userOption": "User",
+      "privacyNote": "The export contains no names, e-mails, IDs, aliases or dates. Rows are shuffled and cannot be attributed to a person. Excluded participants and unsubmitted days are not included. At least 3 participants with data are required.",
       "contentLabel": "Content",
       "aggregatedOption": "Aggregated",
       "rawOption": "Raw data",
+      "aggregatedDescription": "One anonymous row per participant with Ø hours per submitted day per category, plus the course average.",
+      "rawDescription": "One row per time entry (start, end, activity, place, context, well-being) – without reference to person or day.",
       "formatLabel": "Format",
       "csvButton": "CSV",
       "excelButton": "Excel",
       "exportingLabel": "Exporting...",
-      "userPdfDescription": "Creates a PDF with a dedicated evaluation page per participant (submitted days only): time distribution, top activities, and comparison with the course average.",
-      "creatingPdfButton": "Creating PDF...",
-      "createPdfButton": "Create PDF"
+      "exportError": "The export could not be created."
     },
     "userDetail": {
       "backToCourseButton": "Back to course",
       "backToOverviewButton": "Back to course overview",
-      "dayOverviewTab": "Day overview",
-      "timeDistributionTab": "Time distribution"
+      "loading": "Loading…",
+      "daysCompleted": "/ {total} days completed",
+      "privacyNote": "Per person, only whether a day's entry has been completed is visible. Time use data is available to admins only in aggregated form without reference to persons (statistics, data export)."
     },
     "dayList": {
-      "noDaysYet": "This user hasn't recorded any days yet.",
-      "submittedBadge": "Completed",
-      "inProgressBadge": "In progress",
-      "loadingEntries": "Loading…",
-      "noEntriesForDay": "No entries for this day.",
-      "columns": {
-        "time": "Time",
-        "mainActivity": "Main activity",
-        "secondaryActivity": "Secondary activity",
-        "location": "Location / transport",
-        "wellbeing": "Wellbeing"
-      }
-    },
-    "pdfExport": {
-      "userEvaluationTitle": "User evaluation",
-      "courseLabel": "Course: {name}",
-      "participantLabel": "Participant: {name}",
-      "createdAtLabel": "Created on: {date}",
-      "submittedDaysLabel": "Submitted days: {count}",
-      "totalHoursLabel": "Total hours: {hours}",
-      "comparisonChartTitle": "Comparison with course average",
-      "courseAverageLegend": "Course average",
-      "categoryTableHeaders": ["Category", "Hours", "Share", "Course avg. (h)", "Difference"],
-      "noCategoriesRecorded": "No categories recorded",
-      "top5ActivitiesTitle": "Top 5 activities",
-      "activityTableHeaders": ["Category", "Activity", "Hours", "Share"],
-      "unknownCategory": "Unknown",
-      "noActivitiesRecorded": "No activities",
-      "deviceUsageTitle": "Device usage",
-      "itUsageTableHeaders": ["IT usage", "Hours", "Share"],
-      "withIt": "With IT usage",
-      "withoutIt": "Without IT usage",
-      "devicesWithinItTitle": "Devices within IT usage",
-      "deviceTableHeaders": ["Device", "Hours"],
-      "noDetailedDeviceData": "No detailed device data",
-      "unspecifiedDevice": "IT device (unspecified)",
-      "deviceFallback": "Device {id}",
-      "categoryFallback": "Category {id}",
-      "activityFallback": "Activity {id}",
-      "filenameSuffix": "UserEvaluations"
+      "noCourseDays": "No course days are defined for this course.",
+      "colDay": "Course day",
+      "colCompleted": "Completed",
+      "yes": "Yes",
+      "no": "No"
     },
     "csvExport": {
       "firstName": "First name",
@@ -593,9 +681,6 @@
       "noEntries": "No entries yet."
     }
   },
-  "adminUserStatsView": {
-    "noData": "This user hasn't recorded any data yet."
-  },
   "profileDetailsForm": {
     "loadingProfile": "Loading profile…",
     "noResultsFound": "No matches",
@@ -621,28 +706,49 @@
       "roleUser": "User"
     },
     "fields": {
-      "firstName": { "label": "First name", "placeholder": "e.g. Max" },
-      "lastName": { "label": "Last name", "placeholder": "e.g. Sample" },
-      "gender": { "label": "Gender" },
-      "age": { "label": "Age", "placeholder": "e.g. 32" },
-      "maritalStatus": { "label": "Marital / family status" },
+      "firstName": {
+        "label": "First name",
+        "placeholder": "e.g. Max"
+      },
+      "lastName": {
+        "label": "Last name",
+        "placeholder": "e.g. Sample"
+      },
+      "gender": {
+        "label": "Gender"
+      },
+      "age": {
+        "label": "Age",
+        "placeholder": "e.g. 32"
+      },
+      "maritalStatus": {
+        "label": "Marital / family status"
+      },
       "partnerInHousehold": {
         "label": "Does a partner live in the same household?",
         "yes": "Yes",
         "no": "No"
       },
-      "childrenInHousehold": { "label": "Number of children in the household" },
-      "educationLevel": { "label": "Highest completed education level" },
+      "childrenInHousehold": {
+        "label": "Number of children in the household"
+      },
+      "educationLevel": {
+        "label": "Highest completed education level"
+      },
       "employmentStatus": {
         "label": "Current employment status",
         "helper": "Multiple selection possible, maximum 2 answers."
       },
-      "occupationalStatus": { "label": "Position at work" },
+      "occupationalStatus": {
+        "label": "Position at work"
+      },
       "weeklyWorkHours": {
         "label": "Usual weekly working hours",
         "placeholder": "e.g. 40"
       },
-      "mainWorkplace": { "label": "Main place of work" },
+      "mainWorkplace": {
+        "label": "Main place of work"
+      },
       "nationality": {
         "label": "Nationality",
         "searchPlaceholder": "Search nationality…"
@@ -651,8 +757,12 @@
         "label": "Region / place of residence",
         "searchPlaceholder": "Search region…"
       },
-      "healthStatus": { "label": "General health status" },
-      "urbanity": { "label": "Urbanity" }
+      "healthStatus": {
+        "label": "General health status"
+      },
+      "urbanity": {
+        "label": "Urbanity"
+      }
     }
   },
   "enrollmentModal": {
@@ -721,6 +831,36 @@
       "needTwoQuestions": "Please provide exactly two security questions.",
       "needTwoDifferentQuestions": "Please provide two different questions with answers.",
       "internalError": "Internal error while saving the security questions."
+    },
+    "courseExport": {
+      "invalidRequest": "Invalid request.",
+      "courseNotFound": "Course not found.",
+      "tooFewParticipants": "Export not possible: at least {minimum} participants with submitted days are needed so that individual rows cannot be attributed to a person (currently {participants}).",
+      "exportFailed": "The export could not be created.",
+      "columns": {
+        "rowLabel": "Row",
+        "anonymousParticipant": "Participant (anonymous)",
+        "courseAverage": "Course average",
+        "hoursPerDaySuffix": "(h/day)",
+        "totalTracked": "Total tracked (h/day)",
+        "start": "Start",
+        "end": "End",
+        "durationMinutes": "Duration (min)",
+        "durationHours": "Duration (h)",
+        "category": "Category",
+        "activity": "Activity",
+        "secondaryActivity": "Secondary activity",
+        "digitalMediaUsed": "Digital media used",
+        "mediaTypes": "Media types",
+        "locationTransport": "Location / transport",
+        "socialContext": "Social context",
+        "wellbeing": "Well-being",
+        "yes": "Yes",
+        "no": "No"
+      }
+    },
+    "adminStatistics": {
+      "loadFailed": "Statistics could not be loaded."
     }
   }
 }

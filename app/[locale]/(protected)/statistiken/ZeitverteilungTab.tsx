@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import {
   BarChart,
   Bar,
@@ -47,6 +47,7 @@ import type {
   ActivityMetaStats,
 } from "./types";
 import { CATEGORY_COLORS } from "../zeiterfassung/types";
+import { satisfactionLevelForLabel } from "./satisfaction";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -235,16 +236,9 @@ function parseSatisfactionLabel(
   return { value, max };
 }
 
+// Same five levels as in the Zeiterfassung: average rounded to the nearest level
 function getSatisfactionEmoji(label?: string | null): string {
-  const parsed = parseSatisfactionLabel(label ?? undefined);
-  if (!parsed) return "😐";
-
-  const ratio = parsed.value / parsed.max;
-  if (ratio >= 0.8) return "😄";
-  if (ratio >= 0.6) return "🙂";
-  if (ratio >= 0.4) return "😐";
-  if (ratio >= 0.2) return "😟";
-  return "😢";
+  return satisfactionLevelForLabel(label)?.emoji ?? "😐";
 }
 
 function aggregateActivitiesMeta(activities: ActivityRow[]) {
@@ -590,6 +584,7 @@ export default function ZeitverteilungTab({
   onSetDayFilter,
   onToggleCategory,
   onToggleSubcategory,
+  actions,
 }: {
   barData: DayBarData[];
   categoryRows: CategoryRow[];
@@ -603,6 +598,8 @@ export default function ZeitverteilungTab({
   onSetDayFilter: (mode: DayFilterMode) => void;
   onToggleCategory: (categoryId: number) => void;
   onToggleSubcategory: (categoryId: number, subcategoryId: number) => void;
+  // Optional controls rendered at the right end of the filter bar (e.g. PDF export)
+  actions?: ReactNode;
 }) {
   type SortColumn = "name" | "time" | "percent" | "itDevice" | "social" | "location" | "satisfaction";
 
@@ -762,6 +759,8 @@ export default function ZeitverteilungTab({
             ))}
           </div>
         )}
+
+        {actions && <div className="sm:ml-auto">{actions}</div>}
       </div>
 
       {/* ── Stacked bar chart ───────────────────────────────────────────────── */}
