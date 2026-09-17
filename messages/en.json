@@ -60,5 +60,45 @@
       "passwordSetError": "The password could not be set.",
       "passwordResetSuccess": "Password reset successfully. You can now sign in."
     }
+  },
+  "protectedLayout": {
+    "loadingSession": "Preparing session...",
+    "tabs": {
+      "zeiterfassung": "ENTRY",
+      "erfassteZeit": "OVERVIEW",
+      "statistiken": "STATISTICS"
+    },
+    "adminTabs": {
+      "kursuebersicht": "COURSE OVERVIEW",
+      "nutzeruebersicht": "USER OVERVIEW",
+      "statistiken": "STATISTICS"
+    },
+    "adminModeBadge": "Admin mode",
+    "backToEntryAriaLabel": "Back to time diary",
+    "backToEntryLine1": "Back to",
+    "backToEntryLine2": "entry",
+    "adminCenterAriaLabel": "Open admin center",
+    "adminModeLine1": "Admin",
+    "adminModeLine2": "mode",
+    "profileMenuAriaLabel": "Open profile menu",
+    "profileTooltip": "Profile",
+    "profileNameMissing": "Profile name missing",
+    "personalDetailsMenuItem": "Personal details",
+    "securityQuestionsMenuItem": "Security questions",
+    "signOutMenuItem": "Sign out",
+    "settingsAriaLabel": "Open settings",
+    "settingsTooltip": "Settings",
+    "settingsPanelTitle": "Settings",
+    "settingsPanelDescription": "Adjust appearance and account information.",
+    "darkModeTitle": "Dark mode",
+    "darkModeDescription": "Switches between light and dark appearance.",
+    "accountSectionTitle": "Account",
+    "userIdLabel": "User ID",
+    "lastLoginLabel": "Last login",
+    "lastLoginNever": "-",
+    "kursuebersichtTitle": "Course overview",
+    "nutzeruebersichtTitle": "User overview",
+    "statistikenTitle": "Statistics",
+    "confirmDiscardProfileEdit": "Your profile edits haven't been saved yet. Really close?"
   }
 }
