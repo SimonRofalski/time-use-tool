@@ -60,5 +60,45 @@
       "passwordSetError": "Das Passwort konnte nicht gesetzt werden.",
       "passwordResetSuccess": "Passwort erfolgreich zurückgesetzt. Du kannst dich jetzt anmelden."
     }
+  },
+  "protectedLayout": {
+    "loadingSession": "Sitzung wird vorbereitet...",
+    "tabs": {
+      "zeiterfassung": "EINGABE",
+      "erfassteZeit": "ÜBERSICHT",
+      "statistiken": "STATISTIKEN"
+    },
+    "adminTabs": {
+      "kursuebersicht": "KURSÜBERSICHT",
+      "nutzeruebersicht": "NUTZERÜBERSICHT",
+      "statistiken": "STATISTIKEN"
+    },
+    "adminModeBadge": "Admin-Modus",
+    "backToEntryAriaLabel": "Zurück zum Zeittagebuch",
+    "backToEntryLine1": "Zurück zur",
+    "backToEntryLine2": "Eingabe",
+    "adminCenterAriaLabel": "Admin-Center öffnen",
+    "adminModeLine1": "Admin-",
+    "adminModeLine2": "Modus",
+    "profileMenuAriaLabel": "Profilmenü öffnen",
+    "profileTooltip": "Profil",
+    "profileNameMissing": "Profilname fehlt",
+    "personalDetailsMenuItem": "Persönliche Angaben",
+    "securityQuestionsMenuItem": "Sicherheitsfragen",
+    "signOutMenuItem": "Ausloggen",
+    "settingsAriaLabel": "Einstellungen öffnen",
+    "settingsTooltip": "Einstellungen",
+    "settingsPanelTitle": "Einstellungen",
+    "settingsPanelDescription": "Darstellung und Kontoinformationen anpassen.",
+    "darkModeTitle": "Darkmode",
+    "darkModeDescription": "Schaltet zwischen heller und dunkler Darstellung um.",
+    "accountSectionTitle": "Konto",
+    "userIdLabel": "User ID",
+    "lastLoginLabel": "Letztes Login",
+    "lastLoginNever": "-",
+    "kursuebersichtTitle": "Kursübersicht",
+    "nutzeruebersichtTitle": "Nutzerübersicht",
+    "statistikenTitle": "Statistiken",
+    "confirmDiscardProfileEdit": "Die Profilbearbeitung ist noch nicht gespeichert. Wirklich schliessen?"
   }
 }

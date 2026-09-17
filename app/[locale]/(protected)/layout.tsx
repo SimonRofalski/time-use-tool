@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import EnrollmentModal from "@/app/components/EnrollmentModal";
@@ -27,58 +28,36 @@ import {
   X,
 } from "lucide-react";
 
-const tabs = [
-  { path: "/zeiterfassung", label: "EINGABE", icon: ClipboardList },
-  { path: "/erfasste-zeit", label: "ÜBERSICHT", icon: Calendar },
-  { path: "/statistiken", label: "STATISTIKEN", icon: BarChart3 },
-];
-
-const adminTabs = [
-  { id: "kursuebersicht", label: "KURSÜBERSICHT", icon: BookOpen },
-  { id: "nutzeruebersicht", label: "NUTZERÜBERSICHT", icon: Users },
-  { id: "statistiken", label: "STATISTIKEN", icon: BarChart3 },
-];
-
-function formatDateTime(value?: string | null) {
+function formatDateTime(value: string | null | undefined, locale: string) {
   if (!value) {
     return "-";
   }
 
-  return new Date(value).toLocaleString("de-DE", {
+  return new Date(value).toLocaleString(locale === "en" ? "en-US" : "de-DE", {
     dateStyle: "medium",
     timeStyle: "short",
   });
 }
 
-function formatRole(rawRole: unknown) {
-  if (typeof rawRole !== "string" || rawRole.trim().length === 0) {
-    return "Nutzer";
-  }
-
-  return rawRole
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function getUserRole(user: SupabaseUser | null) {
-  if (!user) {
-    return "Nutzer";
-  }
-
-  const roleCandidate =
-    user.app_metadata?.role ??
-    user.user_metadata?.role ??
-    user.app_metadata?.roles?.[0] ??
-    user.user_metadata?.roles?.[0];
-
-  return formatRole(roleCandidate);
-}
-
 export default function ProtectedLayout({ children }: { children: ReactNode }) {
+  const t = useTranslations("protectedLayout");
+  const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const supabase = getSupabaseBrowserClient();
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const tabs = [
+    { path: "/zeiterfassung", label: t("tabs.zeiterfassung"), icon: ClipboardList },
+    { path: "/erfasste-zeit", label: t("tabs.erfassteZeit"), icon: Calendar },
+    { path: "/statistiken", label: t("tabs.statistiken"), icon: BarChart3 },
+  ];
+
+  const adminTabs = [
+    { id: "kursuebersicht", label: t("adminTabs.kursuebersicht"), icon: BookOpen },
+    { id: "nutzeruebersicht", label: t("adminTabs.nutzeruebersicht"), icon: Users },
+    { id: "statistiken", label: t("adminTabs.statistiken"), icon: BarChart3 },
+  ];
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isEnrolled, setIsEnrolled] = useState<boolean | null>(null);
@@ -396,9 +375,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     }
 
     if (profileFormIsEditing) {
-      const shouldClose = window.confirm(
-        "Die Profilbearbeitung ist noch nicht gespeichert. Wirklich schliessen?",
-      );
+      const shouldClose = window.confirm(t("confirmDiscardProfileEdit"));
 
       if (!shouldClose) {
         return;
@@ -441,7 +418,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
         <div className="mx-auto max-w-7xl px-4 py-16 text-center">
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-            Sitzung wird vorbereitet...
+            {t("loadingSession")}
           </p>
         </div>
       </div>
@@ -501,7 +478,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     className="shrink-0 text-amber-700 dark:text-amber-400"
                   />
                   <span className="text-xs font-semibold tracking-wide text-amber-800 dark:text-amber-300">
-                    Admin-Modus
+                    {t("adminModeBadge")}
                   </span>
                 </div>
               )}
@@ -511,7 +488,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                   (adminMode ? (
                     <button
                       type="button"
-                      aria-label="Zurück zum Zeittagebuch"
+                      aria-label={t("backToEntryAriaLabel")}
                       className="inline-flex min-w-[5.9rem] items-center justify-center gap-1.5 rounded-2xl border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs font-semibold tracking-tight text-sky-700 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-500/60 dark:hover:bg-sky-500/15 sm:min-w-[7.75rem] sm:gap-2 sm:px-3.5 sm:text-sm"
                       onClick={() => {
                         setAdminMode(false);
@@ -520,14 +497,18 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     >
                       <ArrowLeft size={16} className="shrink-0" />
                       <span className="text-center leading-[1.05] sm:leading-none">
-                        <span className="block sm:inline">Zurück zur</span>
-                        <span className="block sm:inline sm:ml-1">Eingabe</span>
+                        <span className="block sm:inline">
+                          {t("backToEntryLine1")}
+                        </span>
+                        <span className="block sm:inline sm:ml-1">
+                          {t("backToEntryLine2")}
+                        </span>
                       </span>
                     </button>
                   ) : (
                     <button
                       type="button"
-                      aria-label="Admin-Center öffnen"
+                      aria-label={t("adminCenterAriaLabel")}
                       className="inline-flex min-w-[5.9rem] items-center justify-center gap-1.5 rounded-2xl border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs font-semibold tracking-tight text-amber-800 shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100 hover:text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:border-amber-500/60 dark:hover:bg-amber-500/15 sm:min-w-[7.75rem] sm:gap-2 sm:px-3.5 sm:text-sm"
                       onClick={() => {
                         setAdminMode(true);
@@ -536,8 +517,12 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     >
                       <ShieldCheck size={16} className="shrink-0" />
                       <span className="text-center leading-[1.05] sm:leading-none">
-                        <span className="block sm:inline">Admin-</span>
-                        <span className="block sm:inline">Modus</span>
+                        <span className="block sm:inline">
+                          {t("adminModeLine1")}
+                        </span>
+                        <span className="block sm:inline">
+                          {t("adminModeLine2")}
+                        </span>
                       </span>
                     </button>
                   ))}
@@ -546,7 +531,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                   <div className="group relative">
                     <button
                       type="button"
-                      aria-label="Profilmenü öffnen"
+                      aria-label={t("profileMenuAriaLabel")}
                       className={`rounded-full border p-2.5 transition-colors ${
                         profileMenuOpen || profileModalOpen
                           ? "border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300"
@@ -557,7 +542,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                       <User size={18} />
                     </button>
                     <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-slate-700">
-                      Profil
+                      {t("profileTooltip")}
                     </span>
                   </div>
 
@@ -565,7 +550,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     <div className="absolute right-0 mt-3 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900">
                       <div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800">
                         <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                          {fullName || "Profilname fehlt"}
+                          {fullName || t("profileNameMissing")}
                         </p>
                         <p className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500">
                           {user.email}
@@ -578,7 +563,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                         onClick={openProfileModal}
                       >
                         <User size={16} />
-                        Persönliche Angaben
+                        {t("personalDetailsMenuItem")}
                       </button>
                       <button
                         type="button"
@@ -586,7 +571,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                         onClick={openSecurityQuestionsModal}
                       >
                         <ShieldCheck size={16} />
-                        Sicherheitsfragen
+                        {t("securityQuestionsMenuItem")}
                       </button>
                       <button
                         type="button"
@@ -594,7 +579,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                         onClick={handleSignOut}
                       >
                         <LogOut size={16} />
-                        Ausloggen
+                        {t("signOutMenuItem")}
                       </button>
                     </div>
                   )}
@@ -603,7 +588,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                 <div className="group relative">
                   <button
                     type="button"
-                    aria-label="Einstellungen öffnen"
+                    aria-label={t("settingsAriaLabel")}
                     className={`rounded-full border p-2.5 transition-colors ${
                       settingsOpen
                         ? "border-blue-500 bg-blue-50 text-blue-600 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300"
@@ -617,7 +602,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     <Settings size={18} />
                   </button>
                   <span className="pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-slate-800 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-slate-700">
-                    Einstellungen
+                    {t("settingsTooltip")}
                   </span>
                 </div>
               </div>
@@ -697,10 +682,10 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                      Einstellungen
+                      {t("settingsPanelTitle")}
                     </h2>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      Darstellung und Kontoinformationen anpassen.
+                      {t("settingsPanelDescription")}
                     </p>
                   </div>
                   <button
@@ -723,10 +708,10 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                 >
                   <div>
                     <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      Darkmode
+                      {t("darkModeTitle")}
                     </p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Schaltet zwischen heller und dunkler Darstellung um.
+                      {t("darkModeDescription")}
                     </p>
                   </div>
                   <div
@@ -746,12 +731,12 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
                 <div className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-950">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                    Konto
+                    {t("accountSectionTitle")}
                   </p>
                   <dl className="mt-4 space-y-3 text-sm">
                     <div>
                       <dt className="text-xs text-slate-500 dark:text-slate-400">
-                        User ID
+                        {t("userIdLabel")}
                       </dt>
                       <dd className="mt-1 break-all font-mono text-xs text-slate-700 dark:text-slate-200">
                         {user.id}
@@ -759,10 +744,10 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                     </div>
                     <div>
                       <dt className="text-xs text-slate-500 dark:text-slate-400">
-                        Letztes Login
+                        {t("lastLoginLabel")}
                       </dt>
                       <dd className="mt-1 text-slate-800 dark:text-slate-100">
-                        {formatDateTime(user.last_sign_in_at)}
+                        {formatDateTime(user.last_sign_in_at, locale)}
                       </dd>
                     </div>
                   </dl>
@@ -838,7 +823,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
               {activeAdminTab === "kursuebersicht" && (
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
                   <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    Kursübersicht
+                    {t("kursuebersichtTitle")}
                   </h3>
                   <KursuebersichtTab />
                 </div>
@@ -846,7 +831,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
               {activeAdminTab === "nutzeruebersicht" && (
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
                   <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    Nutzerübersicht
+                    {t("nutzeruebersichtTitle")}
                   </h3>
                   <NutzeruebersichtTab />
                 </div>
@@ -854,7 +839,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
               {activeAdminTab === "statistiken" && (
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
                   <h3 className="mb-6 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    Statistiken
+                    {t("statistikenTitle")}
                   </h3>
                   <StatistikenTab />
                 </div>
