@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 
 type Mode = "signin" | "signup" | "forgot-password";
@@ -14,27 +15,6 @@ type ResetQuestion = {
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
-
-const modeContent: Record<
-  Mode,
-  {
-    title: string;
-    submitLabel: string;
-  }
-> = {
-  signin: {
-    title: "Anmeldung",
-    submitLabel: "Jetzt anmelden",
-  },
-  signup: {
-    title: "Registrieren",
-    submitLabel: "Account erstellen",
-  },
-  "forgot-password": {
-    title: "Passwort zurücksetzen",
-    submitLabel: "Sicherheitsfragen starten",
-  },
-};
 
 function renderStatus(status: string, tone: "error" | "success") {
   if (!status) {
@@ -54,6 +34,7 @@ function renderStatus(status: string, tone: "error" | "success") {
 }
 
 export default function Home() {
+  const t = useTranslations("login");
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,6 +50,21 @@ export default function Home() {
   const [resetToken, setResetToken] = useState<string | null>(null);
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
+
+  const modeContent: Record<Mode, { title: string; submitLabel: string }> = {
+    signin: {
+      title: t("modes.signin.title"),
+      submitLabel: t("modes.signin.submitLabel"),
+    },
+    signup: {
+      title: t("modes.signup.title"),
+      submitLabel: t("modes.signup.submitLabel"),
+    },
+    "forgot-password": {
+      title: t("modes.forgotPassword.title"),
+      submitLabel: t("modes.forgotPassword.submitLabel"),
+    },
+  };
   const currentMode = modeContent[mode];
 
   useEffect(() => {
@@ -110,13 +106,13 @@ export default function Home() {
     setPasswordHasError(false);
 
     if (!normalizedEmail) {
-      setStatus("Bitte E-Mail-Adresse eingeben.");
+      setStatus(t("status.emailRequired"));
       setEmailHasError(true);
       return;
     }
 
     if (!isValidEmail(normalizedEmail)) {
-      setStatus("Bitte eine gültige E-Mail-Adresse eingeben.");
+      setStatus(t("status.emailInvalid"));
       setEmailHasError(true);
       return;
     }
@@ -136,9 +132,7 @@ export default function Home() {
       };
 
       if (!response.ok || !result.profileId || !result.questions) {
-        setStatus(
-          result.error ?? "Sicherheitsfragen konnten nicht geladen werden.",
-        );
+        setStatus(result.error ?? t("status.securityQuestionsLoadError"));
         setStatusTone("error");
       } else {
         setResetProfileId(result.profileId);
@@ -162,7 +156,7 @@ export default function Home() {
         setMode("signin");
         setPassword("");
         setPasswordHasError(false);
-        setStatus("Account erstellt. Du kannst dich jetzt anmelden.");
+        setStatus(t("status.accountCreated"));
         setStatusTone("success");
       }
     } else {
@@ -172,7 +166,7 @@ export default function Home() {
       });
       if (error) {
         if (error.message.includes("Invalid login credentials")) {
-          setStatus("Falsches Passwort oder E-Mail.");
+          setStatus(t("status.wrongCredentials"));
           setStatusTone("error");
           setPasswordHasError(true);
         } else {
@@ -191,13 +185,13 @@ export default function Home() {
     event.preventDefault();
 
     if (!resetProfileId || resetQuestions.length !== 2) {
-      setStatus("Sicherheitsfragen konnten nicht geladen werden.");
+      setStatus(t("status.securityQuestionsLoadError"));
       setStatusTone("error");
       return;
     }
 
     if (resetAnswers.some((answer) => answer.trim().length === 0)) {
-      setStatus("Bitte beantworte beide Sicherheitsfragen.");
+      setStatus(t("status.answerBothQuestions"));
       setStatusTone("error");
       return;
     }
@@ -223,7 +217,7 @@ export default function Home() {
     };
 
     if (!response.ok || !result.token) {
-      setStatus(result.error ?? "Die Antworten konnten nicht geprüft werden.");
+      setStatus(result.error ?? t("status.answersCheckError"));
       setStatusTone("error");
       return;
     }
@@ -238,19 +232,19 @@ export default function Home() {
     event.preventDefault();
 
     if (!resetToken || !resetProfileId) {
-      setStatus("Der Reset-Vorgang ist nicht mehr gültig.");
+      setStatus(t("status.resetSessionExpired"));
       setStatusTone("error");
       return;
     }
 
     if (newPassword !== confirmNewPassword) {
-      setStatus("Passwörter stimmen nicht überein.");
+      setStatus(t("status.passwordMismatch"));
       setStatusTone("error");
       return;
     }
 
     if (newPassword.length < 6) {
-      setStatus("Passwort muss mindestens 6 Zeichen lang sein.");
+      setStatus(t("status.passwordTooShort"));
       setStatusTone("error");
       return;
     }
@@ -270,14 +264,12 @@ export default function Home() {
     const result = (await response.json()) as { error?: string };
 
     if (!response.ok) {
-      setStatus(result.error ?? "Das Passwort konnte nicht gesetzt werden.");
+      setStatus(result.error ?? t("status.passwordSetError"));
       setStatusTone("error");
       return;
     }
 
-    setStatus(
-      "Passwort erfolgreich zurückgesetzt. Du kannst dich jetzt anmelden.",
-    );
+    setStatus(t("status.passwordResetSuccess"));
     setStatusTone("success");
     setMode("signin");
     setPassword("");
@@ -305,7 +297,7 @@ export default function Home() {
             className="h-16 w-16 drop-shadow-lg"
           />
           <h1 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">
-            Time Use Tool
+            {t("brand")}
           </h1>
         </div>
 
@@ -320,7 +312,9 @@ export default function Home() {
                   : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-slate-100"
               }`}
             >
-              <span className="block font-semibold">Anmeldung</span>
+              <span className="block font-semibold">
+                {t("modes.signin.title")}
+              </span>
             </button>
             <button
               type="button"
@@ -332,7 +326,7 @@ export default function Home() {
               }`}
             >
               <span className="block font-semibold">
-                Registrieren
+                {t("modes.signup.title")}
               </span>
             </button>
           </div>
@@ -347,7 +341,7 @@ export default function Home() {
             <form onSubmit={handleSubmit} noValidate>
               <div className="space-y-4">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  E-Mail
+                  {t("emailLabel")}
                   <input
                     type="email"
                     value={email}
@@ -365,12 +359,12 @@ export default function Home() {
                         ? "border-red-400 focus:border-red-500 focus:ring-red-500"
                         : "border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500"
                     }`}
-                    placeholder="name@beispiel.de"
+                    placeholder={t("emailPlaceholder")}
                   />
                 </label>
 
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Passwort
+                  {t("passwordLabel")}
                   <input
                     type="password"
                     value={password}
@@ -386,7 +380,7 @@ export default function Home() {
                         ? "border-red-400 focus:border-red-500 focus:ring-red-500"
                         : "border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500"
                     }`}
-                    placeholder="Mindestens 6 Zeichen"
+                    placeholder={t("passwordPlaceholder")}
                   />
                 </label>
               </div>
@@ -406,7 +400,7 @@ export default function Home() {
             <form onSubmit={handleSubmit} noValidate>
               <div className="space-y-4">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  E-Mail
+                  {t("emailLabel")}
                   <input
                     type="email"
                     value={email}
@@ -424,7 +418,7 @@ export default function Home() {
                         ? "border-red-400 focus:border-red-500 focus:ring-red-500"
                         : "border-slate-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500"
                     }`}
-                    placeholder="name@beispiel.de"
+                    placeholder={t("emailPlaceholder")}
                   />
                 </label>
               </div>
@@ -433,7 +427,7 @@ export default function Home() {
                 type="submit"
                 className="mt-5 w-full rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
               >
-                Sicherheitsfragen laden
+                {t("loadSecurityQuestionsButton")}
               </button>
 
               {renderStatus(status, statusTone)}
@@ -448,7 +442,7 @@ export default function Home() {
                 className="space-y-4"
               >
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  E-Mail
+                  {t("emailLabel")}
                   <input
                     type="email"
                     value={email}
@@ -476,7 +470,7 @@ export default function Home() {
                         setStatus("");
                       }}
                       className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      placeholder="Antwort"
+                      placeholder={t("answerPlaceholder")}
                     />
                   </label>
                 ))}
@@ -485,7 +479,7 @@ export default function Home() {
                   type="submit"
                   className="mt-1 w-full rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
                 >
-                  Antworten prüfen
+                  {t("checkAnswersButton")}
                 </button>
 
                 {renderStatus(status, statusTone)}
@@ -495,7 +489,7 @@ export default function Home() {
           {mode === "forgot-password" && resetToken && (
             <form onSubmit={handleCompletePasswordReset} className="space-y-4">
               <label className="block text-sm font-medium text-slate-700">
-                E-Mail
+                {t("emailLabel")}
                 <input
                   type="email"
                   value={email}
@@ -505,7 +499,7 @@ export default function Home() {
               </label>
 
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Neues Passwort
+                {t("newPasswordLabel")}
                 <input
                   type="password"
                   value={newPassword}
@@ -515,12 +509,12 @@ export default function Home() {
                   }}
                   minLength={6}
                   className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="Mindestens 6 Zeichen"
+                  placeholder={t("passwordPlaceholder")}
                 />
               </label>
 
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Passwort bestätigen
+                {t("confirmPasswordLabel")}
                 <input
                   type="password"
                   value={confirmNewPassword}
@@ -530,7 +524,7 @@ export default function Home() {
                   }}
                   minLength={6}
                   className="mt-1.5 w-full rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  placeholder="Passwort wiederholen"
+                  placeholder={t("confirmPasswordPlaceholder")}
                 />
               </label>
 
@@ -538,7 +532,7 @@ export default function Home() {
                 type="submit"
                 className="w-full rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
               >
-                Neues Passwort setzen
+                {t("setNewPasswordButton")}
               </button>
 
               {renderStatus(status, statusTone)}
@@ -553,14 +547,14 @@ export default function Home() {
                   onClick={() => handleModeChange("signup")}
                   className="rounded-md border border-blue-200 dark:border-blue-600/40 bg-blue-50 dark:bg-blue-500/10 px-3 py-2 font-medium text-blue-700 dark:text-blue-300 transition hover:bg-blue-100 dark:hover:bg-blue-500/15"
                 >
-                  Noch kein Konto? Hier neuen Account erstellen
+                  {t("noAccountButton")}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleModeChange("forgot-password")}
                   className="text-center text-sm text-slate-500 dark:text-slate-400 transition hover:text-slate-700 dark:hover:text-slate-200"
                 >
-                  Passwort vergessen?
+                  {t("forgotPasswordButton")}
                 </button>
               </>
             ) : (
@@ -570,7 +564,7 @@ export default function Home() {
                   onClick={() => handleModeChange("signin")}
                   className="rounded-md border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3 py-2 font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-slate-700"
                 >
-                  Zurück zur Anmeldung
+                  {t("backToSigninButton")}
                 </button>
               </>
             )}

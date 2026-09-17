@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Download, Plus, X } from "lucide-react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { CATEGORY_COLORS } from "@/app/(protected)/zeiterfassung/types";
+import { CATEGORY_COLORS } from "@/app/[locale]/(protected)/zeiterfassung/types";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import ConfirmModal from "./ConfirmModal";
 import UserStatsView from "./UserStatsView";

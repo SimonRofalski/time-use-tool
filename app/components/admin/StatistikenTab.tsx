@@ -17,7 +17,7 @@ import {
 } from "recharts";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { totalPeriodDays } from "@/lib/course-periods";
-import { CATEGORY_COLORS } from "@/app/(protected)/zeiterfassung/types";
+import { CATEGORY_COLORS } from "@/app/[locale]/(protected)/zeiterfassung/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -1,0 +1,64 @@
+{
+  "settingsPage": {
+    "title": "Einstellungen",
+    "description": "Die Einstellungen wurden in das Panel oben rechts verschoben. Dort kannst du den Night Modus umstellen und deine Kontoinformationen einsehen."
+  },
+  "adminPage": {
+    "title": "Admin"
+  },
+  "resetPassword": {
+    "brand": "Time Use Tool",
+    "subtitle": "Neues Passwort setzen",
+    "invalidToken": "Ungültiger oder abgelaufener Recovery-Link. Bitte fordere einen neuen an.",
+    "passwordMismatch": "Passwörter stimmen nicht überein.",
+    "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein.",
+    "samePasswordError": "Das neue Passwort muss sich vom alten unterscheiden.",
+    "successMessage": "Passwort erfolgreich zurückgesetzt!",
+    "newPasswordLabel": "Neues Passwort",
+    "newPasswordPlaceholder": "Mindestens 6 Zeichen",
+    "confirmPasswordLabel": "Passwort bestätigen",
+    "confirmPasswordPlaceholder": "Passwort wiederholen",
+    "submitButton": "Passwort zurücksetzen",
+    "submitButtonLoading": "Wird zurückgesetzt...",
+    "checking": "Wird überprüft..."
+  },
+  "login": {
+    "brand": "Time Use Tool",
+    "modes": {
+      "signin": { "title": "Anmeldung", "submitLabel": "Jetzt anmelden" },
+      "signup": { "title": "Registrieren", "submitLabel": "Account erstellen" },
+      "forgotPassword": {
+        "title": "Passwort zurücksetzen",
+        "submitLabel": "Sicherheitsfragen starten"
+      }
+    },
+    "emailLabel": "E-Mail",
+    "emailPlaceholder": "name@beispiel.de",
+    "passwordLabel": "Passwort",
+    "passwordPlaceholder": "Mindestens 6 Zeichen",
+    "loadSecurityQuestionsButton": "Sicherheitsfragen laden",
+    "checkAnswersButton": "Antworten prüfen",
+    "answerPlaceholder": "Antwort",
+    "newPasswordLabel": "Neues Passwort",
+    "confirmPasswordLabel": "Passwort bestätigen",
+    "confirmPasswordPlaceholder": "Passwort wiederholen",
+    "setNewPasswordButton": "Neues Passwort setzen",
+    "noAccountButton": "Noch kein Konto? Hier neuen Account erstellen",
+    "forgotPasswordButton": "Passwort vergessen?",
+    "backToSigninButton": "Zurück zur Anmeldung",
+    "status": {
+      "emailRequired": "Bitte E-Mail-Adresse eingeben.",
+      "emailInvalid": "Bitte eine gültige E-Mail-Adresse eingeben.",
+      "securityQuestionsLoadError": "Sicherheitsfragen konnten nicht geladen werden.",
+      "accountCreated": "Account erstellt. Du kannst dich jetzt anmelden.",
+      "wrongCredentials": "Falsches Passwort oder E-Mail.",
+      "answerBothQuestions": "Bitte beantworte beide Sicherheitsfragen.",
+      "answersCheckError": "Die Antworten konnten nicht geprüft werden.",
+      "resetSessionExpired": "Der Reset-Vorgang ist nicht mehr gültig.",
+      "passwordMismatch": "Passwörter stimmen nicht überein.",
+      "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein.",
+      "passwordSetError": "Das Passwort konnte nicht gesetzt werden.",
+      "passwordResetSuccess": "Passwort erfolgreich zurückgesetzt. Du kannst dich jetzt anmelden."
+    }
+  }
+}

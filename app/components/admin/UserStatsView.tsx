@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
-import ZeitverteilungTab from "@/app/(protected)/statistiken/ZeitverteilungTab";
+import ZeitverteilungTab from "@/app/[locale]/(protected)/statistiken/ZeitverteilungTab";
 import type {
   CategoryRow,
   SubcategoryRow,
   ActivityRow,
   DayBarData,
   MetaAggregates,
-} from "@/app/(protected)/statistiken/types";
+} from "@/app/[locale]/(protected)/statistiken/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
