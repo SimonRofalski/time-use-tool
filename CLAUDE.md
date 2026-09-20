@@ -5,10 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev       # Start development server (localhost:3000)
-npm run build     # Production build
-npm run start     # Start production server
-npm run lint      # Run ESLint
+npm run dev        # Start development server (localhost:3000)
+npm run build      # Production build
+npm run start      # Start production server
+npm run lint       # Run ESLint
+npm run mock-oidc  # Local mock SWITCH edu-ID OIDC provider (localhost:9999) — run alongside `dev` to test edu-ID login before the real SWITCH SP registration exists
 ```
 
 ## Architecture
@@ -39,7 +40,18 @@ Two Supabase client instances:
 - `lib/supabase/browser-client.ts` — Singleton for client components, uses `NEXT_PUBLIC_*` env vars
 - `lib/supabase/server-client.ts` — Server-side instance using Next.js `cookies()` API for session persistence and token refresh
 
-Auth supports email/password only (Google OAuth was removed). Sessions are stored in cookies and refreshed server-side on each request via the proxy. Password reset supports both the email-link flow (`/reset-password`) and a security-questions flow (`lib/security-questions.ts`, `lib/security-questions-server.ts`, `app/api/security-questions/`, `app/api/password-reset/security-questions/`, `app/api/password-reset/verify/`, `app/api/password-reset/complete/`).
+Sessions are stored in cookies and refreshed server-side on each request via the proxy. Password reset supports both the email-link flow (`/reset-password`) and a security-questions flow (`lib/security-questions.ts`, `lib/security-questions-server.ts`, `app/api/security-questions/`, `app/api/password-reset/security-questions/`, `app/api/password-reset/verify/`, `app/api/password-reset/complete/`) — this stays the recovery path for password-based accounts regardless of how they signed up.
+
+### SWITCH edu-ID login (OIDC)
+
+Added 2026-09 (Google OAuth was removed earlier and is not coming back). Two auth methods now coexist, tracked via `profiles.auth_provider` (`'password' | 'switch_edu_id'`):
+
+- **SWITCH edu-ID** is the primary, prominent option on the login page (`app/[locale]/page.tsx`) — email/password is de-emphasized behind an "mit E-Mail & Passwort anmelden" disclosure link, for accounts that don't have edu-ID.
+- The OIDC negotiation itself (`lib/oidc/client.ts`, `lib/oidc/provision.ts`, using `openid-client` v6's functional API) deliberately has **no Supabase imports** — only `app/api/auth/switch/callback/route.ts` bridges the verified identity into a Supabase session (via `auth.admin.generateLink({type:"magiclink"})` + `verifyOtp`). This is intentional: the team plans to migrate off Supabase to a custom Postgres/auth stack, and Supabase's own SSO/SAML product was deliberately avoided so this logic stays portable.
+- **Account linking**: a first edu-ID login whose email matches an existing password-based profile links automatically (same `auth.users.id`, full history preserved) — see `lib/oidc/provision.ts`. No extra confirmation step from the user (a known v1 simplification).
+- The real SWITCH SP registration (client id/secret) hasn't happened yet — it's an external process the team owns. Development runs against a local mock provider instead: `npm run mock-oidc` (`dev/mock-oidc-provider.mjs`, port 9999, a few seeded test accounts covering new-user / returning-user / email-collision scenarios). Swapping to production only requires changing the four `SWITCH_OIDC_*` env vars, no code changes.
+- **Admin-managed password accounts**: since not everyone has edu-ID, admins can create password-based accounts and reset passwords from the Nutzerübersicht tab (`app/components/admin/NutzeruebersichtTab.tsx`, `CreateUserModal.tsx`, `SetPasswordModal.tsx`, backed by `app/api/admin/users/{create,set-password,delete}/`). Any admin-set password forces `profiles.must_change_password = true`, which gates the entire protected layout (`app/[locale]/(protected)/layout.tsx`, `MustChangePasswordForm.tsx`) until the user sets their own password — this check runs **before** the security-questions gate and applies to every role, no exceptions.
+- `profiles.auth_provider`, `must_change_password`, and `switch_edu_id_sub` are locked to service-role-only writes via a Postgres trigger (`supabase/migrations/20260920000000_add_edu_id_login.sql`) — a user's own RLS "update own profile" policy has no column restriction, so without this trigger a user could flip `must_change_password` back to `false` themselves via a plain `supabase-js` call. Any code that needs to change these three columns must go through `lib/supabase/admin-client.ts`'s service-role client.
 
 ### Navigation
 
@@ -66,6 +78,15 @@ Added for AFE2 — the tool is being made bilingual. Two independent pieces:
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_PROJECT_ID
+SUPABASE_SERVICE_ROLE_KEY     # server-only, used by lib/supabase/admin-client.ts
+
+# SWITCH edu-ID OIDC (see "SWITCH edu-ID login" above) — local dev points
+# these at `npm run mock-oidc`; production values come from the SWITCH SP
+# registration. See .env.example for the local-dev placeholder values.
+SWITCH_OIDC_ISSUER_URL
+SWITCH_OIDC_CLIENT_ID
+SWITCH_OIDC_CLIENT_SECRET
+SWITCH_OIDC_REDIRECT_URI
 ```
 
 ### UI Conventions
@@ -88,3 +109,5 @@ Auth (including security-question-based password reset) and the Supabase schema 
 Course logic (multi-period courses, date-range handling) is centralized in `lib/course-periods.ts` as shared source of truth for admin, user, and stats views.
 
 Known stale/uncertain areas — verify against code before relying on them: the exact current shape of the mandatory profile-completion/enrollment flow in the layout, and whether `@heroicons/react`/`@heroui/react` are still needed as dependencies at all.
+
+**SWITCH edu-ID login status (2026-09-20)**: implemented end-to-end against the local mock OIDC provider (build passes, `tsc --noEmit` clean) but **not yet manually verified in a live browser round-trip** — that's the next step before merging. Also not yet done: the actual SWITCH SP registration (external, owned by the team) and swapping the `SWITCH_OIDC_*` env vars from the mock to production values.

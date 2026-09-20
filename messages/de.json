@@ -52,6 +52,11 @@
     "noAccountButton": "Noch kein Konto? Hier neuen Account erstellen",
     "forgotPasswordButton": "Passwort vergessen?",
     "backToSigninButton": "Zurück zur Anmeldung",
+    "switchEduIdTitle": "Willkommen zurück",
+    "switchEduIdDescription": "Melde dich mit deiner SWITCH edu-ID an.",
+    "switchEduIdButton": "Mit SWITCH edu-ID anmelden",
+    "emailPasswordDisclosureLabel": "Mit E-Mail & Passwort anmelden",
+    "backToSwitchEduIdButton": "← Mit SWITCH edu-ID anmelden",
     "status": {
       "emailRequired": "Bitte E-Mail-Adresse eingeben.",
       "emailInvalid": "Bitte eine gültige E-Mail-Adresse eingeben.",
@@ -65,6 +70,16 @@
       "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein.",
       "passwordSetError": "Das Passwort konnte nicht gesetzt werden.",
       "passwordResetSuccess": "Passwort erfolgreich zurückgesetzt. Du kannst dich jetzt anmelden."
+    },
+    "oidcErrorGeneric": "Anmeldung mit SWITCH edu-ID fehlgeschlagen. Bitte versuche es erneut.",
+    "oidcErrors": {
+      "missingSession": "Die Anmeldung ist abgelaufen. Bitte versuche es erneut.",
+      "exchangeFailed": "Anmeldung mit SWITCH edu-ID fehlgeschlagen. Bitte versuche es erneut.",
+      "missingClaims": "SWITCH edu-ID hat keine ausreichenden Kontodaten geliefert.",
+      "incompleteIdentity": "SWITCH edu-ID hat keine E-Mail-Adresse geliefert. Bitte wende dich an einen Admin.",
+      "accountConflict": "Dieses Konto ist bereits mit einer anderen SWITCH edu-ID verknüpft. Bitte wende dich an einen Admin.",
+      "provisioningFailed": "Konto konnte nicht eingerichtet werden. Bitte versuche es erneut.",
+      "sessionFailed": "Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut."
     }
   },
   "protectedLayout": {
@@ -460,7 +475,8 @@
   },
   "common": {
     "confirmButton": "Bestätigen",
-    "cancelButton": "Abbrechen"
+    "cancelButton": "Abbrechen",
+    "closeButton": "Schliessen"
   },
   "kursuebersicht": {
     "subTabs": {
@@ -625,10 +641,20 @@
     "noCoursePlaceholder": "–",
     "includeButton": "Einschliessen",
     "excludeButton": "Ausschliessen",
+    "createUserButton": "Account anlegen",
+    "setPasswordButton": "Temp-Passwort setzen",
+    "deleteButton": "Löschen",
+    "deleteError": "Nutzer konnte nicht gelöscht werden.",
+    "authMethodBadge": {
+      "switchEduId": "SWITCH edu-ID",
+      "password": "E-Mail & Passwort"
+    },
+    "mustChangePasswordBadge": "Passwortwechsel ausstehend",
     "table": {
       "user": "Nutzer",
       "course": "Kurs",
       "progress": "Fortschritt",
+      "authMethod": "Anmeldeart",
       "actions": "Aktionen"
     },
     "includeConfirm": {
@@ -640,6 +666,38 @@
       "title": "Nutzer ausschliessen",
       "message": "Die Daten von {name} werden aus allen Statistiken entfernt. Der Nutzer wird darüber nicht informiert.",
       "confirmLabel": "Ausschliessen"
+    },
+    "deleteConfirm": {
+      "title": "Nutzer löschen",
+      "message": "Das Konto von {name} wird unwiderruflich gelöscht, inklusive aller erfassten Zeiten.",
+      "confirmLabel": "Löschen"
+    },
+    "createUserModal": {
+      "title": "Account anlegen",
+      "description": "Für Nutzer ohne SWITCH edu-ID. Das temporäre Passwort muss beim ersten Login neu gesetzt werden.",
+      "emailLabel": "E-Mail",
+      "firstNameLabel": "Vorname",
+      "lastNameLabel": "Nachname",
+      "temporaryPasswordLabel": "Temporäres Passwort",
+      "generateButton": "Generieren",
+      "createButton": "Account anlegen",
+      "creatingButton": "Wird angelegt...",
+      "createdTitle": "Account angelegt",
+      "createdMessage": "Konto für {email} wurde angelegt. Bitte gib dieses temporäre Passwort weiter — es wird nicht erneut angezeigt:",
+      "createFailedError": "Account konnte nicht angelegt werden.",
+      "networkError": "Netzwerkfehler beim Anlegen des Accounts."
+    },
+    "setPasswordModal": {
+      "title": "Temporäres Passwort setzen",
+      "description": "Für {name}. Beim nächsten Login muss ein neues Passwort gesetzt werden.",
+      "switchEduIdWarning": "Dieser Nutzer meldet sich aktuell über SWITCH edu-ID an. Passwort trotzdem setzen?",
+      "temporaryPasswordLabel": "Temporäres Passwort",
+      "generateButton": "Generieren",
+      "saveButton": "Passwort setzen",
+      "savingButton": "Wird gespeichert...",
+      "forceConfirmButton": "Trotzdem setzen",
+      "saveFailedError": "Passwort konnte nicht gesetzt werden.",
+      "networkError": "Netzwerkfehler beim Setzen des Passworts."
     }
   },
   "adminStatistiken": {
@@ -806,7 +864,34 @@
     "saveButton": "Sicherheitsfragen speichern",
     "savingButton": "Wird gespeichert..."
   },
+  "mustChangePassword": {
+    "title": "Neues Passwort erforderlich",
+    "description": "Ein Admin hat für dein Konto ein temporäres Passwort gesetzt. Bitte lege jetzt ein neues, eigenes Passwort fest, bevor du fortfährst.",
+    "newPasswordLabel": "Neues Passwort",
+    "confirmPasswordLabel": "Passwort bestätigen",
+    "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein.",
+    "passwordMismatch": "Die Passwörter stimmen nicht überein.",
+    "unexpectedServerResponse": "Unerwartete Serverantwort beim Speichern.",
+    "saveFailedError": "Passwort konnte nicht geändert werden.",
+    "networkError": "Netzwerkfehler beim Ändern des Passworts.",
+    "saveButton": "Passwort speichern",
+    "savingButton": "Wird gespeichert..."
+  },
   "apiErrors": {
+    "changePassword": {
+      "notAuthenticated": "Nicht angemeldet.",
+      "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein."
+    },
+    "adminUsers": {
+      "invalidRequest": "Ungültige Anfrage.",
+      "invalidEmail": "Bitte gib eine gültige E-Mail-Adresse ein.",
+      "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein.",
+      "createFailed": "Konto konnte nicht erstellt werden.",
+      "userNotFound": "Nutzer nicht gefunden.",
+      "switchEduIdAccountNeedsForce": "Dieser Nutzer meldet sich aktuell über SWITCH edu-ID an. Passwort trotzdem setzen?",
+      "cannotDeleteSelf": "Du kannst dein eigenes Konto nicht löschen.",
+      "deleteFailed": "Nutzer konnte nicht gelöscht werden."
+    },
     "passwordResetComplete": {
       "invalidRequest": "Ungültige Anfrage.",
       "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein.",

@@ -52,6 +52,11 @@
     "noAccountButton": "Don't have an account yet? Create one here",
     "forgotPasswordButton": "Forgot password?",
     "backToSigninButton": "Back to sign in",
+    "switchEduIdTitle": "Welcome back",
+    "switchEduIdDescription": "Sign in with your SWITCH edu-ID.",
+    "switchEduIdButton": "Sign in with SWITCH edu-ID",
+    "emailPasswordDisclosureLabel": "Sign in with email & password",
+    "backToSwitchEduIdButton": "← Sign in with SWITCH edu-ID",
     "status": {
       "emailRequired": "Please enter your email address.",
       "emailInvalid": "Please enter a valid email address.",
@@ -65,6 +70,16 @@
       "passwordTooShort": "Password must be at least 6 characters long.",
       "passwordSetError": "The password could not be set.",
       "passwordResetSuccess": "Password reset successfully. You can now sign in."
+    },
+    "oidcErrorGeneric": "Sign-in with SWITCH edu-ID failed. Please try again.",
+    "oidcErrors": {
+      "missingSession": "The sign-in attempt expired. Please try again.",
+      "exchangeFailed": "Sign-in with SWITCH edu-ID failed. Please try again.",
+      "missingClaims": "SWITCH edu-ID did not provide enough account data.",
+      "incompleteIdentity": "SWITCH edu-ID did not provide an email address. Please contact an admin.",
+      "accountConflict": "This account is already linked to a different SWITCH edu-ID. Please contact an admin.",
+      "provisioningFailed": "Account could not be set up. Please try again.",
+      "sessionFailed": "Sign-in could not be completed. Please try again."
     }
   },
   "protectedLayout": {
@@ -460,7 +475,8 @@
   },
   "common": {
     "confirmButton": "Confirm",
-    "cancelButton": "Cancel"
+    "cancelButton": "Cancel",
+    "closeButton": "Close"
   },
   "kursuebersicht": {
     "subTabs": {
@@ -625,10 +641,20 @@
     "noCoursePlaceholder": "–",
     "includeButton": "Include",
     "excludeButton": "Exclude",
+    "createUserButton": "Create account",
+    "setPasswordButton": "Set temp password",
+    "deleteButton": "Delete",
+    "deleteError": "User could not be deleted.",
+    "authMethodBadge": {
+      "switchEduId": "SWITCH edu-ID",
+      "password": "Email & password"
+    },
+    "mustChangePasswordBadge": "Password change pending",
     "table": {
       "user": "User",
       "course": "Course",
       "progress": "Progress",
+      "authMethod": "Sign-in method",
       "actions": "Actions"
     },
     "includeConfirm": {
@@ -640,6 +666,38 @@
       "title": "Exclude user",
       "message": "{name}'s data will be removed from all statistics. The user will not be notified.",
       "confirmLabel": "Exclude"
+    },
+    "deleteConfirm": {
+      "title": "Delete user",
+      "message": "{name}'s account will be permanently deleted, including all tracked time entries.",
+      "confirmLabel": "Delete"
+    },
+    "createUserModal": {
+      "title": "Create account",
+      "description": "For users without SWITCH edu-ID. The temporary password must be changed on first login.",
+      "emailLabel": "Email",
+      "firstNameLabel": "First name",
+      "lastNameLabel": "Last name",
+      "temporaryPasswordLabel": "Temporary password",
+      "generateButton": "Generate",
+      "createButton": "Create account",
+      "creatingButton": "Creating...",
+      "createdTitle": "Account created",
+      "createdMessage": "Account for {email} has been created. Please pass on this temporary password — it will not be shown again:",
+      "createFailedError": "Account could not be created.",
+      "networkError": "Network error while creating the account."
+    },
+    "setPasswordModal": {
+      "title": "Set temporary password",
+      "description": "For {name}. A new password must be set on next login.",
+      "switchEduIdWarning": "This user currently signs in via SWITCH edu-ID. Set the password anyway?",
+      "temporaryPasswordLabel": "Temporary password",
+      "generateButton": "Generate",
+      "saveButton": "Set password",
+      "savingButton": "Saving...",
+      "forceConfirmButton": "Set anyway",
+      "saveFailedError": "Password could not be set.",
+      "networkError": "Network error while setting the password."
     }
   },
   "adminStatistiken": {
@@ -806,7 +864,34 @@
     "saveButton": "Save security questions",
     "savingButton": "Saving..."
   },
+  "mustChangePassword": {
+    "title": "New password required",
+    "description": "An admin has set a temporary password for your account. Please set a new password of your own before continuing.",
+    "newPasswordLabel": "New password",
+    "confirmPasswordLabel": "Confirm password",
+    "passwordTooShort": "Password must be at least 6 characters long.",
+    "passwordMismatch": "The passwords do not match.",
+    "unexpectedServerResponse": "Unexpected server response while saving.",
+    "saveFailedError": "Password could not be changed.",
+    "networkError": "Network error while changing the password.",
+    "saveButton": "Save password",
+    "savingButton": "Saving..."
+  },
   "apiErrors": {
+    "changePassword": {
+      "notAuthenticated": "Not signed in.",
+      "passwordTooShort": "Password must be at least 6 characters long."
+    },
+    "adminUsers": {
+      "invalidRequest": "Invalid request.",
+      "invalidEmail": "Please enter a valid email address.",
+      "passwordTooShort": "Password must be at least 6 characters long.",
+      "createFailed": "Account could not be created.",
+      "userNotFound": "User not found.",
+      "switchEduIdAccountNeedsForce": "This user currently signs in via SWITCH edu-ID. Set the password anyway?",
+      "cannotDeleteSelf": "You cannot delete your own account.",
+      "deleteFailed": "User could not be deleted."
+    },
     "passwordResetComplete": {
       "invalidRequest": "Invalid request.",
       "passwordTooShort": "Password must be at least 6 characters long.",
