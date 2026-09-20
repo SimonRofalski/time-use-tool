@@ -80,6 +80,20 @@ export type Satisfaction = {
   name_en: string;
 };
 
+export type Meaningfulness = {
+  meaningfulness_id: number;
+  code: string;
+  name: string;
+  name_en: string;
+};
+
+export type Stressfulness = {
+  stressfulness_id: number;
+  code: string;
+  name: string;
+  name_en: string;
+};
+
 // All lookup tables bundled together for convenient passing between components
 export type LookupData = {
   categories: Category[];
@@ -89,6 +103,8 @@ export type LookupData = {
   socialContexts: SocialContext[];
   digitalMediaTypes: DigitalMediaType[];
   satisfactions: Satisfaction[];
+  meaningfulnesses: Meaningfulness[];
+  stressfulnesses: Stressfulness[];
 };
 
 // ─── Core data types ──────────────────────────────────────────────────────────
@@ -103,6 +119,8 @@ export type TimeEntryRecord = {
   primary_activity_id: number;
   secondary_activity_id: number | null;
   satisfaction_id: number | null;
+  meaningfulness_id: number | null;
+  stressfulness_id: number | null;
   location_transport_id: number | null;
   digital_media_used: boolean;
   digital_media_type_ids: number[];
@@ -119,6 +137,8 @@ export type PendingEntry = {
   location_transport_id: number | null;
   social_context_ids: number[];
   satisfaction_id: number | null;
+  meaningfulness_id: number | null;
+  stressfulness_id: number | null;
 };
 
 // The ordered steps in the questionnaire flow

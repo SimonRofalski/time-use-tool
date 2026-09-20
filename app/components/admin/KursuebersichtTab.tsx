@@ -52,6 +52,8 @@ type CourseRow = {
   accessCode: string | null;
   anonymized_at: string | null;
   comparison_enabled: boolean;
+  ask_extra_ratings: boolean;
+  ask_day_questionnaire: boolean;
   userCount: number;
   periods: CoursePeriodRow[];
 };
@@ -163,6 +165,8 @@ export default function KursuebersichtTab() {
     { start: "", end: "" },
   ]);
   const [newAccessCode, setNewAccessCode] = useState("");
+  const [newAskExtraRatings, setNewAskExtraRatings] = useState(false);
+  const [newAskDayQuestionnaire, setNewAskDayQuestionnaire] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState(false);
@@ -211,7 +215,7 @@ export default function KursuebersichtTab() {
     const { data: courseData, error: courseErr } = await supabase
       .from("course")
       .select(
-        "course_id, name, start_date, end_date, is_locked, accessCode, anonymized_at, comparison_enabled",
+        "course_id, name, start_date, end_date, is_locked, accessCode, anonymized_at, comparison_enabled, ask_extra_ratings, ask_day_questionnaire",
       )
       .order("start_date", { ascending: false });
 
@@ -584,6 +588,37 @@ export default function KursuebersichtTab() {
     });
   }
 
+  async function handleToggleExtraRatings(courseId: number, enabled: boolean) {
+    const { error } = await supabase
+      .from("course")
+      .update({ ask_extra_ratings: enabled })
+      .eq("course_id", courseId);
+    if (error) return;
+
+    setCourses((prev) =>
+      prev.map((c) =>
+        c.course_id === courseId ? { ...c, ask_extra_ratings: enabled } : c,
+      ),
+    );
+  }
+
+  async function handleToggleDayQuestionnaire(
+    courseId: number,
+    enabled: boolean,
+  ) {
+    const { error } = await supabase
+      .from("course")
+      .update({ ask_day_questionnaire: enabled })
+      .eq("course_id", courseId);
+    if (error) return;
+
+    setCourses((prev) =>
+      prev.map((c) =>
+        c.course_id === courseId ? { ...c, ask_day_questionnaire: enabled } : c,
+      ),
+    );
+  }
+
   async function handleCreateCourse(e: React.FormEvent) {
     e.preventDefault();
     setIsCreating(true);
@@ -641,6 +676,8 @@ export default function KursuebersichtTab() {
         accessCode: newAccessCode.trim(),
         is_locked: false,
         comparison_enabled: false,
+        ask_extra_ratings: newAskExtraRatings,
+        ask_day_questionnaire: newAskDayQuestionnaire,
       })
       .select("course_id")
       .single();
@@ -676,6 +713,8 @@ export default function KursuebersichtTab() {
     setNewName("");
     setNewPeriods([{ start: "", end: "" }]);
     setNewAccessCode("");
+    setNewAskExtraRatings(false);
+    setNewAskDayQuestionnaire(false);
     setIsCreating(false);
   }
 
@@ -850,6 +889,27 @@ export default function KursuebersichtTab() {
           />
         </div>
 
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={newAskExtraRatings}
+              onChange={(e) => setNewAskExtraRatings(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            {t("newCourseForm.askExtraRatingsLabel")}
+          </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={newAskDayQuestionnaire}
+              onChange={(e) => setNewAskDayQuestionnaire(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            {t("newCourseForm.askDayQuestionnaireLabel")}
+          </label>
+        </div>
+
         {createError && <p className="text-sm text-red-600">{createError}</p>}
         {createSuccess && (
           <p className="text-sm text-green-600 font-medium">
@@ -962,6 +1022,16 @@ export default function KursuebersichtTab() {
                       {t("courseList.comparisonDisabledBadge")}
                     </span>
                   )}
+                  {course.ask_extra_ratings && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 sm:px-2.5 sm:py-1 sm:text-xs">
+                      {t("courseList.extraRatingsEnabledBadge")}
+                    </span>
+                  )}
+                  {course.ask_day_questionnaire && (
+                    <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-medium text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 sm:px-2.5 sm:py-1 sm:text-xs">
+                      {t("courseList.dayQuestionnaireEnabledBadge")}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1057,6 +1127,9 @@ export default function KursuebersichtTab() {
   function renderCourseDetail() {
     if (view.type !== "course") return null;
     const { isAnonymized, isComparisonEnabled } = view;
+    const currentCourse = courses.find((c) => c.course_id === view.courseId);
+    const isAskExtraRatings = currentCourse?.ask_extra_ratings ?? false;
+    const isAskDayQuestionnaire = currentCourse?.ask_day_questionnaire ?? false;
 
     return (
       <div className="space-y-4">
@@ -1102,6 +1175,44 @@ export default function KursuebersichtTab() {
               {isComparisonEnabled
                 ? t("courseDetail.comparisonDisableButton")
                 : t("courseDetail.comparisonEnableButton")}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void handleToggleExtraRatings(
+                  view.courseId,
+                  !isAskExtraRatings,
+                )
+              }
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                isAskExtraRatings
+                  ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                  : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              {isAskExtraRatings
+                ? t("courseDetail.extraRatingsDisableButton")
+                : t("courseDetail.extraRatingsEnableButton")}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void handleToggleDayQuestionnaire(
+                  view.courseId,
+                  !isAskDayQuestionnaire,
+                )
+              }
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                isAskDayQuestionnaire
+                  ? "border-teal-200 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-400 dark:hover:bg-teal-900/20"
+                  : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              {isAskDayQuestionnaire
+                ? t("courseDetail.dayQuestionnaireDisableButton")
+                : t("courseDetail.dayQuestionnaireEnableButton")}
             </button>
 
             {!isAnonymized && (

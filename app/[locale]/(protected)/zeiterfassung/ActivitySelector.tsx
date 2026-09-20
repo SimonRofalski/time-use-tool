@@ -109,6 +109,7 @@ type ActivitySelectorProps = {
   onReselectSlots: (slots: string[]) => void;
   showDeleteSelection: boolean;
   isDeletingSelection?: boolean;
+  askExtraRatings: boolean;
 };
 
 // ─── Pure helper functions ────────────────────────────────────────────────────
@@ -753,6 +754,7 @@ export default function ActivitySelector({
   onReselectSlots,
   showDeleteSelection,
   isDeletingSelection = false,
+  askExtraRatings,
 }: ActivitySelectorProps) {
   const t = useTranslations("activitySelector");
   const locale = useLocale() as Locale;
@@ -1435,25 +1437,44 @@ export default function ActivitySelector({
     return SATISFACTION_SORT_RANK_BY_CODE[code] ?? 2;
   }
 
-  // Step 7 (final): how did the user feel? (emoji grid with labels below)
-  function renderSatisfactionStep() {
-    const sortedSatisfactions = [...lookupData.satisfactions].sort(
-      (a, b) =>
-        getSatisfactionSortRank(a.code) - getSatisfactionSortRank(b.code),
-    );
+  // Meaningfulness/Stressfulness scales are keyed ascending low→high
+  // (1=very low … 5=very high) — unlike satisfaction, no rank remapping needed.
+  const MEANINGFULNESS_EMOJI_BY_CODE: Record<string, string> = {
+    "1": "🍂",
+    "2": "🌱",
+    "3": "🌿",
+    "4": "🌳",
+    "5": "🌻",
+  };
+
+  const STRESSFULNESS_EMOJI_BY_CODE: Record<string, string> = {
+    "1": "😌",
+    "2": "🙂",
+    "3": "😐",
+    "4": "😰",
+    "5": "🤯",
+  };
+
+  // Generic emoji grid, shared by the satisfaction/meaningfulness/stressfulness
+  // rating groups on the final step
+  function renderRatingGrid<T extends { code: string; name: string; name_en: string }>(
+    options: T[],
+    selectedId: number | null,
+    getId: (option: T) => number,
+    emojiByCode: Record<string, string>,
+    onSelect: (id: number) => void,
+  ) {
     return (
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
-        {sortedSatisfactions.map((sat) => {
-          const isSelected =
-            pendingEntry.satisfaction_id === sat.satisfaction_id;
-          const emoji = getSmileyForSatisfaction(sat.code);
+        {options.map((option) => {
+          const id = getId(option);
+          const isSelected = selectedId === id;
+          const emoji = emojiByCode[option.code] ?? "🙂";
           return (
             <button
-              key={sat.satisfaction_id}
+              key={id}
               type="button"
-              onClick={() =>
-                onStepComplete({ satisfaction_id: sat.satisfaction_id })
-              }
+              onClick={() => onSelect(id)}
               className={`
                 flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-3 transition-all
                 ${
@@ -1465,11 +1486,102 @@ export default function ActivitySelector({
             >
               <div className="text-4xl">{emoji}</div>
               <div className="text-center text-xs font-semibold text-slate-700 dark:text-slate-300">
-                {getLocalizedName(sat, locale)}
+                {getLocalizedName(option, locale)}
               </div>
             </button>
           );
         })}
+      </div>
+    );
+  }
+
+  // Step 7 (final): how did the user feel? (emoji grid with labels below)
+  // When askExtraRatings is on for the course, two more rating groups
+  // (Meaningfulness, Stressfulness) render on the same screen, and a "Save"
+  // button finalizes — taps become non-advancing selections in that case
+  // (see page.tsx's handleStepComplete: isIntermediateUpdate now also covers
+  // the satisfaction step while askExtraRatings is true). When the flag is
+  // off (the default), this behaves exactly as before: a single tap saves
+  // immediately, no extra groups or button render at all.
+  function renderSatisfactionStep() {
+    const sortedSatisfactions = [...lookupData.satisfactions].sort(
+      (a, b) =>
+        getSatisfactionSortRank(a.code) - getSatisfactionSortRank(b.code),
+    );
+    const sortedMeaningfulness = [...lookupData.meaningfulnesses].sort(
+      (a, b) => Number(a.code) - Number(b.code),
+    );
+    const sortedStressfulness = [...lookupData.stressfulnesses].sort(
+      (a, b) => Number(a.code) - Number(b.code),
+    );
+
+    if (!askExtraRatings) {
+      return renderRatingGrid(
+        sortedSatisfactions,
+        pendingEntry.satisfaction_id,
+        (sat) => sat.satisfaction_id,
+        SATISFACTION_EMOJI_BY_CODE,
+        (id) => onStepComplete({ satisfaction_id: id }),
+      );
+    }
+
+    const isReadyToSave =
+      pendingEntry.satisfaction_id !== null &&
+      pendingEntry.meaningfulness_id !== null &&
+      pendingEntry.stressfulness_id !== null;
+
+    return (
+      <div className="space-y-5">
+        {/* No inline label here: the step's outer heading (getStepQuestion)
+            already shows the satisfaction question text above this grid */}
+        <div>
+          {renderRatingGrid(
+            sortedSatisfactions,
+            pendingEntry.satisfaction_id,
+            (sat) => sat.satisfaction_id,
+            SATISFACTION_EMOJI_BY_CODE,
+            (id) => onStepComplete({ satisfaction_id: id }),
+          )}
+        </div>
+
+        <div>
+          <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            {t("questions.meaningfulness")}
+          </p>
+          {renderRatingGrid(
+            sortedMeaningfulness,
+            pendingEntry.meaningfulness_id,
+            (m) => m.meaningfulness_id,
+            MEANINGFULNESS_EMOJI_BY_CODE,
+            (id) => onStepComplete({ meaningfulness_id: id }),
+          )}
+        </div>
+
+        <div>
+          <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            {t("questions.stressfulness")}
+          </p>
+          {renderRatingGrid(
+            sortedStressfulness,
+            pendingEntry.stressfulness_id,
+            (s) => s.stressfulness_id,
+            STRESSFULNESS_EMOJI_BY_CODE,
+            (id) => onStepComplete({ stressfulness_id: id }),
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onStepComplete({ _advance: true } as any)}
+          disabled={!isReadyToSave}
+          className={`w-full rounded-lg py-2.5 text-sm font-medium transition-colors ${
+            !isReadyToSave
+              ? "cursor-not-allowed bg-slate-300 dark:bg-slate-600 text-slate-500 dark:text-slate-400"
+              : "bg-slate-800 text-white hover:bg-slate-700"
+          }`}
+        >
+          {t("continueButton")}
+        </button>
       </div>
     );
   }

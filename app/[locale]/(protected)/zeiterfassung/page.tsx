@@ -39,6 +39,8 @@ const ActivitySelector = dynamic(() => import("./ActivitySelector"), {
   loading: ActivitySelectorLoading,
 });
 
+const DayQuestionnaireModal = dynamic(() => import("./DayQuestionnaireModal"));
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TOTAL_SLOTS_PER_DAY = 144;
@@ -137,6 +139,8 @@ function createEmptyPendingEntry(slots: string[]): PendingEntry {
     location_transport_id: null,
     social_context_ids: [],
     satisfaction_id: null,
+    meaningfulness_id: null,
+    stressfulness_id: null,
   };
 }
 
@@ -167,6 +171,8 @@ function getPreloadedEntry(
       e.primary_activity_id === first.primary_activity_id &&
       e.secondary_activity_id === first.secondary_activity_id &&
       e.satisfaction_id === first.satisfaction_id &&
+      e.meaningfulness_id === first.meaningfulness_id &&
+      e.stressfulness_id === first.stressfulness_id &&
       e.location_transport_id === first.location_transport_id &&
       e.digital_media_used === first.digital_media_used &&
       JSON.stringify([...e.digital_media_type_ids].sort()) ===
@@ -184,6 +190,8 @@ function getPreloadedEntry(
     location_transport_id: first.location_transport_id,
     social_context_ids: first.social_context_ids,
     satisfaction_id: first.satisfaction_id,
+    meaningfulness_id: first.meaningfulness_id,
+    stressfulness_id: first.stressfulness_id,
   };
 }
 
@@ -197,6 +205,8 @@ function mapRawEntryToRecord(raw: any): TimeEntryRecord {
     primary_activity_id: raw.primary_activity_id,
     secondary_activity_id: raw.secondary_activity_id ?? null,
     satisfaction_id: raw.satisfaction_id ?? null,
+    meaningfulness_id: raw.meaningfulness_id ?? null,
+    stressfulness_id: raw.stressfulness_id ?? null,
     location_transport_id: raw.location_transport_id ?? null,
     digital_media_used: raw.digital_media_used,
     digital_media_type_ids:
@@ -344,6 +354,14 @@ export default function ZeiterfassungPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [courseId, setCourseId] = useState<number | null>(null);
   const [allDates, setAllDates] = useState<string[]>([]);
+  // Per-course opt-in flags (admin-toggleable, default off)
+  const [askExtraRatings, setAskExtraRatings] = useState(false);
+  const [askDayQuestionnaire, setAskDayQuestionnaire] = useState(false);
+  // Set to a day_id right after that day transitions to fully complete
+  // (144/144 slots) — renders the mandatory day-questionnaire popup
+  const [dayQuestionnaireDayId, setDayQuestionnaireDayId] = useState<
+    number | null
+  >(null);
 
   // Current day
   const [currentDate, setCurrentDate] = useState<string>("");
@@ -447,6 +465,16 @@ export default function ZeiterfassungPage() {
     const cid = userCourse.course_id;
     setCourseId(cid);
 
+    // Per-course opt-in flags for the extra activity ratings and the
+    // mandatory day-completion questionnaire (admin-toggleable, default off)
+    const { data: courseSettings } = await supabase
+      .from("course")
+      .select("ask_extra_ratings, ask_day_questionnaire")
+      .eq("course_id", cid)
+      .single();
+    setAskExtraRatings(courseSettings?.ask_extra_ratings === true);
+    setAskDayQuestionnaire(courseSettings?.ask_day_questionnaire === true);
+
     // Load course date range (via periods; fallback to legacy columns)
     const { data: periodsData } = await supabase
       .from("course_period")
@@ -471,21 +499,30 @@ export default function ZeiterfassungPage() {
     setAllDates(dates);
 
     // Load all lookup tables in parallel for speed
-    const [cats, subs, acts, locs, socials, media, sats] = await Promise.all([
-      supabase.from("category").select("*").order("category_id"),
-      supabase.from("subcategory").select("*").order("subcategory_id"),
-      supabase.from("activity").select("*").order("activity_id"),
-      supabase
-        .from("location_transport")
-        .select("*")
-        .order("location_transport_id"),
-      supabase.from("social_context").select("*").order("social_context_id"),
-      supabase
-        .from("digital_media_type")
-        .select("*")
-        .order("digital_media_type_id"),
-      supabase.from("satisfaction").select("*").order("satisfaction_id"),
-    ]);
+    const [cats, subs, acts, locs, socials, media, sats, meanings, stresses] =
+      await Promise.all([
+        supabase.from("category").select("*").order("category_id"),
+        supabase.from("subcategory").select("*").order("subcategory_id"),
+        supabase.from("activity").select("*").order("activity_id"),
+        supabase
+          .from("location_transport")
+          .select("*")
+          .order("location_transport_id"),
+        supabase
+          .from("social_context")
+          .select("*")
+          .order("social_context_id"),
+        supabase
+          .from("digital_media_type")
+          .select("*")
+          .order("digital_media_type_id"),
+        supabase.from("satisfaction").select("*").order("satisfaction_id"),
+        supabase
+          .from("meaningfulness")
+          .select("*")
+          .order("meaningfulness_id"),
+        supabase.from("stressfulness").select("*").order("stressfulness_id"),
+      ]);
     setLookupData({
       categories: cats.data ?? [],
       subcategories: subs.data ?? [],
@@ -494,6 +531,8 @@ export default function ZeiterfassungPage() {
       socialContexts: socials.data ?? [],
       digitalMediaTypes: media.data ?? [],
       satisfactions: sats.data ?? [],
+      meaningfulnesses: meanings.data ?? [],
+      stressfulnesses: stresses.data ?? [],
     });
 
     // Determine initial date: URL param → today → earliest incomplete → last
@@ -553,7 +592,8 @@ export default function ZeiterfassungPage() {
         `
         entry_id, day_id, start_time, end_time,
         primary_activity_id, secondary_activity_id,
-        satisfaction_id, location_transport_id,
+        satisfaction_id, meaningfulness_id, stressfulness_id,
+        location_transport_id,
         digital_media_used,
         time_entry_digital_media_type ( digital_media_type_id ),
         time_entry_social_context ( social_context_id )
@@ -623,10 +663,16 @@ export default function ZeiterfassungPage() {
     const updatedEntry: PendingEntry = { ...pendingEntry, ...cleanData };
 
     // social_context and digital_media_type toggles fire onStepComplete for state
-    // updates without advancing — only proceed when _advance is set
+    // updates without advancing — only proceed when _advance is set.
+    // The satisfaction step joins this list only when askExtraRatings is on:
+    // it then shows three rating groups on one screen (see ActivitySelector's
+    // renderSatisfactionStep), so taps must not auto-save until the explicit
+    // save button fires _advance. When the flag is off, satisfaction stays
+    // single-tap-saves-immediately, exactly as before.
     const isIntermediateUpdate =
       (currentStep === "social_context" ||
-        currentStep === "digital_media_type") &&
+        currentStep === "digital_media_type" ||
+        (currentStep === "satisfaction" && askExtraRatings)) &&
       !isAdvance &&
       !shouldSave;
 
@@ -738,6 +784,8 @@ export default function ZeiterfassungPage() {
       primary_activity_id: finalEntry.primary_activity_id,
       secondary_activity_id: finalEntry.secondary_activity_id || null,
       satisfaction_id: finalEntry.satisfaction_id || null,
+      meaningfulness_id: finalEntry.meaningfulness_id || null,
+      stressfulness_id: finalEntry.stressfulness_id || null,
       location_transport_id: finalEntry.location_transport_id || null,
       digital_media_used: finalEntry.digital_media_used,
     }));
@@ -848,10 +896,24 @@ export default function ZeiterfassungPage() {
       0,
     );
     const isComplete = totalCovered >= TOTAL_SLOTS_PER_DAY;
+
+    // Captured before the update so we can detect a false → true transition
+    // (only a save can cause this; deletes only ever reduce coverage)
+    const { data: previousDay } = await supabase
+      .from("day")
+      .select("is_complete")
+      .eq("day_id", activeDayId)
+      .single();
+    const wasComplete = previousDay?.is_complete === true;
+
     await supabase
       .from("day")
       .update({ is_complete: isComplete, is_submitted: isComplete })
       .eq("day_id", activeDayId);
+
+    if (!wasComplete && isComplete && askDayQuestionnaire) {
+      setDayQuestionnaireDayId(activeDayId);
+    }
   }
 
   // ── Date navigation ───────────────────────────────────────────────────────
@@ -970,6 +1032,7 @@ export default function ZeiterfassungPage() {
               onReselectSlots={handleReselectSlots}
               showDeleteSelection={selectedSlots.size > 0}
               isDeletingSelection={isDeletingSelection}
+              askExtraRatings={askExtraRatings}
             />
           ) : (
             <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-10 text-center">
@@ -1010,6 +1073,17 @@ export default function ZeiterfassungPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Mandatory day-completion questionnaire — fires once, right when a day
+          transitions to fully complete (144/144 slots), if enabled for the course */}
+      {dayQuestionnaireDayId !== null && (
+        <DayQuestionnaireModal
+          dayId={dayQuestionnaireDayId}
+          existingEntries={existingEntries}
+          activities={lookupData.activities}
+          onSaved={() => setDayQuestionnaireDayId(null)}
+        />
       )}
     </div>
   );
