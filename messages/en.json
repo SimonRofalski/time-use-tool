@@ -169,7 +169,9 @@
       "digitalMediaType": "Which devices did you use?",
       "locationTransport": "Where were you during this time?",
       "socialContext": "Was anyone else with you?",
-      "satisfaction": "How did you feel?"
+      "satisfaction": "How did you feel?",
+      "meaningfulness": "How do you rate the meaningfulness of the activity for your long-term well-being / happiness?",
+      "stressfulness": "How do you rate the stressfulness of the activity?"
     },
     "stepLabels": {
       "primaryActivity": "Main activity",
@@ -488,6 +490,8 @@
       "removePeriodTitle": "Remove period",
       "accessCodeLabel": "Access code",
       "accessCodePlaceholder": "e.g. SS2026",
+      "askExtraRatingsLabel": "Ask meaningfulness & stressfulness",
+      "askDayQuestionnaireLabel": "Ask day questionnaire",
       "createSuccess": "Course created successfully.",
       "creatingButton": "Creating…",
       "createButton": "Create course"
@@ -501,6 +505,8 @@
       "anonymizedBadge": "Anonymized",
       "comparisonEnabledBadge": "Comparison enabled",
       "comparisonDisabledBadge": "Comparison locked",
+      "extraRatingsEnabledBadge": "Meaningfulness & stress active",
+      "dayQuestionnaireEnabledBadge": "Day questionnaire active",
       "accessCodeLabel": "Access code:",
       "saveButton": "Save",
       "cancelButton": "Cancel",
@@ -517,6 +523,10 @@
       "exportButton": "Data export",
       "comparisonEnableButton": "Enable comparison",
       "comparisonDisableButton": "Lock comparison",
+      "extraRatingsEnableButton": "Enable meaningfulness & stress",
+      "extraRatingsDisableButton": "Disable meaningfulness & stress",
+      "dayQuestionnaireEnableButton": "Enable day questionnaire",
+      "dayQuestionnaireDisableButton": "Disable day questionnaire",
       "anonymizeButton": "Anonymize course",
       "anonymizingButton": "Anonymizing…",
       "anonymizeConfirm": {
@@ -861,6 +871,29 @@
     },
     "adminStatistics": {
       "loadFailed": "Statistics could not be loaded."
+    }
+  },
+  "dayQuestionnaire": {
+    "title": "Questions about the day",
+    "description": "You've fully logged this day. Please answer a few final questions about it.",
+    "loading": "Loading questionnaire…",
+    "saveButton": "Save",
+    "savingButton": "Saving…",
+    "missingFieldsError": "Please answer all questions.",
+    "saveError": "Error while saving: {message}",
+    "questions": {
+      "fillTiming": "When did you fill in the diary?",
+      "mostPleasant": "What was the most pleasant activity you logged today?",
+      "mostUnpleasant": "What was the most unpleasant activity you logged today?",
+      "mostStressful": "What was the most stressful activity you logged today?",
+      "dayAppreciation": "Overall, how do you appreciate this day?",
+      "unusualDay": {
+        "label": "Was this an ordinary or an unusual day?",
+        "ordinary": "Ordinary day",
+        "unusual": "Unusual day"
+      },
+      "dayType": "What kind of day was this for you?",
+      "tripType": "Were you on a trip (e.g. to another locality, region, or country) during the diary day? Disregard regular trips to school or work, or trips lasting less than two hours in total."
     }
   }
 }

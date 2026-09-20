@@ -169,7 +169,9 @@
       "digitalMediaType": "Welche Geräte hast du genutzt?",
       "locationTransport": "Wo warst du während dieser Zeit?",
       "socialContext": "War jemand anders mit dabei?",
-      "satisfaction": "Wie hast du dich gefühlt?"
+      "satisfaction": "Wie hast du dich gefühlt?",
+      "meaningfulness": "Wie bewertest du die Bedeutsamkeit dieser Aktivität für dein langfristiges Wohlbefinden / Glück?",
+      "stressfulness": "Wie bewertest du die Stressbelastung dieser Aktivität?"
     },
     "stepLabels": {
       "primaryActivity": "Haupttätigkeit",
@@ -488,6 +490,8 @@
       "removePeriodTitle": "Zeitraum entfernen",
       "accessCodeLabel": "Zugangscode",
       "accessCodePlaceholder": "z. B. SS2026",
+      "askExtraRatingsLabel": "Bedeutsamkeit & Stressbelastung abfragen",
+      "askDayQuestionnaireLabel": "Tagesfragebogen abfragen",
       "createSuccess": "Kurs wurde erfolgreich erstellt.",
       "creatingButton": "Wird erstellt…",
       "createButton": "Kurs erstellen"
@@ -501,6 +505,8 @@
       "anonymizedBadge": "Anonymisiert",
       "comparisonEnabledBadge": "Kursvergleich frei",
       "comparisonDisabledBadge": "Kursvergleich gesperrt",
+      "extraRatingsEnabledBadge": "Bedeutsamkeit & Stress aktiv",
+      "dayQuestionnaireEnabledBadge": "Tagesfragebogen aktiv",
       "accessCodeLabel": "Zugangscode:",
       "saveButton": "Speichern",
       "cancelButton": "Abbrechen",
@@ -517,6 +523,10 @@
       "exportButton": "Datenexport",
       "comparisonEnableButton": "Kursvergleich freigeben",
       "comparisonDisableButton": "Kursvergleich sperren",
+      "extraRatingsEnableButton": "Bedeutsamkeit & Stress aktivieren",
+      "extraRatingsDisableButton": "Bedeutsamkeit & Stress deaktivieren",
+      "dayQuestionnaireEnableButton": "Tagesfragebogen aktivieren",
+      "dayQuestionnaireDisableButton": "Tagesfragebogen deaktivieren",
       "anonymizeButton": "Kurs anonymisieren",
       "anonymizingButton": "Anonymisiere…",
       "anonymizeConfirm": {
@@ -861,6 +871,29 @@
     },
     "adminStatistics": {
       "loadFailed": "Statistiken konnten nicht geladen werden."
+    }
+  },
+  "dayQuestionnaire": {
+    "title": "Fragen zum Tag",
+    "description": "Du hast diesen Tag vollständig erfasst. Bitte beantworte noch ein paar abschliessende Fragen dazu.",
+    "loading": "Fragebogen wird geladen…",
+    "saveButton": "Speichern",
+    "savingButton": "Wird gespeichert…",
+    "missingFieldsError": "Bitte beantworte alle Fragen.",
+    "saveError": "Fehler beim Speichern: {message}",
+    "questions": {
+      "fillTiming": "Wann hast du das Tagebuch ausgefüllt?",
+      "mostPleasant": "Was war die angenehmste Aktivität, die du heute erfasst hast?",
+      "mostUnpleasant": "Was war die unangenehmste Aktivität, die du heute erfasst hast?",
+      "mostStressful": "Was war die stressigste Aktivität, die du heute erfasst hast?",
+      "dayAppreciation": "Wie beurteilst du diesen Tag insgesamt?",
+      "unusualDay": {
+        "label": "War das ein gewöhnlicher oder ein ungewöhnlicher Tag?",
+        "ordinary": "Gewöhnlicher Tag",
+        "unusual": "Ungewöhnlicher Tag"
+      },
+      "dayType": "Was für ein Tag war das für dich?",
+      "tripType": "Warst du während des Tagebuchtages auf einer Reise (z. B. in eine andere Ortschaft, Region oder ein anderes Land)? Ausgenommen sind regelmässige Schul- oder Arbeitswege sowie Reisen von insgesamt weniger als zwei Stunden."
     }
   }
 }
