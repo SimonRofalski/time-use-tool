@@ -16,6 +16,19 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+// Maps app/api/auth/switch/callback/route.ts's ?error= codes to translated
+// messages. Kept as an explicit lookup (rather than interpolating the raw
+// code into a translation key) so an unrecognized code falls back safely.
+const OIDC_ERROR_KEYS: Record<string, string> = {
+  oidc_missing_session: "oidcErrors.missingSession",
+  oidc_exchange_failed: "oidcErrors.exchangeFailed",
+  oidc_missing_claims: "oidcErrors.missingClaims",
+  oidc_incomplete_identity: "oidcErrors.incompleteIdentity",
+  oidc_account_conflict: "oidcErrors.accountConflict",
+  oidc_provisioning_failed: "oidcErrors.provisioningFailed",
+  oidc_session_failed: "oidcErrors.sessionFailed",
+};
+
 function renderStatus(status: string, tone: "error" | "success") {
   if (!status) {
     return null;
@@ -35,6 +48,7 @@ function renderStatus(status: string, tone: "error" | "success") {
 
 export default function Home() {
   const t = useTranslations("login");
+  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -78,6 +92,17 @@ export default function Home() {
     );
     return () => listener?.subscription.unsubscribe();
   }, [supabase, router]);
+
+  useEffect(() => {
+    const errorCode = new URLSearchParams(window.location.search).get("error");
+    if (!errorCode) {
+      return;
+    }
+    setStatus(t(OIDC_ERROR_KEYS[errorCode] ?? "oidcErrorGeneric"));
+    setStatusTone("error");
+    window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleModeChange = (newMode: Mode) => {
     setMode(newMode);
@@ -301,7 +326,52 @@ export default function Home() {
           </h1>
         </div>
 
-        {mode !== "forgot-password" && (
+        {!showPasswordLogin && (
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
+            <h2 className="mb-2 text-center text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {t("switchEduIdTitle")}
+            </h2>
+            <p className="mb-5 text-center text-sm text-slate-500 dark:text-slate-400">
+              {t("switchEduIdDescription")}
+            </p>
+
+            <a
+              href="/api/auth/switch/initiate"
+              className="block w-full rounded-md bg-slate-800 px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-slate-700"
+            >
+              {t("switchEduIdButton")}
+            </a>
+
+            <div className="mt-5 text-center">
+              <button
+                type="button"
+                onClick={() => setShowPasswordLogin(true)}
+                className="text-sm text-slate-500 dark:text-slate-400 underline-offset-2 transition hover:text-slate-700 hover:underline dark:hover:text-slate-200"
+              >
+                {t("emailPasswordDisclosureLabel")}
+              </button>
+            </div>
+
+            {renderStatus(status, statusTone)}
+          </div>
+        )}
+
+        {showPasswordLogin && (
+          <>
+            <div className="mb-4 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPasswordLogin(false);
+                  handleModeChange("signin");
+                }}
+                className="text-xs text-slate-500 dark:text-slate-400 transition hover:text-slate-700 dark:hover:text-slate-200"
+              >
+                {t("backToSwitchEduIdButton")}
+              </button>
+            </div>
+
+            {mode !== "forgot-password" && (
           <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 p-2 shadow-sm backdrop-blur-sm">
             <button
               type="button"
@@ -569,7 +639,9 @@ export default function Home() {
               </>
             )}
           </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
