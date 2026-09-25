@@ -1,6 +1,6 @@
 // ─── Shared types and constants for the Zeiterfassung feature ────────────────
 
-// One distinct color per category, assigned by category index (0–9)
+// One distinct color per category, assigned by category index (0–10)
 // Both TimeGrid and ActivitySelector use this array
 export const CATEGORY_COLORS: string[] = [
   "#6366F1", // indigo
@@ -13,6 +13,7 @@ export const CATEGORY_COLORS: string[] = [
   "#DB2777", // pink
   "#0D9488", // teal
   "#65A30D", // lime
+  "#64748B", // slate — nicht spezifizierte Zeitnutzung
 ];
 
 // Returns the hex color for a category by its position in the sorted list

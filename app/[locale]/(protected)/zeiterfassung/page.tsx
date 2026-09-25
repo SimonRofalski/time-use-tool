@@ -31,6 +31,8 @@ function ActivitySelectorLoading() {
   );
 }
 
+import type { PendingSlotPreview } from "./TimeGrid";
+
 const TimeGrid = dynamic(() => import("./TimeGrid"), {
   loading: TimeGridLoading,
 });
@@ -70,6 +72,14 @@ function formatDateCompact(dateString: string, locale: string): string {
       month: "2-digit",
       year: "numeric",
     },
+  );
+}
+
+// Day + month only ("27.03."), for the narrow prev/next buttons on mobile
+function formatDateShort(dateString: string, locale: string): string {
+  return new Date(dateString).toLocaleDateString(
+    locale === "en" ? "en-US" : "de-DE",
+    { day: "2-digit", month: "2-digit" },
   );
 }
 
@@ -259,21 +269,34 @@ function CompletionBar({
 
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm">
-      {/* Date row: prev | current (with inline progress) | next */}
-      <div className="grid grid-cols-1 items-stretch gap-2 sm:grid-cols-[140px_1fr_140px]">
+      {/* Date row: prev | current (with inline progress) | next — a single
+          row on every screen size; on mobile the side buttons shrink to an
+          arrow + short date so the bar takes one line instead of three */}
+      <div className="grid grid-cols-[3rem_1fr_3rem] items-stretch gap-2 sm:grid-cols-[140px_1fr_140px]">
         <button
           type="button"
           onClick={() => canGoPrev && onDateChange(allDates[currentIndex - 1])}
           disabled={!canGoPrev}
-          className="relative overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-1.5 text-right transition-colors hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label={t("completionBar.previousLabel")}
+          className="relative flex flex-col items-center justify-center overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1 py-1 transition-colors hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-35 sm:block sm:px-4 sm:py-1.5 sm:text-right"
         >
-          <span className="pointer-events-none absolute left-1 top-1/2 -translate-y-1/2 text-5xl font-light text-slate-400 select-none leading-none">
+          {/* Mobile: arrow + short date */}
+          <span className="text-2xl font-light leading-none text-slate-400 select-none sm:hidden">
             ‹
           </span>
-          <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          {previousDate && (
+            <span className="text-[10px] font-medium leading-tight text-slate-500 dark:text-slate-400 sm:hidden">
+              {formatDateShort(previousDate, locale)}
+            </span>
+          )}
+          {/* Desktop: label + full date */}
+          <span className="pointer-events-none absolute left-1 top-1/2 hidden -translate-y-1/2 text-5xl font-light text-slate-400 select-none leading-none sm:block">
+            ‹
+          </span>
+          <p className="relative hidden text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500 sm:block">
             {t("completionBar.previousLabel")}
           </p>
-          <p className="relative text-xs font-medium text-slate-600 dark:text-slate-300">
+          <p className="relative hidden text-xs font-medium text-slate-600 dark:text-slate-300 sm:block">
             {previousDate
               ? formatDateCompact(previousDate, locale)
               : t("completionBar.noPreviousDay")}
@@ -304,15 +327,26 @@ function CompletionBar({
           type="button"
           onClick={() => canGoNext && onDateChange(allDates[currentIndex + 1])}
           disabled={!canGoNext}
-          className="relative overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-1.5 text-left transition-colors hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label={t("completionBar.nextLabel")}
+          className="relative flex flex-col items-center justify-center overflow-hidden rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1 py-1 transition-colors hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-35 sm:block sm:px-4 sm:py-1.5 sm:text-left"
         >
-          <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-5xl font-light text-slate-400 select-none leading-none">
+          {/* Mobile: arrow + short date */}
+          <span className="text-2xl font-light leading-none text-slate-400 select-none sm:hidden">
             ›
           </span>
-          <p className="relative text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          {nextDate && (
+            <span className="text-[10px] font-medium leading-tight text-slate-500 dark:text-slate-400 sm:hidden">
+              {formatDateShort(nextDate, locale)}
+            </span>
+          )}
+          {/* Desktop: label + full date */}
+          <span className="pointer-events-none absolute right-1 top-1/2 hidden -translate-y-1/2 text-5xl font-light text-slate-400 select-none leading-none sm:block">
+            ›
+          </span>
+          <p className="relative hidden text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500 sm:block">
             {t("completionBar.nextLabel")}
           </p>
-          <p className="relative text-xs font-medium text-slate-600 dark:text-slate-300">
+          <p className="relative hidden text-xs font-medium text-slate-600 dark:text-slate-300 sm:block">
             {nextDate
               ? formatDateCompact(nextDate, locale)
               : t("completionBar.noNextDay")}
@@ -970,6 +1004,22 @@ export default function ZeiterfassungPage() {
   // Collapse grid on mobile when questionnaire opens, expand when it closes
   const isQuestionnaireActive = !!(currentStep && pendingEntry);
 
+  // Live preview of the entry being filled in, drawn on the selected slots as
+  // soon as a primary activity is picked. Skipped while an existing entry is
+  // only loaded but not yet changed — the grid already shows it as saved.
+  const pendingPreview: PendingSlotPreview | null =
+    isQuestionnaireActive &&
+    !pendingIsExisting &&
+    pendingEntry.primary_activity_id !== null
+      ? {
+          primaryActivityId: pendingEntry.primary_activity_id,
+          secondaryActivityId: pendingEntry.secondary_activity_id,
+          awaitingSecondary:
+            currentStep === "primary_activity" ||
+            currentStep === "secondary_activity",
+        }
+      : null;
+
   return (
     <div className="space-y-4">
       {/* Completion bar: date navigation + slot progress */}
@@ -1008,6 +1058,7 @@ export default function ZeiterfassungPage() {
               existingEntries={existingEntries}
               selectedSlots={selectedSlots}
               lookupData={lookupData}
+              pendingPreview={pendingPreview}
               onSlotsSelected={(slots) => {
                 setGridCollapsed(true);
                 handleSlotsSelected(slots);

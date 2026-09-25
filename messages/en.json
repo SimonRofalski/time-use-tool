@@ -164,7 +164,7 @@
   "activitySelector": {
     "questions": {
       "primaryActivity": "What was your main activity?",
-      "secondaryActivity": "Did you do a secondary activity at the same time?",
+      "secondaryActivity": "Doing anything else at the same time?",
       "digitalMedia": "Did you use a device? (smartphone, tablet, PC…)",
       "digitalMediaType": "Which devices did you use?",
       "locationTransport": "Where were you during this time?",
@@ -182,7 +182,15 @@
       "socialContext": "Social",
       "satisfaction": "Mood"
     },
-    "slotsRangeLabel": "{start} – {end} · {count, plural, one {# field} other {# fields}}",
+    "slotsRange": {
+      "time": "{start} – {end}",
+      "meta": "{count, plural, one {# field} other {# fields}} · {duration}"
+    },
+    "duration": {
+      "minutes": "{minutes} min",
+      "hours": "{hours} h",
+      "hoursMinutes": "{hours} h {minutes} min"
+    },
     "backButton": "Back",
     "continueButton": "Continue",
     "activityList": {
@@ -191,7 +199,8 @@
       "matchCount": "{count, plural, one {# match} other {# matches}}",
       "primarySearchPlaceholder": "Search main activity or keyword...",
       "secondarySearchPlaceholder": "Search secondary activity or keyword...",
-      "noSecondaryActivityButton": "No secondary activity → Continue"
+      "noSecondaryActivityButton": "No secondary activity → Continue",
+      "optionalBadge": "optional"
     },
     "digitalMedia": {
       "yes": "Yes",

@@ -164,7 +164,7 @@
   "activitySelector": {
     "questions": {
       "primaryActivity": "Welche Haupttätigkeit hast du ausgeführt?",
-      "secondaryActivity": "Hast du gleichzeitig eine Nebentätigkeit ausgeführt?",
+      "secondaryActivity": "Gleichzeitig noch etwas gemacht?",
       "digitalMedia": "Hast du ein Gerät genutzt? (Smartphone, Tablet, PC…)",
       "digitalMediaType": "Welche Geräte hast du genutzt?",
       "locationTransport": "Wo warst du während dieser Zeit?",
@@ -182,7 +182,15 @@
       "socialContext": "Sozial",
       "satisfaction": "Stimmung"
     },
-    "slotsRangeLabel": "{start} – {end} · {count, plural, one {# Feld} other {# Felder}}",
+    "slotsRange": {
+      "time": "{start} – {end}",
+      "meta": "{count, plural, one {# Feld} other {# Felder}} · {duration}"
+    },
+    "duration": {
+      "minutes": "{minutes} Min",
+      "hours": "{hours} Std",
+      "hoursMinutes": "{hours} Std {minutes} Min"
+    },
     "backButton": "Zurück",
     "continueButton": "Weiter",
     "activityList": {
@@ -191,7 +199,8 @@
       "matchCount": "{count, plural, one {# Treffer} other {# Treffer}}",
       "primarySearchPlaceholder": "Haupttätigkeit oder Stichwort suchen...",
       "secondarySearchPlaceholder": "Nebentätigkeit oder Stichwort suchen...",
-      "noSecondaryActivityButton": "Keine Nebentätigkeit → Weiter"
+      "noSecondaryActivityButton": "Keine Nebentätigkeit → Weiter",
+      "optionalBadge": "optional"
     },
     "digitalMedia": {
       "yes": "Ja",
