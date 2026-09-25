@@ -65,3 +65,55 @@ html.dark .scrollbar-thin::-webkit-scrollbar-thumb {
 html.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: #475569;
 }
+
+/* Zeiterfassung: pending-entry triangles slide into the selected slots from
+   their own corner (primary = bottom-left, secondary = top-right) */
+@keyframes slot-tri-in-tr {
+  from {
+    transform: translate(70%, -70%);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes slot-tri-in-bl {
+  from {
+    transform: translate(-70%, 70%);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.slot-tri-in-tr {
+  animation: slot-tri-in-tr 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.slot-tri-in-bl {
+  animation: slot-tri-in-bl 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Subtle entrance so a new questionnaire step reads as a new screen */
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.step-in {
+  animation: step-in 220ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-tri-in-tr,
+  .slot-tri-in-bl,
+  .step-in {
+    animation: none;
+  }
+}

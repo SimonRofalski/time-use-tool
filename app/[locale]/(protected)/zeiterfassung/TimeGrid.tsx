@@ -73,37 +73,41 @@ function getCategoryIdForActivity(
   return subcategory?.category_id ?? null;
 }
 
+// Returns the category color for an activity (slate-400 if it can't be resolved)
+function getActivityColor(activityId: number, lookupData: LookupData): string {
+  const categoryId = getCategoryIdForActivity(
+    activityId,
+    lookupData.activities,
+    lookupData.subcategories,
+  );
+  return categoryId
+    ? getCategoryColor(categoryId, lookupData.categories)
+    : "#94A3B8";
+}
+
 // Returns the CSS background style for a filled cell
-// Single activity: solid color | Primary + secondary: top/bottom split
+// Single activity: solid color | Primary + secondary: diagonal split
 function getCellStyle(
   entry: TimeEntryRecord,
   lookupData: LookupData,
 ): React.CSSProperties {
-  const primaryCatId = getCategoryIdForActivity(
-    entry.primary_activity_id,
-    lookupData.activities,
-    lookupData.subcategories,
-  );
-  const primaryColor = primaryCatId
-    ? getCategoryColor(primaryCatId, lookupData.categories)
-    : "#94A3B8";
+  const primaryColor = getActivityColor(entry.primary_activity_id, lookupData);
 
   if (!entry.secondary_activity_id) {
     return { backgroundColor: primaryColor };
   }
 
-  // Two-tone: top half = primary, bottom half = secondary
-  const secondaryCatId = getCategoryIdForActivity(
+  // Two-tone, split along the top-left → bottom-right diagonal:
+  // lower-left triangle = primary, upper-right triangle = secondary.
+  // With a corner direction, the 50% line runs through the other two corners;
+  // the 1px blend around it avoids a jagged edge.
+  const secondaryColor = getActivityColor(
     entry.secondary_activity_id,
-    lookupData.activities,
-    lookupData.subcategories,
+    lookupData,
   );
-  const secondaryColor = secondaryCatId
-    ? getCategoryColor(secondaryCatId, lookupData.categories)
-    : "#94A3B8";
 
   return {
-    background: `linear-gradient(to bottom, ${primaryColor} 50%, ${secondaryColor} 50%)`,
+    background: `linear-gradient(to top right, ${primaryColor} calc(50% - 0.5px), ${secondaryColor} calc(50% + 0.5px))`,
   };
 }
 
@@ -141,11 +145,29 @@ const HOUR_LABELS = Array.from({ length: 24 }, (_, i) =>
 // Pre-generated slot list (stable, never changes)
 const ALL_SLOTS = generateAllSlots();
 
+// The entry currently being filled in, previewed on the selected slots with
+// the same diagonal split as saved entries
+export type PendingSlotPreview = {
+  primaryActivityId: number;
+  secondaryActivityId: number | null;
+  // true while the secondary question is still open: the upper-right triangle
+  // stays empty so it's visible that a second activity can go there
+  awaitingSecondary: boolean;
+};
+
+// Triangles on either side of the top-left -> bottom-right diagonal
+const UPPER_RIGHT_TRIANGLE = "polygon(0 0, 100% 0, 100% 100%)";
+const LOWER_LEFT_TRIANGLE = "polygon(0 0, 0 100%, 100% 100%)";
+// Per-slot delay so a multi-slot selection fills in as a quick wave
+const PREVIEW_STAGGER_MS = 20;
+const PREVIEW_MAX_DELAY_MS = 240;
+
 type TimeGridProps = {
   existingEntries: TimeEntryRecord[];
   selectedSlots: Set<string>; // committed selection managed by parent
   lookupData: LookupData;
   onSlotsSelected: (slots: Set<string>) => void;
+  pendingPreview?: PendingSlotPreview | null;
 };
 
 export default function TimeGrid({
@@ -153,6 +175,7 @@ export default function TimeGrid({
   selectedSlots,
   lookupData,
   onSlotsSelected,
+  pendingPreview = null,
 }: TimeGridProps) {
   // Ref tracks whether a drag is active — avoids state re-renders during drag
   const isDraggingRef = useRef(false);
@@ -170,6 +193,25 @@ export default function TimeGrid({
     () => buildSlotToEntryMap(existingEntries),
     [existingEntries],
   );
+
+  // Position of each selected slot in chronological order (drives the stagger)
+  const selectedSlotOrder = useMemo(
+    () => new Map([...selectedSlots].sort().map((slot, i) => [slot, i])),
+    [selectedSlots],
+  );
+
+  const previewPrimaryColor = pendingPreview
+    ? getActivityColor(pendingPreview.primaryActivityId, lookupData)
+    : null;
+  const previewSecondaryColor =
+    pendingPreview?.secondaryActivityId != null
+      ? getActivityColor(pendingPreview.secondaryActivityId, lookupData)
+      : null;
+  // "No secondary activity" answered: the cell fills up completely
+  const previewIsSolid =
+    !!pendingPreview &&
+    pendingPreview.secondaryActivityId === null &&
+    !pendingPreview.awaitingSecondary;
 
   // Keeps both state and ref in sync
   function setDragging(slots: Set<string>) {
@@ -301,6 +343,14 @@ export default function TimeGrid({
               const isHighlighted = isCellHighlighted(slot);
               const entry = slotToEntry.get(slot);
               const isFilled = !!entry;
+              const isPreview =
+                previewPrimaryColor !== null &&
+                selectedSlots.has(slot) &&
+                !liveDraggingSlots.has(slot);
+              const previewDelay = `${Math.min(
+                (selectedSlotOrder.get(slot) ?? 0) * PREVIEW_STAGGER_MS,
+                PREVIEW_MAX_DELAY_MS,
+              )}ms`;
 
               return (
                 <div
@@ -310,21 +360,66 @@ export default function TimeGrid({
                   onMouseDown={(e) => handleCellMouseDown(slot, e)}
                   onMouseEnter={() => handleCellMouseEnter(slot)}
                   className={`
-                    rounded-sm transition-all duration-75
+                    relative overflow-hidden rounded-sm transition-all duration-75
                     cursor-pointer
                     ${
-                      isHighlighted
-                        ? "ring-1 ring-blue-500 ring-inset brightness-75 md:ring-2"
-                        : isFilled
-                          ? "hover:brightness-90"
-                          : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
+                      isPreview
+                        ? "bg-slate-100 dark:bg-slate-700"
+                        : isHighlighted
+                          ? "ring-1 ring-blue-500 ring-inset brightness-75 md:ring-2"
+                          : isFilled
+                            ? "hover:brightness-90"
+                            : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
                     }
                   `}
                   style={{
                     height: "24px",
-                    ...(isFilled ? getCellStyle(entry, lookupData) : {}),
+                    ...(isFilled && !isPreview
+                      ? getCellStyle(entry, lookupData)
+                      : {}),
                   }}
-                />
+                >
+                  {isPreview && (
+                    <>
+                      {/* Solid fill sits *under* the primary triangle and is
+                          unclipped, so the diagonal edge blends same colour
+                          into same colour and no seam is visible */}
+                      {previewIsSolid && (
+                        <span
+                          className="slot-tri-in-tr pointer-events-none absolute inset-0"
+                          style={{
+                            background: previewPrimaryColor,
+                            animationDelay: previewDelay,
+                          }}
+                        />
+                      )}
+                      {/* Keyed by activity so changing it replays the fly-in */}
+                      <span
+                        key={`p-${pendingPreview?.primaryActivityId}`}
+                        className="slot-tri-in-bl pointer-events-none absolute inset-0"
+                        style={{
+                          background: previewPrimaryColor,
+                          clipPath: LOWER_LEFT_TRIANGLE,
+                          animationDelay: previewDelay,
+                        }}
+                      />
+                      {previewSecondaryColor && (
+                        <span
+                          key={`s-${pendingPreview?.secondaryActivityId}`}
+                          className="slot-tri-in-tr pointer-events-none absolute inset-0"
+                          style={{
+                            background: previewSecondaryColor,
+                            clipPath: UPPER_RIGHT_TRIANGLE,
+                            animationDelay: previewDelay,
+                          }}
+                        />
+                      )}
+                      {/* Selection ring drawn above the triangles (an inset
+                          ring on the cell itself would be covered by them) */}
+                      <span className="pointer-events-none absolute inset-0 rounded-sm ring-1 ring-inset ring-blue-500 md:ring-2" />
+                    </>
+                  )}
+                </div>
               );
             })}
           </div>

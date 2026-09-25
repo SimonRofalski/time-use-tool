@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import type { Locale } from "@/i18n/routing";
 import { getLocalizedName } from "@/lib/i18n/localized-name";
@@ -14,8 +14,10 @@ import {
   Calendar,
   Car,
   ChevronDown,
+  ChevronLeft,
   ChevronUp,
   Check,
+  Clock,
   Clock3,
   CookingPot,
   Dumbbell,
@@ -38,6 +40,7 @@ import {
   MoonStar,
   Music,
   Newspaper,
+  NotebookPen,
   Palette,
   Pencil,
   Plus,
@@ -47,7 +50,6 @@ import {
   Tablet,
   ShoppingBag,
   Sparkles,
-  Timer,
   Trash2,
   TrainFront,
   Tv,
@@ -66,6 +68,7 @@ import {
   type LookupData,
   type TimeEntryRecord,
   CATEGORY_COLORS,
+  getCategoryColor,
 } from "./types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -224,12 +227,13 @@ function getStepMeta(
   };
 }
 
-// Formats the selected slot range as a readable string: "08:00 – 09:30 · 9 Felder"
+// Formats the selected slots for the header badge:
+// time = "08:00 – 09:30", meta = "9 Felder · 1 Std 30 Min"
 function formatSlotsRange(
   slots: Set<string>,
   t: ActivitySelectorTranslate,
-): string {
-  if (slots.size === 0) return "";
+): { time: string; meta: string } {
+  if (slots.size === 0) return { time: "", meta: "" };
   const sorted = [...slots].sort();
   const firstSlot = sorted[0];
   const lastSlot = sorted[sorted.length - 1];
@@ -238,7 +242,22 @@ function formatSlotsRange(
   const endStr = `${Math.floor(endTotal / 60)
     .toString()
     .padStart(2, "0")}:${(endTotal % 60).toString().padStart(2, "0")}`;
-  return t("slotsRangeLabel", { start: firstSlot, end: endStr, count: slots.size });
+
+  // Duration counts the selected slots, not the span, so gaps aren't included
+  const totalMinutes = slots.size * 10;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const duration =
+    hours === 0
+      ? t("duration.minutes", { minutes })
+      : minutes === 0
+        ? t("duration.hours", { hours })
+        : t("duration.hoursMinutes", { hours, minutes });
+
+  return {
+    time: t("slotsRange.time", { start: firstSlot, end: endStr }),
+    meta: t("slotsRange.meta", { count: slots.size, duration }),
+  };
 }
 
 function slotToMinutes(slot: string): number {
@@ -444,11 +463,16 @@ const CATEGORY_VISUAL_BY_CODE: Record<string, CategoryVisual> = {
     tertiaryIcon: Scissors,
   }, // Hobbys
   "8": { primaryIcon: Tv, secondaryIcon: Newspaper, tertiaryIcon: Headphones }, // Massenmedien
-  "9": { primaryIcon: Bus, secondaryIcon: MapPin, tertiaryIcon: Timer }, // Wegezeiten und nicht spezifizierte Zeitnutzung
+  "9": { primaryIcon: Bus, secondaryIcon: Car, tertiaryIcon: Footprints }, // Wegezeiten
+  "99": {
+    primaryIcon: HelpCircle,
+    secondaryIcon: Clock,
+    tertiaryIcon: NotebookPen,
+  }, // Nicht spezifizierte Zeitnutzung
 };
 
 // Fallback rotation for any category code not in the map above (defensive —
-// all 10 current categories are covered, this only matters if new ones are added)
+// all 11 current categories are covered, this only matters if new ones are added)
 const DEFAULT_CATEGORY_VISUALS: CategoryVisual[] = [
   { primaryIcon: BookOpen, secondaryIcon: Laptop, tertiaryIcon: Pencil },
   { primaryIcon: Briefcase, secondaryIcon: Wrench, tertiaryIcon: Clock3 },
@@ -506,6 +530,7 @@ function ActivityList({
   onActiveCategoryChange,
   searchPlaceholder,
   topSlot,
+  searchRowLeadingSlot,
 }: {
   hierarchy: CategoryNode[];
   selectedActivityId: number | null;
@@ -516,6 +541,7 @@ function ActivityList({
   onActiveCategoryChange: (categoryId: number | null) => void;
   searchPlaceholder: string;
   topSlot?: React.ReactNode; // optional slot for the "Keine" button in step 2
+  searchRowLeadingSlot?: React.ReactNode; // e.g. the step's back button
 }) {
   const t = useTranslations("activitySelector");
   const trimmedQuery = searchQuery.trim();
@@ -534,6 +560,7 @@ function ActivityList({
 
       <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/60 p-3">
         <div className="flex items-center gap-2">
+          {searchRowLeadingSlot}
           {!isSearching && activeCategory && (
             <button
               type="button"
@@ -572,72 +599,76 @@ function ActivityList({
         )}
 
         {!isSearching && !activeCategory && hierarchy.length > 0 && (
-          <div className="grid grid-cols-2 gap-2">
-            {hierarchy.map((category, index) => {
-              const visual = getCategoryVisual(category.code, index);
-              const PrimaryIcon = visual.primaryIcon;
-              const SecondaryIcon = visual.secondaryIcon;
-              const TertiaryIcon = visual.tertiaryIcon;
-              const isSelectedCategory = category.subcategories.some((sub) =>
-                sub.activities.some(
-                  (activity) => activity.activity_id === selectedActivityId,
-                ),
-              );
+          // Column count follows the panel's own width (container query), not
+          // the viewport, so cards stay compact wherever the selector is placed
+          <div className="@container">
+            <div className="grid grid-cols-2 gap-2 @xl:grid-cols-3 @3xl:grid-cols-4">
+              {hierarchy.map((category, index) => {
+                const visual = getCategoryVisual(category.code, index);
+                const PrimaryIcon = visual.primaryIcon;
+                const SecondaryIcon = visual.secondaryIcon;
+                const TertiaryIcon = visual.tertiaryIcon;
+                const isSelectedCategory = category.subcategories.some((sub) =>
+                  sub.activities.some(
+                    (activity) => activity.activity_id === selectedActivityId,
+                  ),
+                );
 
-              return (
-                <button
-                  key={category.category_id}
-                  type="button"
-                  onClick={() => onActiveCategoryChange(category.category_id)}
-                  className={`group overflow-hidden rounded-2xl bg-white dark:bg-slate-800 text-left shadow-sm transition-all hover:shadow-md ${
-                    isSelectedCategory
-                      ? "border-2"
-                      : "border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-                  }`}
-                  style={
-                    isSelectedCategory
-                      ? { borderColor: category.color }
-                      : undefined
-                  }
-                >
-                  <div
-                    className="h-1.5 w-full shrink-0"
-                    style={{ backgroundColor: category.color }}
-                  />
-                  <div
-                    className="flex flex-col gap-3 p-3"
-                    style={{
-                      background: `linear-gradient(160deg, ${category.color}14 0%, transparent 60%)`,
-                    }}
+                return (
+                  <button
+                    key={category.category_id}
+                    type="button"
+                    onClick={() => onActiveCategoryChange(category.category_id)}
+                    className={`group flex h-full flex-col overflow-hidden rounded-2xl border-2 bg-white dark:bg-slate-800 text-left shadow-sm transition-all hover:shadow-md ${
+                      isSelectedCategory
+                        ? "border-[color:var(--cat)]"
+                        : "border-[color:color-mix(in_srgb,var(--cat)_35%,transparent)] hover:border-[color:var(--cat)]"
+                    }`}
+                    style={
+                      {
+                        "--cat": category.color,
+                        // Outer 1px ring thickens the border on selection
+                        // without shifting the layout like a wider border would
+                        ...(isSelectedCategory && {
+                          boxShadow: `0 0 0 1px ${category.color}`,
+                        }),
+                      } as CSSProperties
+                    }
                   >
-                    <div className="flex items-start justify-between gap-1">
-                      <h4 className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
-                        {category.name}
-                      </h4>
-                      {isSelectedCategory && (
-                        <span
-                          className="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold text-white"
-                          style={{ backgroundColor: category.color }}
-                        >
-                          ✓
-                        </span>
-                      )}
+                    <div
+                      className="flex flex-1 flex-col justify-between gap-3 p-3"
+                      style={{
+                        background: `linear-gradient(160deg, ${category.color}2e 0%, ${category.color}0d 100%)`,
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <h4 className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
+                          {category.name}
+                        </h4>
+                        {isSelectedCategory && (
+                          <span
+                            className="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold text-white"
+                            style={{ backgroundColor: category.color }}
+                          >
+                            ✓
+                          </span>
+                        )}
+                      </div>
+                      {/* Pinned to the bottom by justify-between — cards in a
+                          row share a height, so icons stay aligned */}
+                      <div
+                        className="flex items-center gap-2.5"
+                        style={{ color: category.color }}
+                      >
+                        <PrimaryIcon className="h-5 w-5" />
+                        <SecondaryIcon className="h-5 w-5" />
+                        <TertiaryIcon className="h-5 w-5" />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 dark:bg-slate-700/80 text-slate-500 dark:text-slate-400 ring-1 ring-slate-200 dark:ring-slate-600">
-                        <PrimaryIcon className="h-4 w-4" />
-                      </div>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 dark:bg-slate-700/80 text-slate-500 dark:text-slate-400 ring-1 ring-slate-200 dark:ring-slate-600">
-                        <SecondaryIcon className="h-4 w-4" />
-                      </div>
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80 dark:bg-slate-700/80 text-slate-500 dark:text-slate-400 ring-1 ring-slate-200 dark:ring-slate-600">
-                        <TertiaryIcon className="h-4 w-4" />
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -888,6 +919,9 @@ export default function ActivitySelector({
   // Includes a "no secondary activity" button at the top
   // The primary activity is excluded from the list to prevent check constraint violations
   function renderSecondaryActivityStep() {
+    const primaryColor = primaryCategory
+      ? getCategoryColor(primaryCategory.category_id, lookupData.categories)
+      : "#94A3B8";
     const hierarchyWithoutPrimary = buildActivityHierarchy(
       lookupData,
       searchQuery,
@@ -908,12 +942,58 @@ export default function ActivitySelector({
         onActiveCategoryChange={setActiveCategoryId}
         searchPlaceholder={t("activityList.secondarySearchPlaceholder")}
         topSlot={
+          // Banner that sets this step apart from the (visually identical)
+          // primary step: carries the question itself, confirms the primary
+          // choice with a half-filled slot, and makes "no secondary activity"
+          // the obvious default action
+          <div className="flex flex-col gap-3 rounded-2xl border border-blue-200 dark:border-blue-800/50 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <div className="relative h-10 w-14 shrink-0 overflow-hidden rounded-lg bg-white dark:bg-slate-700 shadow-sm ring-1 ring-slate-200 dark:ring-slate-600">
+                <span
+                  className="slot-tri-in-bl absolute inset-0"
+                  style={{
+                    background: primaryColor,
+                    clipPath: "polygon(0 0, 0 100%, 100% 100%)",
+                  }}
+                />
+                <Plus className="absolute right-1 top-1 h-3.5 w-3.5 text-slate-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg font-bold leading-snug text-slate-900 dark:text-slate-100">
+                  {t("questions.secondaryActivity")}{" "}
+                  <span className="ml-0.5 inline-block translate-y-[-2px] rounded-full bg-white/80 dark:bg-slate-800/80 px-2 py-0.5 align-middle text-[11px] font-semibold text-blue-600 dark:text-blue-300 ring-1 ring-blue-200 dark:ring-blue-800/50">
+                    {t("activityList.optionalBadge")}
+                  </span>
+                </p>
+                {primaryActivity && (
+                  <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span className="truncate">
+                      {t("overview.mainActivity", {
+                        name: getLocalizedName(primaryActivity, locale),
+                      })}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onStepComplete({ secondary_activity_id: null })}
+              className="shrink-0 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+            >
+              {t("activityList.noSecondaryActivityButton")}
+            </button>
+          </div>
+        }
+        searchRowLeadingSlot={
           <button
             type="button"
-            onClick={() => onStepComplete({ secondary_activity_id: null })}
-            className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-600"
+            onClick={onBack}
+            className="flex shrink-0 items-center gap-1 self-stretch rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 text-sm font-medium text-slate-600 dark:text-slate-300 shadow-sm transition-colors hover:border-slate-400 dark:hover:border-slate-500 hover:text-slate-800 dark:hover:text-slate-100"
           >
-            {t("activityList.noSecondaryActivityButton")}
+            <ChevronLeft className="h-4 w-4" />
+            {t("backButton")}
           </button>
         }
       />
@@ -1607,7 +1687,9 @@ export default function ActivitySelector({
   }
 
   const stepMeta = getStepMeta(step, t);
+  const slotsRange = formatSlotsRange(selectedSlots, t);
   const isFirstStep = step === "primary_activity";
+  const isSecondaryStep = step === "secondary_activity";
 
   const containerRef = useRef<HTMLDivElement>(null);
   const forceEditorOpenRef = useRef(false);
@@ -1634,32 +1716,44 @@ export default function ActivitySelector({
       className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden"
     >
       {/* Header: time range badge + step progress inline */}
-      <div className="flex items-center gap-3 px-4 pt-3 pb-3 border-b border-slate-100 dark:border-slate-700">
-        <div className="flex items-center gap-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 text-blue-700 dark:text-blue-300 ring-1 ring-blue-100 dark:ring-blue-800/30 shrink-0">
-          <Clock3 className="h-4 w-4 shrink-0" />
-          <span className="text-sm font-semibold">
-            {formatSlotsRange(selectedSlots, t)}
-          </span>
+      <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-700 px-4 py-3">
+        <div className="flex shrink-0 items-center gap-2.5 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/20 px-3 py-1.5 ring-1 ring-blue-100 dark:ring-blue-800/40">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm dark:bg-blue-500">
+            <Clock3 className="h-4 w-4" />
+          </div>
+          <div className="leading-tight">
+            <p className="text-sm font-bold tabular-nums text-blue-900 dark:text-blue-100">
+              {slotsRange.time}
+            </p>
+            <p className="text-[11px] font-medium text-blue-600/80 dark:text-blue-300/80">
+              {slotsRange.meta}
+            </p>
+          </div>
         </div>
 
         {isEditorVisible && (
-          <div className="flex flex-1 flex-col gap-1 min-w-0">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">
-              {stepMeta.label}
-            </span>
-            <div className="flex gap-1">
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                {stepMeta.label}
+              </span>
+              <span className="shrink-0 text-xs font-medium tabular-nums text-slate-400">
+                {stepMeta.index}/{stepMeta.total}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
               {Array.from({ length: stepMeta.total }, (_, i) => {
                 const done = i < stepMeta.index - 1;
                 const active = i === stepMeta.index - 1;
                 return (
                   <div
                     key={i}
-                    className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                    className={`flex-1 rounded-full transition-all duration-300 ${
                       active
-                        ? "bg-blue-500"
+                        ? "h-2 bg-gradient-to-r from-blue-500 to-indigo-500 shadow-sm shadow-blue-500/30"
                         : done
-                          ? "bg-blue-300"
-                          : "bg-slate-200 dark:bg-slate-600"
+                          ? "h-1.5 bg-blue-500 dark:bg-blue-400"
+                          : "h-1.5 bg-slate-200 dark:bg-slate-600"
                     }`}
                   />
                 );
@@ -1669,8 +1763,9 @@ export default function ActivitySelector({
         )}
       </div>
 
-      {/* Back button — only shown when editor is open and not on first step */}
-      {isEditorVisible && !isFirstStep && (
+      {/* Back button — only shown when editor is open and not on first step.
+          The secondary step shows it inline next to its search field instead. */}
+      {isEditorVisible && !isFirstStep && !isSecondaryStep && (
         <div className="px-4 pt-2 pb-1 flex">
           <button
             type="button"
@@ -2114,14 +2209,22 @@ export default function ActivitySelector({
 
       {/* Question + editor only shown on explicit edit action */}
       <div className={isEditorVisible ? "block" : "hidden"}>
-        <div className="px-4 pb-2 pt-3">
-          <h3 className="text-base font-bold leading-snug text-slate-900 dark:text-slate-100">
-            {getStepQuestion(step, t)}
-          </h3>
-        </div>
+        {/* Keyed by step so each new question fades in as a new screen */}
+        <div key={step} className="step-in">
+          {/* The secondary step's question lives in its banner instead */}
+          {isSecondaryStep ? (
+            <div className="pt-3" />
+          ) : (
+            <div className="px-4 pb-2 pt-3">
+              <h3 className="text-base font-bold leading-snug text-slate-900 dark:text-slate-100">
+                {getStepQuestion(step, t)}
+              </h3>
+            </div>
+          )}
 
-        {/* Step content (scrollable if needed) */}
-        <div className="px-4 pb-4">{renderStepContent()}</div>
+          {/* Step content (scrollable if needed) */}
+          <div className="px-4 pb-4">{renderStepContent()}</div>
+        </div>
       </div>
     </div>
   );

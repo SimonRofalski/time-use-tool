@@ -7,6 +7,7 @@ import {
   Bike,
   Briefcase,
   Circle,
+  CircleHelp,
   GraduationCap,
   HandHeart,
   Home,
@@ -45,7 +46,7 @@ const CONTEXT_EMOJI: Record<string, string> = {
 };
 
 // Icon per category, keyed by the stable numeric category_id (not by name —
-// names are locale-dependent, ids are not). See lib DB: 1..10 fixed order.
+// names are locale-dependent, ids are not). See lib DB: 1..11 fixed order.
 const CATEGORY_ICON_BY_ID: Record<number, LucideIcon> = {
   1: BedDouble, // Persönliche Pflege
   2: Briefcase, // Erwerbstätigkeit
@@ -56,7 +57,8 @@ const CATEGORY_ICON_BY_ID: Record<number, LucideIcon> = {
   7: Bike, // Sport und Aktivitäten im Freien
   8: Palette, // Hobbys
   9: Tv, // Massenmedien
-  10: Route, // Wegezeiten und nicht spezifizierte Zeitnutzung
+  10: Route, // Wegezeiten
+  11: CircleHelp, // Nicht spezifizierte Zeitnutzung
 };
 
 function getCategoryIcon(categoryId: number): LucideIcon {
