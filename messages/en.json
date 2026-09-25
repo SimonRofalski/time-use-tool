@@ -102,6 +102,9 @@
     "languageDescription": "Choose the language of the user interface.",
     "languageDe": "Deutsch",
     "languageEn": "English",
+    "tutorialTitle": "Tutorial",
+    "tutorialDescription": "Shows you the most important features in a few steps.",
+    "tutorialRestartButton": "Restart tutorial",
     "accountSectionTitle": "Account",
     "userIdLabel": "User ID",
     "lastLoginLabel": "Last login",
@@ -903,6 +906,59 @@
       },
       "dayType": "What kind of day was this for you?",
       "tripType": "Were you on a trip (e.g. to another locality, region, or country) during the diary day? Disregard regular trips to school or work, or trips lasting less than two hours in total."
+    }
+  },
+  "tutorial": {
+    "stepCounter": "{current} of {total}",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Let's go",
+    "close": "Close tutorial",
+    "steps": {
+      "welcome": {
+        "title": "Welcome to the Time Use Tool 👋",
+        "body": "In a few steps we'll show you with an example how to record your time. Don't worry: nothing is saved during the tutorial – and you can skip at any time."
+      },
+      "dayNav": {
+        "title": "Your days",
+        "body": "Switch between the days of your course here. The bar shows how many of the day's 144 ten-minute slots you've already filled in."
+      },
+      "timeGrid": {
+        "title": "Select a time range",
+        "body": "Each row is an hour, each slot ten minutes. Drag across the slots to select a time range. In this example, 00:00–06:00 is selected."
+      },
+      "primaryActivity": {
+        "title": "Choose the main activity",
+        "body": "Pick what you mainly did during this time. Activities are sorted into categories, or you can search directly. In this example: “Sleeping” under Personal care."
+      },
+      "secondaryActivity": {
+        "title": "Secondary activity – optional",
+        "body": "Were you doing something else at the same time, like listening to music? Then pick it here as a secondary activity – the slot in the grid is then split diagonally. If not, just tap “No secondary activity → Continue”."
+      },
+      "device": {
+        "title": "Device use",
+        "body": "Next we ask whether you used a device like a smartphone, tablet or computer – and if so, which one."
+      },
+      "location": {
+        "title": "Location",
+        "body": "Here you say where you were – or how you were travelling."
+      },
+      "social": {
+        "title": "People and mood",
+        "body": "Finally: who was with you, and how did you feel? Then the entry is saved and the slots in the grid are filled in."
+      },
+      "overview": {
+        "title": "Overview",
+        "body": "The overview shows all days of your course – and which ones aren't complete yet."
+      },
+      "statistics": {
+        "title": "Statistics",
+        "body": "Statistics shows charts of how you spend your time. Once the admin has enabled it, you can compare your entries with other participants in your course."
+      },
+      "settings": {
+        "title": "Settings",
+        "body": "Set dark mode and language here. You can also restart this tutorial here at any time."
+      }
     }
   }
 }
