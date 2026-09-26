@@ -110,10 +110,84 @@ html.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   animation: step-in 220ms ease-out both;
 }
 
+/* Tutorial tour: the arrow draws itself in, then gently nudges toward its
+   target; each step's card eases in */
+@keyframes tour-arrow-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tour-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes tour-arrow-nudge {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(var(--tour-nudge-x), var(--tour-nudge-y));
+  }
+}
+@keyframes tour-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tour-arrow-path {
+  stroke-dasharray: 1;
+  animation: tour-arrow-draw 450ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.tour-arrow-head {
+  animation: tour-fade-in 150ms 380ms ease-out both;
+}
+.tour-arrow-nudge {
+  animation: tour-arrow-nudge 1.6s 600ms ease-in-out infinite;
+}
+.tour-card-in {
+  animation: tour-card-in 220ms ease-out both;
+}
+/* "Tap" on the spotlit target before the tour moves on (simulated click) */
+@keyframes tour-tap {
+  0% {
+    transform: scale(1);
+    background-color: rgb(59 130 246 / 0);
+  }
+  40% {
+    transform: scale(0.97);
+    background-color: rgb(59 130 246 / 0.28);
+  }
+  100% {
+    transform: scale(1);
+    background-color: rgb(59 130 246 / 0.18);
+  }
+}
+.tour-tap {
+  animation: tour-tap 450ms ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .slot-tri-in-tr,
   .slot-tri-in-bl,
-  .step-in {
+  .step-in,
+  .tour-arrow-path,
+  .tour-arrow-head,
+  .tour-arrow-nudge,
+  .tour-card-in,
+  .tour-tap {
     animation: none;
   }
 }

@@ -356,6 +356,7 @@ export default function TimeGrid({
                 <div
                   key={slot}
                   data-slot={slot}
+                  data-selected={selectedSlots.has(slot) ? "" : undefined}
                   title={getSlotTooltip(slot)}
                   onMouseDown={(e) => handleCellMouseDown(slot, e)}
                   onMouseEnter={() => handleCellMouseEnter(slot)}

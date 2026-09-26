@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
@@ -32,6 +32,12 @@ function ActivitySelectorLoading() {
 }
 
 import type { PendingSlotPreview } from "./TimeGrid";
+import {
+  TUTORIAL_DEMO_EVENT,
+  getCurrentTutorialDemo,
+  type TutorialDemo,
+  type TutorialDemoEventDetail,
+} from "@/app/components/tutorial/TutorialTour";
 
 const TimeGrid = dynamic(() => import("./TimeGrid"), {
   loading: TimeGridLoading,
@@ -205,6 +211,72 @@ function getPreloadedEntry(
   };
 }
 
+// ─── Tutorial scenes ──────────────────────────────────────────────────────────
+
+// The tutorial's example selection: midnight to 06:00 (36 slots)
+const TUTORIAL_DEMO_SLOTS = Array.from(
+  { length: 36 },
+  (_, i) =>
+    `${Math.floor(i / 6)
+      .toString()
+      .padStart(2, "0")}:${((i % 6) * 10).toString().padStart(2, "0")}`,
+);
+
+type TutorialSceneState = {
+  selectedSlots: Set<string>;
+  pendingEntry: PendingEntry | null;
+  step: QuestionnaireStep | null;
+};
+
+// Scripted questionnaire state per tutorial scene, rendered instead of the
+// real state while the tour runs (never saved). Example: sleeping 00:00–06:00,
+// no secondary activity, at home. Lookups by language-neutral `code`.
+function buildTutorialScene(
+  scene: TutorialDemo,
+  lookupData: LookupData,
+): TutorialSceneState {
+  if (scene === "empty") {
+    return { selectedSlots: new Set(), pendingEntry: null, step: null };
+  }
+
+  const activityId = (code: string) =>
+    lookupData.activities.find((a) => a.code === code)?.activity_id ?? null;
+  const sleepingId = activityId("011"); // Schlafen
+  const homeId =
+    lookupData.locationTransports.find((l) => l.code === "11")
+      ?.location_transport_id ?? null; // Zuhause
+
+  const selectedSlots = new Set(TUTORIAL_DEMO_SLOTS);
+  const empty = createEmptyPendingEntry(TUTORIAL_DEMO_SLOTS);
+  const withPrimary = { ...empty, primary_activity_id: sleepingId };
+  const withDevice = { ...withPrimary, digital_media_used: false };
+
+  switch (scene) {
+    case "select-night":
+      return { selectedSlots, pendingEntry: empty, step: "primary_activity" };
+    case "primary-chosen":
+      return {
+        selectedSlots,
+        pendingEntry: withPrimary,
+        step: "secondary_activity",
+      };
+    case "device":
+      return { selectedSlots, pendingEntry: withPrimary, step: "digital_media" };
+    case "location":
+      return {
+        selectedSlots,
+        pendingEntry: withDevice,
+        step: "location_transport",
+      };
+    case "social":
+      return {
+        selectedSlots,
+        pendingEntry: { ...withDevice, location_transport_id: homeId },
+        step: "social_context",
+      };
+  }
+}
+
 // Maps a raw Supabase row (with nested social_context join) to TimeEntryRecord
 function mapRawEntryToRecord(raw: any): TimeEntryRecord {
   return {
@@ -268,7 +340,10 @@ function CompletionBar({
         : "text-orange-600";
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm">
+    <div
+      data-tour="day-nav"
+      className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm"
+    >
       {/* Date row: prev | current (with inline progress) | next — a single
           row on every screen size; on mobile the side buttons shrink to an
           arrow + short date so the bar takes one line instead of three */}
@@ -746,6 +821,46 @@ export default function ZeiterfassungPage() {
     setStepHistory([]);
   }
 
+  // ── Tutorial scenes ───────────────────────────────────────────────────────
+
+  // The tour announces which scene to show; the page then renders that
+  // scripted state instead of its real one (derived below, real state is
+  // untouched — an entry the user had open reappears after the tour)
+  const [tutorialScene, setTutorialScene] = useState<TutorialDemo | null>(
+    null,
+  );
+  useEffect(() => {
+    function handleTutorialDemo(event: Event) {
+      setTutorialScene(
+        (event as CustomEvent<TutorialDemoEventDetail>).detail.demo,
+      );
+    }
+    window.addEventListener(TUTORIAL_DEMO_EVENT, handleTutorialDemo);
+    // Pick up a scene announced before this page mounted
+    setTutorialScene(getCurrentTutorialDemo());
+    return () =>
+      window.removeEventListener(TUTORIAL_DEMO_EVENT, handleTutorialDemo);
+  }, []);
+
+  const scene = useMemo(
+    () =>
+      tutorialScene && lookupData
+        ? buildTutorialScene(tutorialScene, lookupData)
+        : null,
+    [tutorialScene, lookupData],
+  );
+
+  // The example sits at 00:00–06:00: scroll the grid back to the top for it
+  useEffect(() => {
+    if (!scene || scene.selectedSlots.size === 0) return;
+    requestAnimationFrame(() => {
+      const gridScroller = document.querySelector<HTMLElement>(
+        '[data-tour="time-grid"] > div',
+      );
+      if (gridScroller) gridScroller.scrollTop = 0;
+    });
+  }, [scene]);
+
   async function handleDeleteSelectedEntries() {
     if (selectedSlots.size === 0) return;
 
@@ -1001,22 +1116,33 @@ export default function ZeiterfassungPage() {
     );
   }
 
+  // During the tutorial the scripted scene replaces the real state: an empty
+  // day with the example selection. Interaction is blocked by the tour and
+  // all handlers are no-ops, so nothing can be saved.
+  const shownEntries = scene ? [] : existingEntries;
+  const shownSelectedSlots = scene ? scene.selectedSlots : selectedSlots;
+  const shownPendingEntry = scene ? scene.pendingEntry : pendingEntry;
+  const shownStep = scene ? scene.step : currentStep;
+  const shownCoveredSlots = scene ? 0 : coveredSlots;
+  const shownPendingIsExisting = scene ? false : pendingIsExisting;
+  const noop = () => {};
+
   // Collapse grid on mobile when questionnaire opens, expand when it closes
-  const isQuestionnaireActive = !!(currentStep && pendingEntry);
+  const isQuestionnaireActive = !!(shownStep && shownPendingEntry);
 
   // Live preview of the entry being filled in, drawn on the selected slots as
   // soon as a primary activity is picked. Skipped while an existing entry is
   // only loaded but not yet changed — the grid already shows it as saved.
   const pendingPreview: PendingSlotPreview | null =
     isQuestionnaireActive &&
-    !pendingIsExisting &&
-    pendingEntry.primary_activity_id !== null
+    !shownPendingIsExisting &&
+    shownPendingEntry.primary_activity_id !== null
       ? {
-          primaryActivityId: pendingEntry.primary_activity_id,
-          secondaryActivityId: pendingEntry.secondary_activity_id,
+          primaryActivityId: shownPendingEntry.primary_activity_id,
+          secondaryActivityId: shownPendingEntry.secondary_activity_id,
           awaitingSecondary:
-            currentStep === "primary_activity" ||
-            currentStep === "secondary_activity",
+            shownStep === "primary_activity" ||
+            shownStep === "secondary_activity",
         }
       : null;
 
@@ -1025,7 +1151,7 @@ export default function ZeiterfassungPage() {
       {/* Completion bar: date navigation + slot progress */}
       <CompletionBar
         currentDate={currentDate}
-        coveredSlots={coveredSlots}
+        coveredSlots={shownCoveredSlots}
         allDates={allDates}
         onDateChange={handleDateChange}
       />
@@ -1035,7 +1161,7 @@ export default function ZeiterfassungPage() {
         {/* Left: 24×6 time grid — collapsible on mobile when questionnaire is active */}
         <div className="w-full md:w-1/3 min-w-0 md:self-start">
           {/* Mobile collapse toggle — only shown when questionnaire is open */}
-          {isQuestionnaireActive && (
+          {isQuestionnaireActive && !scene && (
             <button
               type="button"
               className="flex w-full items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-700 md:hidden"
@@ -1052,36 +1178,41 @@ export default function ZeiterfassungPage() {
 
           {/* Grid: always visible on md+, toggleable on mobile when questionnaire active */}
           <div
-            className={`${isQuestionnaireActive && gridCollapsed ? "hidden" : "block"} md:block ${isQuestionnaireActive ? "mt-2 md:mt-0" : ""}`}
+            data-tour="time-grid"
+            className={`${isQuestionnaireActive && gridCollapsed && !scene ? "hidden" : "block"} md:block ${isQuestionnaireActive && !scene ? "mt-2 md:mt-0" : ""}`}
           >
             <TimeGrid
-              existingEntries={existingEntries}
-              selectedSlots={selectedSlots}
+              existingEntries={shownEntries}
+              selectedSlots={shownSelectedSlots}
               lookupData={lookupData}
               pendingPreview={pendingPreview}
-              onSlotsSelected={(slots) => {
-                setGridCollapsed(true);
-                handleSlotsSelected(slots);
-              }}
+              onSlotsSelected={
+                scene
+                  ? noop
+                  : (slots) => {
+                      setGridCollapsed(true);
+                      handleSlotsSelected(slots);
+                    }
+              }
             />
           </div>
         </div>
 
         {/* Right: activity questionnaire or idle placeholder */}
-        <div className="w-full md:w-2/3 min-w-0">
+        <div data-tour="activity-panel" className="w-full md:w-2/3 min-w-0">
           {isQuestionnaireActive ? (
             <ActivitySelector
-              step={currentStep}
-              pendingEntry={pendingEntry}
-              selectedSlots={selectedSlots}
-              existingEntries={existingEntries}
+              step={shownStep}
+              pendingEntry={shownPendingEntry}
+              selectedSlots={shownSelectedSlots}
+              existingEntries={shownEntries}
               lookupData={lookupData}
-              onStepComplete={handleStepComplete}
-              onBack={handleBack}
-              onDeleteSelection={handleDeleteSelectedEntries}
-              onDeleteSlots={handleDeleteSlots}
-              onReselectSlots={handleReselectSlots}
-              showDeleteSelection={selectedSlots.size > 0}
+              onStepComplete={scene ? noop : handleStepComplete}
+              onBack={scene ? noop : handleBack}
+              onDeleteSelection={scene ? noop : handleDeleteSelectedEntries}
+              onDeleteSlots={scene ? async () => {} : handleDeleteSlots}
+              onReselectSlots={scene ? noop : handleReselectSlots}
+              showDeleteSelection={shownSelectedSlots.size > 0}
               isDeletingSelection={isDeletingSelection}
               askExtraRatings={askExtraRatings}
             />

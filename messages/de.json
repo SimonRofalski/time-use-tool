@@ -102,6 +102,9 @@
     "languageDescription": "Wähle die Sprache der Benutzeroberfläche.",
     "languageDe": "Deutsch",
     "languageEn": "English",
+    "tutorialTitle": "Tutorial",
+    "tutorialDescription": "Zeigt dir in ein paar Schritten die wichtigsten Funktionen.",
+    "tutorialRestartButton": "Tutorial neu starten",
     "accountSectionTitle": "Konto",
     "userIdLabel": "User ID",
     "lastLoginLabel": "Letztes Login",
@@ -903,6 +906,59 @@
       },
       "dayType": "Was für ein Tag war das für dich?",
       "tripType": "Warst du während des Tagebuchtages auf einer Reise (z. B. in eine andere Ortschaft, Region oder ein anderes Land)? Ausgenommen sind regelmässige Schul- oder Arbeitswege sowie Reisen von insgesamt weniger als zwei Stunden."
+    }
+  },
+  "tutorial": {
+    "stepCounter": "{current} von {total}",
+    "back": "Zurück",
+    "next": "Weiter",
+    "finish": "Los geht's",
+    "close": "Tutorial schliessen",
+    "steps": {
+      "welcome": {
+        "title": "Willkommen beim Time Use Tool 👋",
+        "body": "In ein paar Schritten zeigen wir dir an einem Beispiel, wie du deine Zeit erfasst. Keine Sorge: Während des Tutorials wird nichts gespeichert – und du kannst jederzeit überspringen."
+      },
+      "dayNav": {
+        "title": "Deine Tage",
+        "body": "Hier wechselst du zwischen den Tagen deines Kurses. Der Balken zeigt, wie viele der 144 Zehn-Minuten-Felder des Tages schon ausgefüllt sind."
+      },
+      "timeGrid": {
+        "title": "Zeitraum auswählen",
+        "body": "Jede Zeile ist eine Stunde, jedes Feld zehn Minuten. Ziehe über die Felder, um einen Zeitraum auszuwählen. Im Beispiel ist 00:00–06:00 Uhr ausgewählt."
+      },
+      "primaryActivity": {
+        "title": "Haupttätigkeit wählen",
+        "body": "Wähle, was du in dieser Zeit hauptsächlich gemacht hast. Die Tätigkeiten sind nach Kategorien sortiert, du kannst aber auch direkt suchen. Im Beispiel: „Schlafen“ unter Persönliche Pflege."
+      },
+      "secondaryActivity": {
+        "title": "Nebentätigkeit – optional",
+        "body": "Hast du gleichzeitig noch etwas anderes gemacht, zum Beispiel Musik gehört? Dann wählst du das hier als Nebentätigkeit – das Feld im Raster wird dann diagonal geteilt. Wenn nicht, tippst du einfach auf „Keine Nebentätigkeit → Weiter“."
+      },
+      "device": {
+        "title": "Gerätenutzung",
+        "body": "Danach fragen wir, ob du dabei ein Gerät wie Smartphone, Tablet oder PC genutzt hast – und falls ja, welches."
+      },
+      "location": {
+        "title": "Ort",
+        "body": "Hier gibst du an, wo du warst – oder mit welchem Verkehrsmittel du unterwegs warst."
+      },
+      "social": {
+        "title": "Personen und Stimmung",
+        "body": "Zum Schluss: Wer war dabei, und wie hast du dich gefühlt? Danach wird der Eintrag gespeichert und die Felder im Raster sind gefüllt."
+      },
+      "overview": {
+        "title": "Übersicht",
+        "body": "In der Übersicht siehst du alle Tage deines Kurses – und welche noch nicht vollständig ausgefüllt sind."
+      },
+      "statistics": {
+        "title": "Statistiken",
+        "body": "Unter Statistiken siehst du in Diagrammen, wie du deine Zeit verbringst. Sobald der Admin es freigegeben hat, kannst du deine Angaben mit anderen Teilnehmern aus deinem Kurs vergleichen."
+      },
+      "settings": {
+        "title": "Einstellungen",
+        "body": "Hier stellst du Darkmode und Sprache ein. Und hier kannst du dieses Tutorial jederzeit neu starten."
+      }
     }
   }
 }

@@ -618,6 +618,7 @@ function ActivityList({
                   <button
                     key={category.category_id}
                     type="button"
+                    data-tour-category={category.code}
                     onClick={() => onActiveCategoryChange(category.category_id)}
                     className={`group flex h-full flex-col overflow-hidden rounded-2xl border-2 bg-white dark:bg-slate-800 text-left shadow-sm transition-all hover:shadow-md ${
                       isSelectedCategory
@@ -979,6 +980,7 @@ export default function ActivitySelector({
             </div>
             <button
               type="button"
+              data-tour="no-secondary-button"
               onClick={() => onStepComplete({ secondary_activity_id: null })}
               className="shrink-0 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
             >

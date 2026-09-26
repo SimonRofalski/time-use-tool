@@ -9,6 +9,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import EnrollmentModal from "@/app/components/EnrollmentModal";
 import ProfileDetailsForm from "@/app/components/ProfileDetailsForm";
 import SecurityQuestionsForm from "@/app/components/SecurityQuestionsForm";
+import TutorialTour, {
+  type TutorialStep,
+} from "@/app/components/tutorial/TutorialTour";
 import KursuebersichtTab from "@/app/components/admin/KursuebersichtTab";
 import NutzeruebersichtTab from "@/app/components/admin/NutzeruebersichtTab";
 import StatistikenTab from "@/app/components/admin/StatistikenTab";
@@ -21,6 +24,7 @@ import {
   Languages,
   LogOut,
   Moon,
+  RotateCcw,
   Settings,
   ShieldCheck,
   SunMedium,
@@ -42,6 +46,7 @@ function formatDateTime(value: string | null | undefined, locale: string) {
 
 export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const t = useTranslations("protectedLayout");
+  const tTutorial = useTranslations("tutorial");
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
@@ -50,8 +55,89 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
   const tabs = [
     { path: "/zeiterfassung", label: t("tabs.zeiterfassung"), icon: ClipboardList },
-    { path: "/erfasste-zeit", label: t("tabs.erfassteZeit"), icon: Calendar },
-    { path: "/statistiken", label: t("tabs.statistiken"), icon: BarChart3 },
+    {
+      path: "/erfasste-zeit",
+      label: t("tabs.erfassteZeit"),
+      icon: Calendar,
+      tourId: "tab-erfasste-zeit",
+    },
+    {
+      path: "/statistiken",
+      label: t("tabs.statistiken"),
+      icon: BarChart3,
+      tourId: "tab-statistiken",
+    },
+  ];
+
+  // Guided tour: an example (sleeping 00:00–06:00, no secondary activity)
+  // walked through the questionnaire on the Zeiterfassung page, then the other
+  // tabs and the settings panel. Targets are `data-tour` attributes; the
+  // `demo` scenes are rendered by the Zeiterfassung page and never saved.
+  const tutorialStep = (
+    key: string,
+    options: Omit<TutorialStep, "title" | "body">,
+  ): TutorialStep => ({
+    ...options,
+    title: tTutorial(`steps.${key}.title`),
+    body: tTutorial(`steps.${key}.body`),
+  });
+  const tutorialSteps: TutorialStep[] = [
+    tutorialStep("welcome", { route: "/zeiterfassung", demo: "empty" }),
+    tutorialStep("dayNav", {
+      route: "/zeiterfassung",
+      target: "day-nav",
+      demo: "empty",
+    }),
+    tutorialStep("timeGrid", {
+      route: "/zeiterfassung",
+      // The example's selected cells (00:00–06:00), not the whole grid
+      selector: '[data-tour="time-grid"] [data-selected]',
+      placement: "right",
+      demo: "select-night",
+    }),
+    tutorialStep("primaryActivity", {
+      route: "/zeiterfassung",
+      // "Persönliche Pflege" (category code 0), tapped on "Weiter"
+      selector: '[data-tour-category="0"]',
+      placement: "left",
+      tapOnNext: true,
+      demo: "select-night",
+    }),
+    tutorialStep("secondaryActivity", {
+      route: "/zeiterfassung",
+      target: "no-secondary-button",
+      tapOnNext: true,
+      demo: "primary-chosen",
+    }),
+    tutorialStep("device", {
+      route: "/zeiterfassung",
+      target: "activity-panel",
+      demo: "device",
+    }),
+    tutorialStep("location", {
+      route: "/zeiterfassung",
+      target: "activity-panel",
+      demo: "location",
+    }),
+    tutorialStep("social", {
+      route: "/zeiterfassung",
+      target: "activity-panel",
+      demo: "social",
+    }),
+    tutorialStep("overview", {
+      route: "/erfasste-zeit",
+      target: "tab-erfasste-zeit",
+      backdrop: "none",
+    }),
+    tutorialStep("statistics", {
+      route: "/statistiken",
+      target: "tab-statistiken",
+      backdrop: "none",
+    }),
+    tutorialStep("settings", {
+      target: "settings-panel",
+      openSettings: true,
+    }),
   ];
 
   const adminTabs = [
@@ -87,6 +173,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const [profileFirstName, setProfileFirstName] = useState("");
   const [profileLastName, setProfileLastName] = useState("");
   const [activeCourseName, setActiveCourseName] = useState("");
+  // null = unknown (still loading), then whether profiles.tutorial_completed_at is set
+  const [tutorialSeen, setTutorialSeen] = useState<boolean | null>(null);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  // Bumped on every start so a restart always begins at step 1
+  const [tutorialRunId, setTutorialRunId] = useState(0);
 
   const isAdmin = profileRole === "admin";
 
@@ -197,6 +288,18 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setProfileRole(role);
     setProfileFirstName(profileData?.first_name ?? "");
     setProfileLastName(profileData?.last_name ?? "");
+
+    // Separate query so a missing column (migration not yet applied) can't
+    // break the role lookup above; on error treat the tour as seen rather than
+    // re-showing it on every login
+    const { data: tutorialData, error: tutorialError } = await supabase
+      .from("profiles")
+      .select("tutorial_completed_at")
+      .eq("id", authUser.id)
+      .single();
+    setTutorialSeen(
+      tutorialError ? true : !!tutorialData?.tutorial_completed_at,
+    );
 
     // Admins skip profile completion and course enrollment requirements
     if (role === "admin") {
@@ -368,7 +471,46 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setProfileFirstName("");
     setProfileLastName("");
     setActiveCourseName("");
+    setTutorialSeen(null);
+    setTutorialOpen(false);
     router.push("/");
+  }
+
+  // Starts the tour on the Zeiterfassung page (its targets live there); the
+  // tour keeps looking for targets while the page is still loading
+  function startTutorial() {
+    setSettingsOpen(false);
+    setProfileMenuOpen(false);
+    setAdminMode(false);
+    if (pathname !== "/zeiterfassung") {
+      router.push("/zeiterfassung");
+    }
+    setTutorialRunId((current) => current + 1);
+    setTutorialOpen(true);
+  }
+
+  // Navigates / opens the settings panel for the step the tour just showed
+  function handleTutorialStepChange(step: TutorialStep) {
+    if (step.route && step.route !== pathname) {
+      router.push(step.route);
+    }
+    setSettingsOpen(!!step.openSettings);
+  }
+
+  // Finishing and skipping both count as seen — it won't auto-start again.
+  // Ends on the Zeiterfassung page so the user can start entering right away.
+  async function handleTutorialFinish() {
+    setTutorialOpen(false);
+    setTutorialSeen(true);
+    setSettingsOpen(false);
+    if (pathname !== "/zeiterfassung") {
+      router.push("/zeiterfassung");
+    }
+    if (!user) return;
+    await supabase
+      .from("profiles")
+      .update({ tutorial_completed_at: new Date().toISOString() })
+      .eq("id", user.id);
   }
 
   function handleProfileModalClose() {
@@ -419,6 +561,31 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     document.cookie = `NEXT_LOCALE=${newLocale}; path=/; max-age=31536000`;
     window.location.reload();
   }
+
+  // Auto-start once for regular users who are fully onboarded (security
+  // questions, profile, course enrollment) and haven't seen the tour yet
+  useEffect(() => {
+    if (
+      tutorialSeen === false &&
+      !tutorialOpen &&
+      !isAdmin &&
+      accessCheckReady &&
+      needsSecurityQuestions === false &&
+      needsProfileDetails === false &&
+      isEnrolled === true
+    ) {
+      startTutorial();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    tutorialSeen,
+    tutorialOpen,
+    isAdmin,
+    accessCheckReady,
+    needsSecurityQuestions,
+    needsProfileDetails,
+    isEnrolled,
+  ]);
 
   if (
     !user ||
@@ -601,6 +768,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                 <div className="group relative">
                   <button
                     type="button"
+                    data-tour="settings-button"
                     aria-label={t("settingsAriaLabel")}
                     className={`rounded-full border p-2.5 transition-colors ${
                       settingsOpen
@@ -662,6 +830,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                         <Link
                           key={tab.path}
                           href={tab.path}
+                          data-tour={tab.tourId}
                           className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-3 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm ${
                             isActive
                               ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
@@ -691,7 +860,9 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                 className="flex-1 bg-slate-950/45 backdrop-blur-sm"
                 onClick={() => setSettingsOpen(false)}
               />
-              <aside className="flex h-full w-full max-w-sm flex-col border-l border-slate-200 bg-white p-5 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+              <aside
+                data-tour="settings-panel"
+                className="flex h-full w-full max-w-sm flex-col border-l border-slate-200 bg-white p-5 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -777,6 +948,23 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                       {t("languageEn")}
                     </button>
                   </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-800">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {t("tutorialTitle")}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {t("tutorialDescription")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={startTutorial}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-500 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-400 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
+                  >
+                    <RotateCcw size={14} className="shrink-0" />
+                    {t("tutorialRestartButton")}
+                  </button>
                 </div>
 
                 <div className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-950">
@@ -866,6 +1054,15 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
                 />
               </div>
             </div>
+          )}
+
+          {tutorialOpen && (
+            <TutorialTour
+              key={tutorialRunId}
+              steps={tutorialSteps}
+              onFinish={handleTutorialFinish}
+              onStepChange={handleTutorialStepChange}
+            />
           )}
 
           {adminMode ? (
