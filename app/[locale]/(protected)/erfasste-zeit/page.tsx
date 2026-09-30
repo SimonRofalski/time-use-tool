@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
+import { ClipboardList } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import {
   formatPeriodLabel,
@@ -45,6 +46,7 @@ type CourseDay = {
   entryCount: number;
   isSubmitted: boolean;
   isComplete: boolean;
+  dayQuestionnaireCompleted: boolean;
   status: DayStatus;
 };
 
@@ -180,11 +182,15 @@ function getStatusLabel(status: DayStatus, t: ErfassteZeitTranslate): string {
 function DayCarouselCard({
   day,
   onClick,
+  onEditDayQuestions,
 }: {
   day: CourseDay;
   onClick: () => void;
+  // Only passed for completed days when the course asks the day questions
+  onEditDayQuestions?: () => void;
 }) {
   const t = useTranslations("erfassteZeit");
+  const tDayQuestionnaire = useTranslations("dayQuestionnaire");
   const locale = useLocale();
   const colors = getStatusColors(day.status);
   const isAvailable = day.status !== "nicht_verfuegbar";
@@ -234,6 +240,29 @@ function DayCarouselCard({
           {completionPercentage}%
         </p>
       </div>
+
+      {/* w-0 + min-w-full: the button wraps its label instead of widening
+          the (content-sized) card beyond its neighbours */}
+      {onEditDayQuestions && (
+        <button
+          type="button"
+          onClick={(event) => {
+            // The card itself opens the day in Zeiterfassung
+            event.stopPropagation();
+            onEditDayQuestions();
+          }}
+          className={`mt-2 flex w-0 min-w-full items-center justify-center gap-1 rounded-md border px-2 py-1 text-center text-[11px] leading-tight transition-colors ${
+            day.dayQuestionnaireCompleted
+              ? "border-green-200 bg-white font-medium text-green-700 hover:bg-green-100 dark:border-green-800/50 dark:bg-slate-900 dark:text-green-300 dark:hover:bg-green-900/40"
+              : "border-amber-300 bg-amber-50 font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
+          }`}
+        >
+          <ClipboardList size={12} className="shrink-0" />
+          {day.dayQuestionnaireCompleted
+            ? tDayQuestionnaire("editButton")
+            : tDayQuestionnaire("answerButton")}
+        </button>
+      )}
     </div>
   );
 }
@@ -243,14 +272,22 @@ function DayCarouselCard({
 function DayCarousel({
   days,
   onDayClick,
+  onEditDayQuestions,
   label,
 }: {
   days: CourseDay[];
   onDayClick: (date: string) => void;
+  // Set when the course asks the day questions; offered on completed days
+  onEditDayQuestions?: (date: string) => void;
   label?: string;
 }) {
   const t = useTranslations("erfassteZeit");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const editHandlerFor = (day: CourseDay) =>
+    onEditDayQuestions && day.isComplete
+      ? () => onEditDayQuestions(day.date)
+      : undefined;
 
   return (
     <div>
@@ -268,6 +305,7 @@ function DayCarousel({
             key={day.date}
             day={day}
             onClick={() => onDayClick(day.date)}
+            onEditDayQuestions={editHandlerFor(day)}
           />
         ))}
       </div>
@@ -283,6 +321,7 @@ function DayCarousel({
             key={day.date}
             day={day}
             onClick={() => onDayClick(day.date)}
+            onEditDayQuestions={editHandlerFor(day)}
           />
         ))}
       </div>
@@ -355,6 +394,8 @@ export default function ErfassteZeitPage() {
   );
   const [courseDays, setCourseDays] = useState<CourseDay[]>([]);
   const [periods, setPeriods] = useState<CoursePeriodInfo[]>([]);
+  // Per-course opt-in flag for the day questionnaire (admin-toggleable)
+  const [askDayQuestionnaire, setAskDayQuestionnaire] = useState(false);
 
   // Tracks the last time data was loaded to avoid unnecessary reloads on tab switch
   const lastLoadTimeRef = useRef<number>(0);
@@ -428,7 +469,7 @@ export default function ErfassteZeitPage() {
     ] = await Promise.all([
       supabase
         .from("course")
-        .select("name, start_date, end_date")
+        .select("name, start_date, end_date, ask_day_questionnaire")
         .eq("course_id", courseId)
         .single(),
       supabase
@@ -438,7 +479,7 @@ export default function ErfassteZeitPage() {
         .order("sort_order", { ascending: true }),
       supabase
         .from("day")
-        .select("day_id, date, is_submitted, is_complete")
+        .select("day_id, date, is_submitted, is_complete, day_questionnaire_completed")
         .eq("profiles_id", userId)
         .eq("course_id", courseId),
     ]);
@@ -476,6 +517,7 @@ export default function ErfassteZeitPage() {
           ];
 
     setPeriods(effectivePeriods);
+    setAskDayQuestionnaire(courseData.ask_day_questionnaire === true);
     setCourseSummary({
       courseName: courseData.name,
       periods: effectivePeriods,
@@ -533,6 +575,8 @@ export default function ErfassteZeitPage() {
         entryCount,
         isSubmitted,
         isComplete: dayRecord?.is_complete ?? false,
+        dayQuestionnaireCompleted:
+          dayRecord?.day_questionnaire_completed ?? false,
         status: getDayStatus(date, entryCount, isSubmitted),
       };
     });
@@ -545,6 +589,11 @@ export default function ErfassteZeitPage() {
   // Navigates to the Zeiterfassung page for the selected date
   function handleDayClick(date: string) {
     router.push(`/zeiterfassung?date=${date}`);
+  }
+
+  // Opens the day in Zeiterfassung with its day questions already open
+  function handleEditDayQuestions(date: string) {
+    router.push(`/zeiterfassung?date=${date}&dayQuestions=1`);
   }
 
   // ── Render states ────────────────────────────────────────────────────────────
@@ -643,6 +692,9 @@ export default function ErfassteZeitPage() {
           <DayCarousel
             days={periodDays}
             onDayClick={handleDayClick}
+            onEditDayQuestions={
+              askDayQuestionnaire ? handleEditDayQuestions : undefined
+            }
             label={formatPeriodLabel(
               period.start_date,
               period.end_date,

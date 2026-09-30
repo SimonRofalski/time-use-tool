@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
+import { ClipboardList } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import {
   type TimeEntryRecord,
@@ -245,11 +246,15 @@ function buildTutorialScene(
   const homeId =
     lookupData.locationTransports.find((l) => l.code === "11")
       ?.location_transport_id ?? null; // Zuhause
+  const aloneId =
+    lookupData.socialContexts.find((s) => s.code === "1")
+      ?.social_context_id ?? null; // Alleine
 
   const selectedSlots = new Set(TUTORIAL_DEMO_SLOTS);
   const empty = createEmptyPendingEntry(TUTORIAL_DEMO_SLOTS);
   const withPrimary = { ...empty, primary_activity_id: sleepingId };
   const withDevice = { ...withPrimary, digital_media_used: false };
+  const withLocation = { ...withDevice, location_transport_id: homeId };
 
   switch (scene) {
     case "select-night":
@@ -271,8 +276,17 @@ function buildTutorialScene(
     case "social":
       return {
         selectedSlots,
-        pendingEntry: { ...withDevice, location_transport_id: homeId },
+        pendingEntry: withLocation,
         step: "social_context",
+      };
+    case "satisfaction":
+      return {
+        selectedSlots,
+        pendingEntry: {
+          ...withLocation,
+          social_context_ids: aloneId !== null ? [aloneId] : [],
+        },
+        step: "satisfaction",
       };
   }
 }
@@ -309,13 +323,20 @@ function CompletionBar({
   coveredSlots,
   allDates,
   onDateChange,
+  onEditDayQuestions,
+  dayQuestionsAnswered,
 }: {
   currentDate: string;
   coveredSlots: number;
   allDates: string[];
   onDateChange: (date: string) => void;
+  // Shown for completed days when the course asks the day questions
+  onEditDayQuestions?: () => void;
+  // false = still open (postponed) → highlighted "answer" button
+  dayQuestionsAnswered: boolean;
 }) {
   const t = useTranslations("zeiterfassung");
+  const tDayQuestionnaire = useTranslations("dayQuestionnaire");
   const locale = useLocale();
   const currentIndex = allDates.indexOf(currentDate);
   const canGoPrev = currentIndex > 0;
@@ -428,6 +449,30 @@ function CompletionBar({
           </p>
         </button>
       </div>
+
+      {onEditDayQuestions && (
+        <div className="mt-2 flex justify-center">
+          {dayQuestionsAnswered ? (
+            <button
+              type="button"
+              onClick={onEditDayQuestions}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800"
+            >
+              <ClipboardList size={14} className="text-blue-600 dark:text-blue-400" />
+              {tDayQuestionnaire("editButton")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onEditDayQuestions}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
+            >
+              <ClipboardList size={14} />
+              {tDayQuestionnaire("answerButton")}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -466,11 +511,23 @@ export default function ZeiterfassungPage() {
   // Per-course opt-in flags (admin-toggleable, default off)
   const [askExtraRatings, setAskExtraRatings] = useState(false);
   const [askDayQuestionnaire, setAskDayQuestionnaire] = useState(false);
-  // Set to a day_id right after that day transitions to fully complete
-  // (144/144 slots) — renders the mandatory day-questionnaire popup
+  // Day whose questionnaire popup is open: set automatically right after a
+  // day transitions to fully complete (144/144 slots), or by the user
   const [dayQuestionnaireDayId, setDayQuestionnaireDayId] = useState<
     number | null
   >(null);
+  // "prompt" = shown automatically (can be postponed), "edit" = opened by the user
+  const [dayQuestionnaireMode, setDayQuestionnaireMode] = useState<
+    "prompt" | "edit"
+  >("prompt");
+  // Whether the current day's questionnaire is answered (day.day_questionnaire_completed)
+  const [dayQuestionnaireCompleted, setDayQuestionnaireCompleted] =
+    useState(false);
+  // Deep link from Erfasste Zeit (?dayQuestions=1): open the day questions
+  // once, as soon as the linked day has loaded
+  const openDayQuestionsOnLoadRef = useRef(
+    searchParams.get("dayQuestions") === "1",
+  );
 
   // Current day
   const [currentDate, setCurrentDate] = useState<string>("");
@@ -676,7 +733,7 @@ export default function ZeiterfassungPage() {
 
     const { data: dayRecord } = await supabase
       .from("day")
-      .select("day_id")
+      .select("day_id, day_questionnaire_completed")
       .eq("profiles_id", userId)
       .eq("course_id", courseId)
       .eq("date", date)
@@ -684,17 +741,37 @@ export default function ZeiterfassungPage() {
 
     const loadedDayId = dayRecord?.day_id ?? null;
     setDayId(loadedDayId);
+    setDayQuestionnaireCompleted(
+      dayRecord?.day_questionnaire_completed === true,
+    );
+
+    const openDayQuestions = openDayQuestionsOnLoadRef.current;
+    if (openDayQuestions) {
+      openDayQuestionsOnLoadRef.current = false;
+      router.replace(`/zeiterfassung?date=${date}`);
+    }
 
     if (loadedDayId === null) {
       setExistingEntries([]);
       setCoveredSlots(0);
       return;
     }
-    await loadEntriesForDay(loadedDayId);
+    const totalCovered = await loadEntriesForDay(loadedDayId);
+
+    if (
+      openDayQuestions &&
+      askDayQuestionnaire &&
+      totalCovered !== null &&
+      totalCovered >= TOTAL_SLOTS_PER_DAY
+    ) {
+      setDayQuestionnaireMode("edit");
+      setDayQuestionnaireDayId(loadedDayId);
+    }
   }
 
-  // Fetches all time entries (with social context) for a day_id
-  async function loadEntriesForDay(targetDayId: number) {
+  // Fetches all time entries (with social context) for a day_id and returns
+  // the number of covered slots (null on error)
+  async function loadEntriesForDay(targetDayId: number): Promise<number | null> {
     const { data: rawEntries, error } = await supabase
       .from("time_entry")
       .select(
@@ -712,7 +789,7 @@ export default function ZeiterfassungPage() {
 
     if (error) {
       setErrorMessage(t("entriesLoadError"));
-      return;
+      return null;
     }
 
     const entries = (rawEntries ?? []).map(mapRawEntryToRecord);
@@ -724,6 +801,7 @@ export default function ZeiterfassungPage() {
       0,
     );
     setCoveredSlots(totalCovered);
+    return totalCovered;
   }
 
   // ── Grid interaction ──────────────────────────────────────────────────────
@@ -1061,6 +1139,7 @@ export default function ZeiterfassungPage() {
       .eq("day_id", activeDayId);
 
     if (!wasComplete && isComplete && askDayQuestionnaire) {
+      setDayQuestionnaireMode("prompt");
       setDayQuestionnaireDayId(activeDayId);
     }
   }
@@ -1154,6 +1233,18 @@ export default function ZeiterfassungPage() {
         coveredSlots={shownCoveredSlots}
         allDates={allDates}
         onDateChange={handleDateChange}
+        onEditDayQuestions={
+          askDayQuestionnaire &&
+          !scene &&
+          dayId !== null &&
+          coveredSlots >= TOTAL_SLOTS_PER_DAY
+            ? () => {
+                setDayQuestionnaireMode("edit");
+                setDayQuestionnaireDayId(dayId);
+              }
+            : undefined
+        }
+        dayQuestionsAnswered={dayQuestionnaireCompleted}
       />
 
       {/* Responsive layout: stacked on mobile, side-by-side on md+ */}
@@ -1257,14 +1348,23 @@ export default function ZeiterfassungPage() {
         </div>
       )}
 
-      {/* Mandatory day-completion questionnaire — fires once, right when a day
-          transitions to fully complete (144/144 slots), if enabled for the course */}
+      {/* Day-completion questionnaire — prompted once, right when a day
+          transitions to fully complete (144/144 slots), if enabled for the
+          course; can be postponed and re-opened via the day bar button */}
       {dayQuestionnaireDayId !== null && (
         <DayQuestionnaireModal
+          key={dayQuestionnaireDayId}
           dayId={dayQuestionnaireDayId}
           existingEntries={existingEntries}
           activities={lookupData.activities}
-          onSaved={() => setDayQuestionnaireDayId(null)}
+          mode={dayQuestionnaireMode}
+          onSaved={() => {
+            if (dayQuestionnaireDayId === dayId) {
+              setDayQuestionnaireCompleted(true);
+            }
+            setDayQuestionnaireDayId(null);
+          }}
+          onClose={() => setDayQuestionnaireDayId(null)}
         />
       )}
     </div>

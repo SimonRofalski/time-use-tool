@@ -172,9 +172,9 @@
       "digitalMediaType": "Welche Geräte hast du genutzt?",
       "locationTransport": "Wo warst du während dieser Zeit?",
       "socialContext": "War jemand anders mit dabei?",
-      "satisfaction": "Wie hast du dich gefühlt?",
-      "meaningfulness": "Wie bewertest du die Bedeutsamkeit dieser Aktivität für dein langfristiges Wohlbefinden / Glück?",
-      "stressfulness": "Wie bewertest du die Stressbelastung dieser Aktivität?"
+      "satisfaction": "Wie hast du dich während der Aktivität gefühlt?",
+      "meaningfulness": "Wie bewertest du die Bedeutsamkeit dieser Aktivität für dein/e langfristiges Wohlbefinden / Zufriedenheit?",
+      "stressfulness": "Wie stressig war die Aktivität?"
     },
     "stepLabels": {
       "primaryActivity": "Haupttätigkeit",
@@ -569,7 +569,8 @@
           "title": "Teilnehmer entfernen",
           "message": "Soll {name} wirklich aus dem Kurs entfernt werden? Die Zeiteinträge bleiben erhalten.",
           "confirmLabel": "Entfernen"
-        }
+        },
+        "dayQuestionnairesProgress": "{answered} / {total} Tagesfragen beantwortet"
       }
     },
     "exportModal": {
@@ -593,14 +594,16 @@
       "backToOverviewButton": "Zur Kursübersicht",
       "loading": "Wird geladen…",
       "daysCompleted": "/ {total} Tage abgeschlossen",
-      "privacyNote": "Pro Person ist nur ersichtlich, ob die Eingabe eines Tages abgeschlossen wurde. Zeitnutzungsdaten sind für Admins nur aggregiert und ohne Personenbezug einsehbar (Statistiken, Datenexport)."
+      "privacyNote": "Pro Person ist nur ersichtlich, ob die Eingabe eines Tages abgeschlossen und die Tagesfragen beantwortet wurden – nicht die Antworten selbst. Zeitnutzungsdaten sind für Admins nur aggregiert und ohne Personenbezug einsehbar (Statistiken, Datenexport)."
     },
     "dayList": {
       "noCourseDays": "Für diesen Kurs sind keine Kurstage hinterlegt.",
       "colDay": "Kurstag",
       "colCompleted": "Abgeschlossen",
       "yes": "Ja",
-      "no": "Nein"
+      "no": "Nein",
+      "colDayQuestionnaire": "Tagesfragen",
+      "pending": "Offen"
     },
     "csvExport": {
       "firstName": "Vorname",
@@ -887,7 +890,11 @@
   },
   "dayQuestionnaire": {
     "title": "Fragen zum Tag",
-    "description": "Du hast diesen Tag vollständig erfasst. Bitte beantworte noch ein paar abschliessende Fragen dazu.",
+    "description": "Du hast diesen Tag vollständig erfasst. Bitte beantworte noch ein paar abschliessende Fragen dazu. Falls du gerade keine Zeit hast, kannst du sie auch später über «Tagesfragen ausfüllen» beantworten.",
+    "editDescription": "Hier kannst du deine Antworten zu diesem Tag anpassen.",
+    "editButton": "Tagesfragen bearbeiten",
+    "cancelButton": "Abbrechen",
+    "close": "Schliessen",
     "loading": "Fragebogen wird geladen…",
     "saveButton": "Speichern",
     "savingButton": "Wird gespeichert…",
@@ -906,7 +913,9 @@
       },
       "dayType": "Was für ein Tag war das für dich?",
       "tripType": "Warst du während des Tagebuchtages auf einer Reise (z. B. in eine andere Ortschaft, Region oder ein anderes Land)? Ausgenommen sind regelmässige Schul- oder Arbeitswege sowie Reisen von insgesamt weniger als zwei Stunden."
-    }
+    },
+    "laterButton": "Später ausfüllen",
+    "answerButton": "Tagesfragen ausfüllen"
   },
   "tutorial": {
     "stepCounter": "{current} von {total}",
@@ -944,8 +953,12 @@
         "body": "Hier gibst du an, wo du warst – oder mit welchem Verkehrsmittel du unterwegs warst."
       },
       "social": {
-        "title": "Personen und Stimmung",
-        "body": "Zum Schluss: Wer war dabei, und wie hast du dich gefühlt? Danach wird der Eintrag gespeichert und die Felder im Raster sind gefüllt."
+        "title": "Personen",
+        "body": "Wer war dabei? Du kannst mehrere Personen auswählen – oder angeben, dass du alleine warst."
+      },
+      "mood": {
+        "title": "Stimmung",
+        "body": "Zum Schluss: Wie hast du dich während der Aktivität gefühlt? Je nach Kurs fragen wir hier auch, wie stressig und wie bedeutsam die Aktivität für dich war. Danach wird der Eintrag gespeichert und die Felder im Raster sind gefüllt."
       },
       "overview": {
         "title": "Übersicht",

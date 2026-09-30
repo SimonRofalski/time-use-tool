@@ -67,13 +67,16 @@ type EnrolledUser = {
   alias: string | null;
   isExcluded: boolean;
   submittedDays: number;
+  // Submitted days whose day questionnaire is answered (flag only, no answers)
+  answeredDayQuestionnaires: number;
   courseTotalDays: number;
 };
 
-// One course day for a participant — only the completion flag, nothing else
+// One course day for a participant — only completion flags, nothing else
 type DayStatusRow = {
   date: string; // "YYYY-MM-DD"
   isSubmitted: boolean;
+  dayQuestionnaireCompleted: boolean;
 };
 
 type ExportRow = Record<string, string | number>;
@@ -278,10 +281,13 @@ export default function KursuebersichtTab() {
         .select("id, email, first_name, last_name")
         .in("id", userIds),
       // Paged: large courses exceed the 1000-row cap
-      fetchAllRows<{ profiles_id: string }>((from, to) =>
+      fetchAllRows<{
+        profiles_id: string;
+        day_questionnaire_completed: boolean;
+      }>((from, to) =>
         supabase
           .from("day")
-          .select("profiles_id")
+          .select("profiles_id, day_questionnaire_completed")
           .eq("course_id", courseId)
           .eq("is_submitted", true)
           .order("day_id")
@@ -302,9 +308,14 @@ export default function KursuebersichtTab() {
     }
 
     const submittedByUser: Record<string, number> = {};
+    const answeredByUser: Record<string, number> = {};
     for (const d of submittedDays) {
       submittedByUser[d.profiles_id] =
         (submittedByUser[d.profiles_id] ?? 0) + 1;
+      if (d.day_questionnaire_completed) {
+        answeredByUser[d.profiles_id] =
+          (answeredByUser[d.profiles_id] ?? 0) + 1;
+      }
     }
 
     const ucById: Record<
@@ -329,6 +340,7 @@ export default function KursuebersichtTab() {
         alias: ucById[id]?.alias ?? null,
         isExcluded: ucById[id]?.isExcluded ?? false,
         submittedDays: submittedByUser[id] ?? 0,
+        answeredDayQuestionnaires: answeredByUser[id] ?? 0,
         courseTotalDays,
       })),
     );
@@ -339,7 +351,7 @@ export default function KursuebersichtTab() {
     setIsLoadingDays(true);
     setUserDays([]);
 
-    // Only `date` + `is_submitted` are read — never time entries.
+    // Only `date` + completion flags are read — never time entries or answers.
     const [{ data: periods }, { data: days }] = await Promise.all([
       supabase
         .from("course_period")
@@ -347,7 +359,7 @@ export default function KursuebersichtTab() {
         .eq("course_id", courseId),
       supabase
         .from("day")
-        .select("date, is_submitted")
+        .select("date, is_submitted, day_questionnaire_completed")
         .eq("profiles_id", userId)
         .eq("course_id", courseId),
     ]);
@@ -370,14 +382,21 @@ export default function KursuebersichtTab() {
     }
 
     const submittedDates = new Set<string>();
+    const answeredDates = new Set<string>();
     for (const d of days ?? []) {
-      if (d.is_submitted) submittedDates.add(String(d.date).slice(0, 10));
+      const date = String(d.date).slice(0, 10);
+      if (d.is_submitted) submittedDates.add(date);
+      if (d.day_questionnaire_completed) answeredDates.add(date);
     }
 
     // Course days ∪ submitted days (in case a submitted day lies outside the periods)
     const allDates = [...new Set([...courseDates, ...submittedDates])].sort();
     setUserDays(
-      allDates.map((date) => ({ date, isSubmitted: submittedDates.has(date) })),
+      allDates.map((date) => ({
+        date,
+        isSubmitted: submittedDates.has(date),
+        dayQuestionnaireCompleted: answeredDates.has(date),
+      })),
     );
     setIsLoadingDays(false);
   }
@@ -1426,6 +1445,21 @@ export default function KursuebersichtTab() {
                         <span className="text-slate-400 dark:text-slate-500">
                           / {u.courseTotalDays} {t("courseDetail.table.daysUnit")}
                         </span>
+                        {/* Answered day questionnaires, out of the completed days */}
+                        {isAskDayQuestionnaire && (
+                          <p
+                            className={`mt-0.5 text-xs ${
+                              u.answeredDayQuestionnaires < u.submittedDays
+                                ? "text-amber-600 dark:text-amber-400"
+                                : "text-slate-400 dark:text-slate-500"
+                            }`}
+                          >
+                            {t("courseDetail.table.dayQuestionnairesProgress", {
+                              answered: u.answeredDayQuestionnaires,
+                              total: u.submittedDays,
+                            })}
+                          </p>
+                        )}
                       </td>
 
                       {/* Actions */}
@@ -1513,7 +1547,13 @@ export default function KursuebersichtTab() {
     if (view.type !== "user") return null;
 
     const submittedCount = userDays.filter((d) => d.isSubmitted).length;
+    const answeredCount = userDays.filter(
+      (d) => d.isSubmitted && d.dayQuestionnaireCompleted,
+    ).length;
     const totalCount = Math.max(userDays.length, view.courseTotalDays);
+    const isAskDayQuestionnaire =
+      courses.find((c) => c.course_id === view.courseId)
+        ?.ask_day_questionnaire ?? false;
 
     return (
       <div className="space-y-4">
@@ -1567,6 +1607,14 @@ export default function KursuebersichtTab() {
                   </>
                 )}
               </p>
+              {!isLoadingDays && isAskDayQuestionnaire && (
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                  {t("courseDetail.table.dayQuestionnairesProgress", {
+                    answered: answeredCount,
+                    total: submittedCount,
+                  })}
+                </p>
+              )}
             </div>
             <div className="flex items-start gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 dark:border-violet-800 dark:bg-violet-900/20 sm:max-w-sm">
               <ShieldCheck
@@ -1580,12 +1628,12 @@ export default function KursuebersichtTab() {
           </div>
         </div>
 
-        {renderUserDayList()}
+        {renderUserDayList(isAskDayQuestionnaire)}
       </div>
     );
   }
 
-  function renderUserDayList() {
+  function renderUserDayList(showDayQuestionnaire: boolean) {
     if (view.type !== "user") return null;
     if (isLoadingDays) return null; // summary card already shows the loading state
     if (userDays.length === 0) {
@@ -1607,6 +1655,11 @@ export default function KursuebersichtTab() {
               <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {t("dayList.colCompleted")}
               </th>
+              {showDayQuestionnaire && (
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {t("dayList.colDayQuestionnaire")}
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1639,6 +1692,25 @@ export default function KursuebersichtTab() {
                     </span>
                   )}
                 </td>
+                {showDayQuestionnaire && (
+                  <td className="px-4 py-3">
+                    {day.dayQuestionnaireCompleted ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        <CheckCircle2 size={13} />
+                        {t("dayList.yes")}
+                      </span>
+                    ) : day.isSubmitted ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        <Circle size={13} />
+                        {t("dayList.pending")}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400 dark:text-slate-500">
+                        –
+                      </span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

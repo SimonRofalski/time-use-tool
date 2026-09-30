@@ -23,7 +23,8 @@ export type TutorialDemo =
   | "primary-chosen"
   | "device"
   | "location"
-  | "social";
+  | "social"
+  | "satisfaction";
 
 // Window event fired whenever the active step's demo changes (null = none,
 // also fired when the tour closes). Pages listen for it instead of the tour
