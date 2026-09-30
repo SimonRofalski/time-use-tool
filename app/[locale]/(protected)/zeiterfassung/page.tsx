@@ -609,13 +609,38 @@ export default function ZeiterfassungPage() {
   async function loadPageData() {
     setIsLoading(true);
 
-    const { data: authData } = await supabase.auth.getUser();
-    if (!authData.user) {
+    // Local session is enough: the protected layout and proxy.ts already
+    // verify the user with the auth server, and RLS guards every query —
+    // skipping the extra auth round trip speeds up the first paint
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.user) {
       router.push("/");
       return;
     }
-    const uid = authData.user.id;
+    const uid = session.user.id;
     setUserId(uid);
+
+    // Lookup tables don't depend on the course — start loading them right
+    // away, in parallel with the enrollment and course queries below
+    const lookupsPromise = Promise.all([
+      supabase.from("category").select("*").order("category_id"),
+      supabase.from("subcategory").select("*").order("subcategory_id"),
+      supabase.from("activity").select("*").order("activity_id"),
+      supabase
+        .from("location_transport")
+        .select("*")
+        .order("location_transport_id"),
+      supabase.from("social_context").select("*").order("social_context_id"),
+      supabase
+        .from("digital_media_type")
+        .select("*")
+        .order("digital_media_type_id"),
+      supabase.from("satisfaction").select("*").order("satisfaction_id"),
+      supabase.from("meaningfulness").select("*").order("meaningfulness_id"),
+      supabase.from("stressfulness").select("*").order("stressfulness_id"),
+    ]);
 
     // Get course enrollment
     const { data: userCourse } = await supabase
@@ -631,64 +656,36 @@ export default function ZeiterfassungPage() {
     const cid = userCourse.course_id;
     setCourseId(cid);
 
-    // Per-course opt-in flags for the extra activity ratings and the
-    // mandatory day-completion questionnaire (admin-toggleable, default off)
-    const { data: courseSettings } = await supabase
-      .from("course")
-      .select("ask_extra_ratings, ask_day_questionnaire")
-      .eq("course_id", cid)
-      .single();
+    // Per-course opt-in flags (extra activity ratings, day questionnaire;
+    // admin-toggleable, default off), legacy date columns, and the periods
+    const [{ data: courseSettings }, { data: periodsData }] = await Promise.all([
+      supabase
+        .from("course")
+        .select("ask_extra_ratings, ask_day_questionnaire, start_date, end_date")
+        .eq("course_id", cid)
+        .single(),
+      supabase
+        .from("course_period")
+        .select("start_date, end_date, sort_order")
+        .eq("course_id", cid)
+        .order("sort_order", { ascending: true }),
+    ]);
     setAskExtraRatings(courseSettings?.ask_extra_ratings === true);
     setAskDayQuestionnaire(courseSettings?.ask_day_questionnaire === true);
 
-    // Load course date range (via periods; fallback to legacy columns)
-    const { data: periodsData } = await supabase
-      .from("course_period")
-      .select("start_date, end_date, sort_order")
-      .eq("course_id", cid)
-      .order("sort_order", { ascending: true });
-
+    // Course date range via periods; fallback to legacy columns
     let dates: string[];
     if (periodsData && periodsData.length > 0) {
       dates = getPeriodDates(periodsData);
     } else {
-      // Legacy fallback for courses without period rows
-      const { data: course } = await supabase
-        .from("course")
-        .select("start_date, end_date")
-        .eq("course_id", cid)
-        .single();
-      dates = course
-        ? getSinglePeriodDates(course.start_date, course.end_date)
+      dates = courseSettings
+        ? getSinglePeriodDates(courseSettings.start_date, courseSettings.end_date)
         : [];
     }
     setAllDates(dates);
 
-    // Load all lookup tables in parallel for speed
     const [cats, subs, acts, locs, socials, media, sats, meanings, stresses] =
-      await Promise.all([
-        supabase.from("category").select("*").order("category_id"),
-        supabase.from("subcategory").select("*").order("subcategory_id"),
-        supabase.from("activity").select("*").order("activity_id"),
-        supabase
-          .from("location_transport")
-          .select("*")
-          .order("location_transport_id"),
-        supabase
-          .from("social_context")
-          .select("*")
-          .order("social_context_id"),
-        supabase
-          .from("digital_media_type")
-          .select("*")
-          .order("digital_media_type_id"),
-        supabase.from("satisfaction").select("*").order("satisfaction_id"),
-        supabase
-          .from("meaningfulness")
-          .select("*")
-          .order("meaningfulness_id"),
-        supabase.from("stressfulness").select("*").order("stressfulness_id"),
-      ]);
+      await lookupsPromise;
     setLookupData({
       categories: cats.data ?? [],
       subcategories: subs.data ?? [],

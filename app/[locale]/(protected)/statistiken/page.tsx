@@ -56,6 +56,71 @@ type RawEntry = {
   social_context_ids: number[];
 };
 
+// ─── Time entry loading ───────────────────────────────────────────────────────
+
+const TIME_ENTRY_SELECT =
+  "entry_id, day_id, start_time, end_time, primary_activity_id, location_transport_id, satisfaction_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)";
+
+// A day has at most 144 entries, so 6 days (≤ 864 rows) fit into one
+// 1000-row response — each request is a single page, and requests can run
+// side by side instead of paging through one long result one after another
+const DAYS_PER_ENTRY_REQUEST = 6;
+const MAX_PARALLEL_ENTRY_REQUESTS = 8;
+
+function mapEntryRow(row: any): RawEntry {
+  return {
+    entry_id: row.entry_id,
+    day_id: row.day_id,
+    start_time: row.start_time,
+    end_time: row.end_time,
+    primary_activity_id: row.primary_activity_id,
+    location_transport_id: row.location_transport_id,
+    satisfaction_id: row.satisfaction_id,
+    digital_media_type_ids: (row.time_entry_digital_media_type ?? [])
+      .map((m: any) => m.digital_media_type_id)
+      .filter((id: unknown) => typeof id === "number"),
+    social_context_ids: (row.time_entry_social_context ?? [])
+      .map((m: any) => m.social_context_id)
+      .filter((id: unknown) => typeof id === "number"),
+  };
+}
+
+// Loads the time entries of the given days in parallel day chunks
+async function fetchEntriesForDays(
+  supabase: ReturnType<typeof getSupabaseBrowserClient>,
+  dayIds: number[],
+): Promise<RawEntry[]> {
+  const chunks: number[][] = [];
+  for (let i = 0; i < dayIds.length; i += DAYS_PER_ENTRY_REQUEST) {
+    chunks.push(dayIds.slice(i, i + DAYS_PER_ENTRY_REQUEST));
+  }
+
+  const results: any[][] = new Array(chunks.length);
+  let nextChunk = 0;
+  // A few workers pull chunks until none are left (bounded concurrency)
+  async function worker() {
+    while (nextChunk < chunks.length) {
+      const index = nextChunk++;
+      // fetchAllRows as a safety net, should a chunk ever exceed one page
+      results[index] = await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("time_entry")
+          .select(TIME_ENTRY_SELECT)
+          .in("day_id", chunks[index])
+          .order("entry_id")
+          .range(from, to),
+      );
+    }
+  }
+  await Promise.all(
+    Array.from(
+      { length: Math.min(MAX_PARALLEL_ENTRY_REQUESTS, chunks.length) },
+      worker,
+    ),
+  );
+  return results.flat().map(mapEntryRow);
+}
+
 // Lookup row shapes
 type ActivityLookup = {
   activity_id: number;
@@ -684,7 +749,11 @@ export default function StatistikenPage() {
 
   const [activeTab, setActiveTab] = useState<Tab>("zeitverteilung");
   const [isLoading, setIsLoading] = useState(true);
+  // The course comparison loads in the background after the page is shown
+  const [isComparisonLoading, setIsComparisonLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  // Incremented per loadAllData run, so an outdated run can bail out
+  const loadIdRef = useRef(0);
   const [isCourseComparisonEnabled, setIsCourseComparisonEnabled] =
     useState(false);
 
@@ -700,6 +769,9 @@ export default function StatistikenPage() {
     { key: string; label: string }[]
   >([]);
   const [dayFilter, setDayFilter] = useState<DayFilterMode>("alle");
+  // Latest filters, for the background comparison load to apply on arrival
+  const filtersRef = useRef({ weeks: selectedWeeks, dayFilter });
+  filtersRef.current = { weeks: selectedWeeks, dayFilter };
 
   // Raw data kept for KW-filter recomputation
   type RawDataSnapshot = {
@@ -1198,25 +1270,37 @@ export default function StatistikenPage() {
   // ── Data loading ────────────────────────────────────────────────────────────
 
   async function loadAllData() {
+    // A later reload (focus/visibility) supersedes this one: results of an
+    // outdated run are dropped instead of overwriting newer state
+    const loadId = ++loadIdRef.current;
+    const isStale = () => loadId !== loadIdRef.current;
+
     lastLoadTimeRef.current = Date.now();
     setIsLoading(true);
     setErrorMessage("");
 
-    // Step 1: get the logged-in user
-    const { data: authData } = await supabase.auth.getUser();
-    if (!authData.user) {
+    // Step 1: the logged-in user. The local session is enough here: the
+    // protected layout and proxy.ts already verify the user with the auth
+    // server, and every query below is enforced by RLS — this saves a
+    // network round trip before anything else can start.
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const authUser = session?.user;
+    if (!authUser) {
       router.push("/");
       return;
     }
-    const userId = authData.user.id;
+    const userId = authUser.id;
     setParticipantId(userId);
 
-    // Step 2: get course enrollment
+    // Step 2: get course enrollment (everything else depends on course_id)
     const { data: userCourse } = await supabase
       .from("user_course")
       .select("course_id")
       .eq("profiles_id", userId)
       .single();
+    if (isStale()) return;
     if (!userCourse) {
       setErrorMessage(t("errors.noCourseFound"));
       setIsLoading(false);
@@ -1224,10 +1308,27 @@ export default function StatistikenPage() {
     }
     const courseId = userCourse.course_id;
 
-    const [{ data: courseSettings }, { data: myProfile }] = await Promise.all([
+    // Step 3: all independent queries in ONE parallel round trip — course
+    // settings (incl. legacy date columns), profile, periods, lookup tables,
+    // this user's days, and the submitted days of the whole course for the
+    // comparison pool
+    const [
+      { data: courseSettings },
+      { data: myProfile },
+      { data: periodsData },
+      cats,
+      subs,
+      acts,
+      mediaTypes,
+      socialContexts,
+      locations,
+      sats,
+      { data: myDays },
+      allDays,
+    ] = await Promise.all([
       supabase
         .from("course")
-        .select("name, comparison_enabled")
+        .select("name, comparison_enabled, start_date, end_date")
         .eq("course_id", courseId)
         .single(),
       supabase
@@ -1235,7 +1336,61 @@ export default function StatistikenPage() {
         .select("first_name, last_name")
         .eq("id", userId)
         .maybeSingle(),
+      supabase
+        .from("course_period")
+        .select("start_date, end_date, sort_order")
+        .eq("course_id", courseId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("category")
+        .select("category_id, name, name_en")
+        .order("category_id"),
+      supabase
+        .from("subcategory")
+        .select("subcategory_id, name, name_en, category_id")
+        .order("subcategory_id"),
+      supabase
+        .from("activity")
+        .select("activity_id, name, name_en, subcategory_id")
+        .order("activity_id"),
+      supabase
+        .from("digital_media_type")
+        .select("digital_media_type_id, name, name_en, code")
+        .order("digital_media_type_id"),
+      supabase
+        .from("social_context")
+        .select("social_context_id, name, name_en, code")
+        .order("social_context_id"),
+      supabase
+        .from("location_transport")
+        .select("location_transport_id, name, name_en, code")
+        .order("location_transport_id"),
+      supabase
+        .from("satisfaction")
+        .select("satisfaction_id, name, name_en, code")
+        .order("satisfaction_id"),
+      supabase
+        .from("day")
+        .select("day_id, date, is_submitted, is_complete")
+        .eq("profiles_id", userId)
+        .eq("course_id", courseId),
+      // Submitted days of all participants, for the comparison pool (paged —
+      // grows with course size). Participant IDs are derived from day records
+      // instead of user_course: avoids a self-referential RLS policy on
+      // user_course and limits the pool to users who submitted something.
+      fetchAllRows<{ day_id: number; profiles_id: string; date: string }>(
+        (from, to) =>
+          supabase
+            .from("day")
+            .select("day_id, profiles_id, date")
+            .eq("course_id", courseId)
+            .eq("is_submitted", true)
+            .order("day_id")
+            .range(from, to),
+      ),
     ]);
+    if (isStale()) return;
+
     setIsCourseComparisonEnabled(courseSettings?.comparison_enabled === true);
     setCourseName(courseSettings?.name ?? "");
     setParticipantName(
@@ -1243,69 +1398,25 @@ export default function StatistikenPage() {
         .map((v) => (v ?? "").trim())
         .filter(Boolean)
         .join(" ") ||
-        authData.user.email ||
+        authUser.email ||
         "",
     );
 
-    // Step 3: load course date range via periods; fallback to legacy columns
-    const { data: periodsData } = await supabase
-      .from("course_period")
-      .select("start_date, end_date, sort_order")
-      .eq("course_id", courseId)
-      .order("sort_order", { ascending: true });
-
+    // Course date range via periods; fallback to legacy columns
     let allCourseDates: string[];
     if (periodsData && periodsData.length > 0) {
       allCourseDates = getPeriodDates(periodsData);
     } else {
-      const { data: courseData } = await supabase
-        .from("course")
-        .select("start_date, end_date")
-        .eq("course_id", courseId)
-        .single();
-      if (!courseData) {
+      if (!courseSettings) {
         setErrorMessage(t("errors.courseDataLoadError"));
         setIsLoading(false);
         return;
       }
       allCourseDates = getSinglePeriodDates(
-        courseData.start_date,
-        courseData.end_date,
+        courseSettings.start_date,
+        courseSettings.end_date,
       );
     }
-
-    // Step 4: load lookup tables in parallel
-    const [cats, subs, acts, mediaTypes, socialContexts, locations, sats] =
-      await Promise.all([
-        supabase
-          .from("category")
-          .select("category_id, name, name_en")
-          .order("category_id"),
-        supabase
-          .from("subcategory")
-          .select("subcategory_id, name, name_en, category_id")
-          .order("subcategory_id"),
-        supabase
-          .from("activity")
-          .select("activity_id, name, name_en, subcategory_id")
-          .order("activity_id"),
-        supabase
-          .from("digital_media_type")
-          .select("digital_media_type_id, name, name_en, code")
-          .order("digital_media_type_id"),
-        supabase
-          .from("social_context")
-          .select("social_context_id, name, name_en, code")
-          .order("social_context_id"),
-        supabase
-          .from("location_transport")
-          .select("location_transport_id, name, name_en, code")
-          .order("location_transport_id"),
-        supabase
-          .from("satisfaction")
-          .select("satisfaction_id, name, name_en, code")
-          .order("satisfaction_id"),
-      ]);
 
     if (
       cats.error ||
@@ -1373,56 +1484,19 @@ export default function StatistikenPage() {
       }
     });
 
-    // Step 5: load day records for this user in this course
-    // Track submitted OR complete days to stay compatible with legacy rows.
-    const { data: myDays } = await supabase
-      .from("day")
-      .select("day_id, date, is_submitted, is_complete")
-      .eq("profiles_id", userId)
-      .eq("course_id", courseId);
-
     const allMyDays = myDays ?? [];
     const submittedDayIds = new Set(
       allMyDays.filter((d) => d.is_submitted).map((d) => d.day_id),
     );
 
-    // Step 6: load the time entries of this user's SUBMITTED days.
+    // Step 4: load the time entries of this user's SUBMITTED days.
     // Only submitted days count — the same basis as the Kursvergleich, the PDF
     // and the admin export. Days still "in Bearbeitung" are partially filled and
     // would distort totals and per-day averages; they show as grey placeholders.
-    // Paged: a fully tracked day has 144 entries, Supabase caps responses at 1000.
-    const allMyDayIds = allMyDays
-      .filter((d) => d.is_submitted)
-      .map((d) => d.day_id);
-    let allMyEntries: RawEntry[] = [];
-
-    if (allMyDayIds.length > 0) {
-      const entryData = await fetchAllRows<any>((from, to) =>
-        supabase
-          .from("time_entry")
-          .select(
-            "entry_id, day_id, start_time, end_time, primary_activity_id, location_transport_id, satisfaction_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
-          )
-          .in("day_id", allMyDayIds)
-          .order("entry_id")
-          .range(from, to),
-      );
-      allMyEntries = entryData.map((row: any) => ({
-        entry_id: row.entry_id,
-        day_id: row.day_id,
-        start_time: row.start_time,
-        end_time: row.end_time,
-        primary_activity_id: row.primary_activity_id,
-        location_transport_id: row.location_transport_id,
-        satisfaction_id: row.satisfaction_id,
-        digital_media_type_ids: (row.time_entry_digital_media_type ?? [])
-          .map((m: any) => m.digital_media_type_id)
-          .filter((id: unknown) => typeof id === "number"),
-        social_context_ids: (row.time_entry_social_context ?? [])
-          .map((m: any) => m.social_context_id)
-          .filter((id: unknown) => typeof id === "number"),
-      }));
-    }
+    const allMyEntries = await fetchEntriesForDays(supabase, [
+      ...submittedDayIds,
+    ]);
+    if (isStale()) return;
 
     const trackedDays = allMyDays.filter((d) => d.is_submitted);
     const trackedDayIds = new Set(trackedDays.map((d) => d.day_id));
@@ -1484,28 +1558,16 @@ export default function StatistikenPage() {
     setWeekOptions(weekOptionsList);
     setSelectedWeeks([]);
 
-    // Step 8: load course comparison data
-    // Derive participant IDs from submitted day records instead of user_course.
-    // This avoids a self-referential RLS policy on user_course and naturally limits
-    // the comparison pool to users who have actually submitted at least one day.
-    // Load submitted days for all participants (paged — grows with course size)
-    const allDays = await fetchAllRows<{
-      day_id: number;
-      profiles_id: string;
-      date: string;
-    }>((from, to) =>
-      supabase
-        .from("day")
-        .select("day_id, profiles_id, date")
-        .eq("course_id", courseId)
-        .eq("is_submitted", true)
-        .order("day_id")
-        .range(from, to),
-    );
+    // Zeitverteilung is ready: show the page now. The course comparison
+    // (entries of every qualifying participant — by far the largest load)
+    // continues in the background and only gates the Kursvergleich tab.
+    lastLoadTimeRef.current = Date.now();
+    setIsLoading(false);
 
+    // Step 5: course comparison data
     // Group submitted day IDs by user and filter to users with ≥ MIN_DAYS_FOR_COMPARISON
     const submittedDaysByUser: Record<string, number[]> = {};
-    for (const day of allDays ?? []) {
+    for (const day of allDays) {
       if (!submittedDaysByUser[day.profiles_id]) {
         submittedDaysByUser[day.profiles_id] = [];
       }
@@ -1517,7 +1579,7 @@ export default function StatistikenPage() {
     );
 
     const comparisonDayIdToDate: Record<number, string> = {};
-    for (const day of allDays ?? []) {
+    for (const day of allDays) {
       comparisonDayIdToDate[day.day_id] = normalizeDateOnly(day.date);
     }
 
@@ -1526,49 +1588,31 @@ export default function StatistikenPage() {
       qualifyingUsers.length >= 3 &&
       courseSettings?.comparison_enabled === true
     ) {
-      // Load all time entries for all qualifying users' submitted days
-      const allQualifyingDayIds = qualifyingUsers.flatMap(
-        ([, dayIds]) => dayIds,
-      );
+      setIsComparisonLoading(true);
 
-      // Paged in chunks of day ids: the pool easily exceeds the 1000-row cap
-      // (21 submitted days = 3024 entries), and long id lists keep URLs short.
-      const allEntries: any[] = [];
-      for (let i = 0; i < allQualifyingDayIds.length; i += 200) {
-        const ids = allQualifyingDayIds.slice(i, i + 200);
-        const batch = await fetchAllRows<any>((from, to) =>
-          supabase
-            .from("time_entry")
-            .select(
-              "entry_id, day_id, start_time, end_time, primary_activity_id, location_transport_id, satisfaction_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
-            )
-            .in("day_id", ids)
-            .order("entry_id")
-            .range(from, to),
-        );
-        allEntries.push(...batch);
+      // Own entries are already loaded — only fetch the other participants'
+      const otherDayIds = qualifyingUsers
+        .filter(([profileId]) => profileId !== userId)
+        .flatMap(([, dayIds]) => dayIds);
+
+      let otherEntries: RawEntry[];
+      try {
+        otherEntries = await fetchEntriesForDays(supabase, otherDayIds);
+      } catch {
+        otherEntries = [];
       }
+      if (isStale()) return;
 
-      const rawAllEntries: RawEntry[] = allEntries.map((row: any) => ({
-        entry_id: row.entry_id,
-        day_id: row.day_id,
-        start_time: row.start_time,
-        end_time: row.end_time,
-        primary_activity_id: row.primary_activity_id,
-        location_transport_id: row.location_transport_id,
-        satisfaction_id: row.satisfaction_id,
-        digital_media_type_ids: (row.time_entry_digital_media_type ?? [])
-          .map((m: any) => m.digital_media_type_id)
-          .filter((id: unknown) => typeof id === "number"),
-        social_context_ids: (row.time_entry_social_context ?? [])
-          .map((m: any) => m.social_context_id)
-          .filter((id: unknown) => typeof id === "number"),
-      }));
+      const ownPoolEntries = qualifyingUsers.some(
+        ([profileId]) => profileId === userId,
+      )
+        ? allMyEntries
+        : [];
 
       rawComparisonRef.current = {
         userId,
         qualifyingUsers,
-        rawAllEntries,
+        rawAllEntries: [...ownPoolEntries, ...otherEntries],
         dayIdToDate: comparisonDayIdToDate,
         myEntries,
         mySubmittedDayIds: submittedDayIds,
@@ -1577,7 +1621,12 @@ export default function StatistikenPage() {
         satisfactionRankById,
         maxSatisfactionRank,
       };
-      computeAndSetComparison([], "alle");
+      // Apply whatever filters the user picked while this was loading
+      computeAndSetComparison(
+        filtersRef.current.weeks,
+        filtersRef.current.dayFilter,
+      );
+      setIsComparisonLoading(false);
     } else {
       rawComparisonRef.current = null;
       setComparisonTopics([]);
@@ -1589,10 +1638,8 @@ export default function StatistikenPage() {
           ? qualifyingUsers.length
           : 0,
       );
+      setIsComparisonLoading(false);
     }
-
-    lastLoadTimeRef.current = Date.now();
-    setIsLoading(false);
   }
 
   // ── Accordion toggle handlers ───────────────────────────────────────────────
@@ -1695,7 +1742,8 @@ export default function StatistikenPage() {
   const exportButton = (
     <button
       type="button"
-      disabled={isExportingPdf}
+      // The PDF includes the course comparison, so wait until it's loaded
+      disabled={isExportingPdf || isComparisonLoading}
       onClick={() => void handleExportPdf()}
       title={t("pdf.buttonTitle")}
       className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/15"
@@ -1770,6 +1818,10 @@ export default function StatistikenPage() {
           onToggleSubcategory={handleToggleSubcategory}
           actions={exportButton}
         />
+      ) : isCourseComparisonEnabled && isComparisonLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <p className="text-slate-500 dark:text-slate-400">{t("loading")}</p>
+        </div>
       ) : isCourseComparisonEnabled ? (
         <KursvergleichTab
           topics={comparisonTopics}

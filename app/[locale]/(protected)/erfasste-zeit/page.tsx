@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { ClipboardList } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import {
   formatPeriodLabel,
   getPeriodDates,
@@ -438,14 +439,19 @@ export default function ErfassteZeitPage() {
     setIsLoading(true);
     setErrorMessage("");
 
-    // Step 1: get the currently logged-in user
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData.user) {
+    // Step 1: get the currently logged-in user. The local session suffices:
+    // the protected layout and proxy.ts already verify the user with the auth
+    // server, and all queries below are enforced by RLS — saves a round trip.
+    const {
+      data: { session },
+      error: authError,
+    } = await supabase.auth.getSession();
+    if (authError || !session?.user) {
       setErrorMessage(t("errors.userLoadError"));
       setIsLoading(false);
       return;
     }
-    const userId = authData.user.id;
+    const userId = session.user.id;
 
     // Step 2: get the course the user is enrolled in (one course per user)
     const { data: userCourseData, error: userCourseError } = await supabase
@@ -530,20 +536,41 @@ export default function ErfassteZeitPage() {
 
     if (dayIds.length > 0) {
       // Fetch start_time + end_time so we can count covered 10-min slots per day
-      // (one DB row can span multiple slots, so row count ≠ slot count)
-      const { data: entryRows, error: entryError } = await supabase
-        .from("time_entry")
-        .select("day_id, start_time, end_time")
-        .in("day_id", dayIds);
+      // (one DB row can span multiple slots, so row count ≠ slot count).
+      // A day has at most 144 rows, so chunks of 6 days fit one 1000-row page
+      // (the response cap) and all chunks load in parallel.
+      const dayIdChunks: number[][] = [];
+      for (let i = 0; i < dayIds.length; i += 6) {
+        dayIdChunks.push(dayIds.slice(i, i + 6));
+      }
 
-      if (entryError) {
+      let entryRows: { day_id: number; start_time: string; end_time: string }[];
+      try {
+        const chunkRows = await Promise.all(
+          dayIdChunks.map((chunk) =>
+            fetchAllRows<{
+              day_id: number;
+              start_time: string;
+              end_time: string;
+            }>((from, to) =>
+              supabase
+                .from("time_entry")
+                .select("day_id, start_time, end_time")
+                .in("day_id", chunk)
+                .order("entry_id")
+                .range(from, to),
+            ),
+          ),
+        );
+        entryRows = chunkRows.flat();
+      } catch {
         setErrorMessage(t("errors.entriesLoadError"));
         setIsLoading(false);
         return;
       }
 
       // Sum covered slots per day instead of counting rows
-      for (const row of entryRows ?? []) {
+      for (const row of entryRows) {
         const coveredSlots = calculateCoveredSlots(
           row.start_time,
           row.end_time,
