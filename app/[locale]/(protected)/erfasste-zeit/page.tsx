@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
+import { ClipboardList } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import {
   formatPeriodLabel,
   getPeriodDates,
@@ -45,6 +47,7 @@ type CourseDay = {
   entryCount: number;
   isSubmitted: boolean;
   isComplete: boolean;
+  dayQuestionnaireCompleted: boolean;
   status: DayStatus;
 };
 
@@ -180,11 +183,15 @@ function getStatusLabel(status: DayStatus, t: ErfassteZeitTranslate): string {
 function DayCarouselCard({
   day,
   onClick,
+  onEditDayQuestions,
 }: {
   day: CourseDay;
   onClick: () => void;
+  // Only passed for completed days when the course asks the day questions
+  onEditDayQuestions?: () => void;
 }) {
   const t = useTranslations("erfassteZeit");
+  const tDayQuestionnaire = useTranslations("dayQuestionnaire");
   const locale = useLocale();
   const colors = getStatusColors(day.status);
   const isAvailable = day.status !== "nicht_verfuegbar";
@@ -234,6 +241,29 @@ function DayCarouselCard({
           {completionPercentage}%
         </p>
       </div>
+
+      {/* w-0 + min-w-full: the button wraps its label instead of widening
+          the (content-sized) card beyond its neighbours */}
+      {onEditDayQuestions && (
+        <button
+          type="button"
+          onClick={(event) => {
+            // The card itself opens the day in Zeiterfassung
+            event.stopPropagation();
+            onEditDayQuestions();
+          }}
+          className={`mt-2 flex w-0 min-w-full items-center justify-center gap-1 rounded-md border px-2 py-1 text-center text-[11px] leading-tight transition-colors ${
+            day.dayQuestionnaireCompleted
+              ? "border-green-200 bg-white font-medium text-green-700 hover:bg-green-100 dark:border-green-800/50 dark:bg-slate-900 dark:text-green-300 dark:hover:bg-green-900/40"
+              : "border-amber-300 bg-amber-50 font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
+          }`}
+        >
+          <ClipboardList size={12} className="shrink-0" />
+          {day.dayQuestionnaireCompleted
+            ? tDayQuestionnaire("editButton")
+            : tDayQuestionnaire("answerButton")}
+        </button>
+      )}
     </div>
   );
 }
@@ -243,14 +273,22 @@ function DayCarouselCard({
 function DayCarousel({
   days,
   onDayClick,
+  onEditDayQuestions,
   label,
 }: {
   days: CourseDay[];
   onDayClick: (date: string) => void;
+  // Set when the course asks the day questions; offered on completed days
+  onEditDayQuestions?: (date: string) => void;
   label?: string;
 }) {
   const t = useTranslations("erfassteZeit");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const editHandlerFor = (day: CourseDay) =>
+    onEditDayQuestions && day.isComplete
+      ? () => onEditDayQuestions(day.date)
+      : undefined;
 
   return (
     <div>
@@ -268,6 +306,7 @@ function DayCarousel({
             key={day.date}
             day={day}
             onClick={() => onDayClick(day.date)}
+            onEditDayQuestions={editHandlerFor(day)}
           />
         ))}
       </div>
@@ -283,6 +322,7 @@ function DayCarousel({
             key={day.date}
             day={day}
             onClick={() => onDayClick(day.date)}
+            onEditDayQuestions={editHandlerFor(day)}
           />
         ))}
       </div>
@@ -355,6 +395,8 @@ export default function ErfassteZeitPage() {
   );
   const [courseDays, setCourseDays] = useState<CourseDay[]>([]);
   const [periods, setPeriods] = useState<CoursePeriodInfo[]>([]);
+  // Per-course opt-in flag for the day questionnaire (admin-toggleable)
+  const [askDayQuestionnaire, setAskDayQuestionnaire] = useState(false);
 
   // Tracks the last time data was loaded to avoid unnecessary reloads on tab switch
   const lastLoadTimeRef = useRef<number>(0);
@@ -397,14 +439,19 @@ export default function ErfassteZeitPage() {
     setIsLoading(true);
     setErrorMessage("");
 
-    // Step 1: get the currently logged-in user
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData.user) {
+    // Step 1: get the currently logged-in user. The local session suffices:
+    // the protected layout and proxy.ts already verify the user with the auth
+    // server, and all queries below are enforced by RLS — saves a round trip.
+    const {
+      data: { session },
+      error: authError,
+    } = await supabase.auth.getSession();
+    if (authError || !session?.user) {
       setErrorMessage(t("errors.userLoadError"));
       setIsLoading(false);
       return;
     }
-    const userId = authData.user.id;
+    const userId = session.user.id;
 
     // Step 2: get the course the user is enrolled in (one course per user)
     const { data: userCourseData, error: userCourseError } = await supabase
@@ -428,7 +475,7 @@ export default function ErfassteZeitPage() {
     ] = await Promise.all([
       supabase
         .from("course")
-        .select("name, start_date, end_date")
+        .select("name, start_date, end_date, ask_day_questionnaire")
         .eq("course_id", courseId)
         .single(),
       supabase
@@ -438,7 +485,7 @@ export default function ErfassteZeitPage() {
         .order("sort_order", { ascending: true }),
       supabase
         .from("day")
-        .select("day_id, date, is_submitted, is_complete")
+        .select("day_id, date, is_submitted, is_complete, day_questionnaire_completed")
         .eq("profiles_id", userId)
         .eq("course_id", courseId),
     ]);
@@ -476,6 +523,7 @@ export default function ErfassteZeitPage() {
           ];
 
     setPeriods(effectivePeriods);
+    setAskDayQuestionnaire(courseData.ask_day_questionnaire === true);
     setCourseSummary({
       courseName: courseData.name,
       periods: effectivePeriods,
@@ -488,20 +536,41 @@ export default function ErfassteZeitPage() {
 
     if (dayIds.length > 0) {
       // Fetch start_time + end_time so we can count covered 10-min slots per day
-      // (one DB row can span multiple slots, so row count ≠ slot count)
-      const { data: entryRows, error: entryError } = await supabase
-        .from("time_entry")
-        .select("day_id, start_time, end_time")
-        .in("day_id", dayIds);
+      // (one DB row can span multiple slots, so row count ≠ slot count).
+      // A day has at most 144 rows, so chunks of 6 days fit one 1000-row page
+      // (the response cap) and all chunks load in parallel.
+      const dayIdChunks: number[][] = [];
+      for (let i = 0; i < dayIds.length; i += 6) {
+        dayIdChunks.push(dayIds.slice(i, i + 6));
+      }
 
-      if (entryError) {
+      let entryRows: { day_id: number; start_time: string; end_time: string }[];
+      try {
+        const chunkRows = await Promise.all(
+          dayIdChunks.map((chunk) =>
+            fetchAllRows<{
+              day_id: number;
+              start_time: string;
+              end_time: string;
+            }>((from, to) =>
+              supabase
+                .from("time_entry")
+                .select("day_id, start_time, end_time")
+                .in("day_id", chunk)
+                .order("entry_id")
+                .range(from, to),
+            ),
+          ),
+        );
+        entryRows = chunkRows.flat();
+      } catch {
         setErrorMessage(t("errors.entriesLoadError"));
         setIsLoading(false);
         return;
       }
 
       // Sum covered slots per day instead of counting rows
-      for (const row of entryRows ?? []) {
+      for (const row of entryRows) {
         const coveredSlots = calculateCoveredSlots(
           row.start_time,
           row.end_time,
@@ -533,6 +602,8 @@ export default function ErfassteZeitPage() {
         entryCount,
         isSubmitted,
         isComplete: dayRecord?.is_complete ?? false,
+        dayQuestionnaireCompleted:
+          dayRecord?.day_questionnaire_completed ?? false,
         status: getDayStatus(date, entryCount, isSubmitted),
       };
     });
@@ -545,6 +616,11 @@ export default function ErfassteZeitPage() {
   // Navigates to the Zeiterfassung page for the selected date
   function handleDayClick(date: string) {
     router.push(`/zeiterfassung?date=${date}`);
+  }
+
+  // Opens the day in Zeiterfassung with its day questions already open
+  function handleEditDayQuestions(date: string) {
+    router.push(`/zeiterfassung?date=${date}&dayQuestions=1`);
   }
 
   // ── Render states ────────────────────────────────────────────────────────────
@@ -643,6 +719,9 @@ export default function ErfassteZeitPage() {
           <DayCarousel
             days={periodDays}
             onDayClick={handleDayClick}
+            onEditDayQuestions={
+              askDayQuestionnaire ? handleEditDayQuestions : undefined
+            }
             label={formatPeriodLabel(
               period.start_date,
               period.end_date,

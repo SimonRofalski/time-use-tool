@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Check, Loader2, Save } from "lucide-react";
+import { Check, Loader2, Save, X } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import type { Locale } from "@/i18n/routing";
 import { getLocalizedName } from "@/lib/i18n/localized-name";
@@ -55,6 +55,10 @@ type DayQuestionnaireModalProps = {
   existingEntries: TimeEntryRecord[];
   activities: Activity[];
   onSaved: () => void;
+  onClose: () => void;
+  // "prompt" = shown automatically right after the day was completed (can be
+  // postponed via "Später ausfüllen"); "edit" = opened by the user themselves
+  mode: "prompt" | "edit";
 };
 
 // A small reusable option-card row, mirroring ProfileDetailsForm's visual style
@@ -121,7 +125,10 @@ export default function DayQuestionnaireModal({
   existingEntries,
   activities,
   onSaved,
+  onClose,
+  mode,
 }: DayQuestionnaireModalProps) {
+  const isEditMode = mode === "edit";
   const t = useTranslations("dayQuestionnaire");
   const locale = useLocale() as Locale;
   const supabase = getSupabaseBrowserClient();
@@ -136,8 +143,13 @@ export default function DayQuestionnaireModal({
     let cancelled = false;
 
     async function loadLookups() {
-      const [fillTimingsRes, dayTypesRes, tripTypesRes, dayAppreciationsRes] =
-        await Promise.all([
+      const [
+        fillTimingsRes,
+        dayTypesRes,
+        tripTypesRes,
+        dayAppreciationsRes,
+        existingRes,
+      ] = await Promise.all([
           supabase
             .from("diary_fill_timing")
             .select("*")
@@ -148,9 +160,28 @@ export default function DayQuestionnaireModal({
             .from("day_appreciation")
             .select("*")
             .order("day_appreciation_id"),
+          // Earlier answers for this day, if any — prefilled for editing
+          supabase
+            .from("day_questionnaire")
+            .select("*")
+            .eq("day_id", dayId)
+            .maybeSingle(),
         ]);
 
       if (cancelled) return;
+      const existing = existingRes.data;
+      if (existing) {
+        setForm({
+          diaryFillTimingId: existing.diary_fill_timing_id,
+          mostPleasantActivityId: existing.most_pleasant_activity_id,
+          mostUnpleasantActivityId: existing.most_unpleasant_activity_id,
+          mostStressfulActivityId: existing.most_stressful_activity_id,
+          dayAppreciationId: existing.day_appreciation_id,
+          isUnusualDay: existing.is_unusual_day,
+          dayTypeContextId: existing.day_type_context_id,
+          tripTypeId: existing.trip_type_id,
+        });
+      }
       setLookups({
         fillTimings: fillTimingsRes.data ?? [],
         dayTypes: dayTypesRes.data ?? [],
@@ -163,7 +194,7 @@ export default function DayQuestionnaireModal({
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [supabase, dayId]);
 
   // Distinct primary activities logged that day (secondary activities excluded),
   // in the order they first appear
@@ -182,11 +213,23 @@ export default function DayQuestionnaireModal({
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
+  // A prefilled activity may no longer be logged that day (entries edited
+  // since) — then it counts as unanswered instead of being saved again
+  const dayActivityPick = (activityId: number | null) =>
+    activityId !== null && dayActivityIds.includes(activityId)
+      ? activityId
+      : null;
+  const mostPleasantActivityId = dayActivityPick(form.mostPleasantActivityId);
+  const mostUnpleasantActivityId = dayActivityPick(
+    form.mostUnpleasantActivityId,
+  );
+  const mostStressfulActivityId = dayActivityPick(form.mostStressfulActivityId);
+
   const isComplete =
     form.diaryFillTimingId !== null &&
-    form.mostPleasantActivityId !== null &&
-    form.mostUnpleasantActivityId !== null &&
-    form.mostStressfulActivityId !== null &&
+    mostPleasantActivityId !== null &&
+    mostUnpleasantActivityId !== null &&
+    mostStressfulActivityId !== null &&
     form.dayAppreciationId !== null &&
     form.isUnusualDay !== null &&
     form.dayTypeContextId !== null &&
@@ -206,9 +249,9 @@ export default function DayQuestionnaireModal({
       {
         day_id: dayId,
         diary_fill_timing_id: form.diaryFillTimingId,
-        most_pleasant_activity_id: form.mostPleasantActivityId,
-        most_unpleasant_activity_id: form.mostUnpleasantActivityId,
-        most_stressful_activity_id: form.mostStressfulActivityId,
+        most_pleasant_activity_id: mostPleasantActivityId,
+        most_unpleasant_activity_id: mostUnpleasantActivityId,
+        most_stressful_activity_id: mostStressfulActivityId,
         day_appreciation_id: form.dayAppreciationId,
         is_unusual_day: form.isUnusualDay,
         day_type_context_id: form.dayTypeContextId,
@@ -229,11 +272,21 @@ export default function DayQuestionnaireModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
       <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          {t("title")}
-        </h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            {t("title")}
+          </h2>
+          <button
+            type="button"
+            aria-label={t("close")}
+            onClick={onClose}
+            className="rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          >
+            <X size={18} />
+          </button>
+        </div>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {t("description")}
+          {isEditMode ? t("editDescription") : t("description")}
         </p>
 
         {!lookups ? (
@@ -261,33 +314,33 @@ export default function DayQuestionnaireModal({
 
             <QuestionPanel
               label={t("questions.mostPleasant")}
-              isAnswered={!showValidation || form.mostPleasantActivityId !== null}
+              isAnswered={!showValidation || mostPleasantActivityId !== null}
             >
               <OptionCards
                 options={dayActivityOptions}
-                selectedValue={form.mostPleasantActivityId}
+                selectedValue={mostPleasantActivityId}
                 onSelect={(value) => updateField("mostPleasantActivityId", value)}
               />
             </QuestionPanel>
 
             <QuestionPanel
               label={t("questions.mostUnpleasant")}
-              isAnswered={!showValidation || form.mostUnpleasantActivityId !== null}
+              isAnswered={!showValidation || mostUnpleasantActivityId !== null}
             >
               <OptionCards
                 options={dayActivityOptions}
-                selectedValue={form.mostUnpleasantActivityId}
+                selectedValue={mostUnpleasantActivityId}
                 onSelect={(value) => updateField("mostUnpleasantActivityId", value)}
               />
             </QuestionPanel>
 
             <QuestionPanel
               label={t("questions.mostStressful")}
-              isAnswered={!showValidation || form.mostStressfulActivityId !== null}
+              isAnswered={!showValidation || mostStressfulActivityId !== null}
             >
               <OptionCards
                 options={dayActivityOptions}
-                selectedValue={form.mostStressfulActivityId}
+                selectedValue={mostStressfulActivityId}
                 onSelect={(value) => updateField("mostStressfulActivityId", value)}
               />
             </QuestionPanel>
@@ -367,11 +420,19 @@ export default function DayQuestionnaireModal({
               </p>
             )}
 
-            <div className="sticky bottom-0 -mx-6 border-t border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+            <div className="sticky bottom-0 -mx-6 flex gap-2 border-t border-slate-200 bg-white/95 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving}
+                className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                {isEditMode ? t("cancelButton") : t("laterButton")}
+              </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-blue-500 dark:hover:bg-blue-400 dark:focus:ring-offset-slate-900"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-blue-500 dark:hover:bg-blue-400 dark:focus:ring-offset-slate-900"
               >
                 {saving ? (
                   <Loader2 size={16} className="animate-spin" />

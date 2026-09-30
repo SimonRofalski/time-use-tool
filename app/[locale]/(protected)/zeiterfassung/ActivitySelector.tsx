@@ -1579,7 +1579,7 @@ export default function ActivitySelector({
 
   // Step 7 (final): how did the user feel? (emoji grid with labels below)
   // When askExtraRatings is on for the course, two more rating groups
-  // (Meaningfulness, Stressfulness) render on the same screen, and a "Save"
+  // (Stressfulness, then Meaningfulness) render on the same screen, and a "Save"
   // button finalizes — taps become non-advancing selections in that case
   // (see page.tsx's handleStepComplete: isIntermediateUpdate now also covers
   // the satisfaction step while askExtraRatings is true). When the flag is
@@ -1628,19 +1628,6 @@ export default function ActivitySelector({
 
         <div>
           <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-            {t("questions.meaningfulness")}
-          </p>
-          {renderRatingGrid(
-            sortedMeaningfulness,
-            pendingEntry.meaningfulness_id,
-            (m) => m.meaningfulness_id,
-            MEANINGFULNESS_EMOJI_BY_CODE,
-            (id) => onStepComplete({ meaningfulness_id: id }),
-          )}
-        </div>
-
-        <div>
-          <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
             {t("questions.stressfulness")}
           </p>
           {renderRatingGrid(
@@ -1649,6 +1636,19 @@ export default function ActivitySelector({
             (s) => s.stressfulness_id,
             STRESSFULNESS_EMOJI_BY_CODE,
             (id) => onStepComplete({ stressfulness_id: id }),
+          )}
+        </div>
+
+        <div>
+          <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            {t("questions.meaningfulness")}
+          </p>
+          {renderRatingGrid(
+            sortedMeaningfulness,
+            pendingEntry.meaningfulness_id,
+            (m) => m.meaningfulness_id,
+            MEANINGFULNESS_EMOJI_BY_CODE,
+            (id) => onStepComplete({ meaningfulness_id: id }),
           )}
         </div>
 

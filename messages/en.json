@@ -172,9 +172,9 @@
       "digitalMediaType": "Which devices did you use?",
       "locationTransport": "Where were you during this time?",
       "socialContext": "Was anyone else with you?",
-      "satisfaction": "How did you feel?",
+      "satisfaction": "How did you feel during the activity?",
       "meaningfulness": "How do you rate the meaningfulness of the activity for your long-term well-being / happiness?",
-      "stressfulness": "How do you rate the stressfulness of the activity?"
+      "stressfulness": "How stressful was the activity?"
     },
     "stepLabels": {
       "primaryActivity": "Main activity",
@@ -569,7 +569,8 @@
           "title": "Remove participant",
           "message": "Do you really want to remove {name} from the course? Their time entries are kept.",
           "confirmLabel": "Remove"
-        }
+        },
+        "dayQuestionnairesProgress": "{answered} / {total} day questions answered"
       }
     },
     "exportModal": {
@@ -593,14 +594,16 @@
       "backToOverviewButton": "Back to course overview",
       "loading": "Loading…",
       "daysCompleted": "/ {total} days completed",
-      "privacyNote": "Per person, only whether a day's entry has been completed is visible. Time use data is available to admins only in aggregated form without reference to persons (statistics, data export)."
+      "privacyNote": "Per person, only whether a day's entry has been completed and its day questions answered is visible – not the answers themselves. Time use data is available to admins only in aggregated form without reference to persons (statistics, data export)."
     },
     "dayList": {
       "noCourseDays": "No course days are defined for this course.",
       "colDay": "Course day",
       "colCompleted": "Completed",
       "yes": "Yes",
-      "no": "No"
+      "no": "No",
+      "colDayQuestionnaire": "Day questions",
+      "pending": "Open"
     },
     "csvExport": {
       "firstName": "First name",
@@ -887,7 +890,11 @@
   },
   "dayQuestionnaire": {
     "title": "Questions about the day",
-    "description": "You've fully logged this day. Please answer a few final questions about it.",
+    "description": "You have fully logged this day. Please answer a few final questions about it. If you don't have time right now, you can answer them later via “Answer day questions”.",
+    "editDescription": "You can change your answers for this day here.",
+    "editButton": "Edit day questions",
+    "cancelButton": "Cancel",
+    "close": "Close",
     "loading": "Loading questionnaire…",
     "saveButton": "Save",
     "savingButton": "Saving…",
@@ -906,7 +913,9 @@
       },
       "dayType": "What kind of day was this for you?",
       "tripType": "Were you on a trip (e.g. to another locality, region, or country) during the diary day? Disregard regular trips to school or work, or trips lasting less than two hours in total."
-    }
+    },
+    "laterButton": "Fill in later",
+    "answerButton": "Answer day questions"
   },
   "tutorial": {
     "stepCounter": "{current} of {total}",
@@ -944,8 +953,12 @@
         "body": "Here you say where you were – or how you were travelling."
       },
       "social": {
-        "title": "People and mood",
-        "body": "Finally: who was with you, and how did you feel? Then the entry is saved and the slots in the grid are filled in."
+        "title": "People",
+        "body": "Who was with you? You can pick several people – or say that you were alone."
+      },
+      "mood": {
+        "title": "Mood",
+        "body": "Finally: how did you feel during the activity? Depending on your course, we also ask how stressful and how meaningful the activity was for you. Then the entry is saved and the slots in the grid are filled in."
       },
       "overview": {
         "title": "Overview",

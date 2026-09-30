@@ -124,6 +124,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       target: "activity-panel",
       demo: "social",
     }),
+    tutorialStep("mood", {
+      route: "/zeiterfassung",
+      target: "activity-panel",
+      demo: "satisfaction",
+    }),
     tutorialStep("overview", {
       route: "/erfasste-zeit",
       target: "tab-erfasste-zeit",
