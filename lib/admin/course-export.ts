@@ -17,6 +17,10 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 //
 // Mindestgrösse: Unter MIN_PARTICIPANTS_FOR_EXPORT Teilnehmenden mit Daten wäre
 // jede Zeile trivial zuzuordnen — dann wird gar nicht exportiert.
+//
+// Für die wissenschaftliche Auswertung gibt es zusätzlich den pseudonymisierten
+// Forschungsexport (PersonID + Datum, inkl. Survey und Tagesfragen), siehe
+// lib/admin/research-export.ts.
 
 export const MIN_PARTICIPANTS_FOR_EXPORT = 3;
 
@@ -43,6 +47,8 @@ type RawEntry = {
   secondary_activity_id: number | null;
   location_transport_id: number | null;
   satisfaction_id: number | null;
+  stressfulness_id: number | null;
+  meaningfulness_id: number | null;
   digital_media_used: boolean | null;
   time_entry_digital_media_type?: { digital_media_type_id: number | null }[];
   time_entry_social_context?: { social_context_id: number | null }[];
@@ -50,7 +56,7 @@ type RawEntry = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function minutesFromTimes(start: string, end: string): number {
+export function minutesFromTimes(start: string, end: string): number {
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
   const startMin = sh * 60 + sm;
@@ -59,7 +65,7 @@ function minutesFromTimes(start: string, end: string): number {
   return mins > 0 ? mins : 0;
 }
 
-function round(value: number, decimals: number): number {
+export function round(value: number, decimals: number): number {
   const f = 10 ** decimals;
   return Math.round(value * f) / f;
 }
@@ -74,7 +80,7 @@ function shuffle<T>(items: T[]): T[] {
   return arr;
 }
 
-function chunk<T>(items: T[], size: number): T[][] {
+export function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
@@ -154,6 +160,8 @@ export async function buildCourseExport(
     socialContextsRes,
     digitalMediaTypesRes,
     satisfactionsRes,
+    stressfulnessRes,
+    meaningfulnessRes,
   ] = await Promise.all([
     admin
       .from("category")
@@ -172,6 +180,8 @@ export async function buildCourseExport(
       .from("digital_media_type")
       .select("digital_media_type_id, name, name_en"),
     admin.from("satisfaction").select("satisfaction_id, name, name_en"),
+    admin.from("stressfulness").select("stressfulness_id, name, name_en"),
+    admin.from("meaningfulness").select("meaningfulness_id, name, name_en"),
   ]);
 
   const categoryNameById: Record<number, string> = {};
@@ -210,6 +220,12 @@ export async function buildCourseExport(
   const satisfactionNameById: Record<number, string> = {};
   for (const s of satisfactionsRes.data ?? [])
     satisfactionNameById[s.satisfaction_id] = getLocalizedName(s, locale);
+  const stressfulnessNameById: Record<number, string> = {};
+  for (const s of stressfulnessRes.data ?? [])
+    stressfulnessNameById[s.stressfulness_id] = getLocalizedName(s, locale);
+  const meaningfulnessNameById: Record<number, string> = {};
+  for (const m of meaningfulnessRes.data ?? [])
+    meaningfulnessNameById[m.meaningfulness_id] = getLocalizedName(m, locale);
 
   // Time entries of the submitted days
   // (chunked day-id lists keep request URLs short; paged to beat the 1000-row cap)
@@ -220,7 +236,7 @@ export async function buildCourseExport(
       admin
         .from("time_entry")
         .select(
-          "entry_id, day_id, start_time, end_time, primary_activity_id, secondary_activity_id, location_transport_id, satisfaction_id, digital_media_used, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
+          "entry_id, day_id, start_time, end_time, primary_activity_id, secondary_activity_id, location_transport_id, satisfaction_id, stressfulness_id, meaningfulness_id, digital_media_used, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
         )
         .in("day_id", ids)
         .order("entry_id")
@@ -320,6 +336,14 @@ export async function buildCourseExport(
           [tc("wellbeing")]:
             e.satisfaction_id != null
               ? (satisfactionNameById[e.satisfaction_id] ?? "")
+              : "",
+          [tc("stressfulness")]:
+            e.stressfulness_id != null
+              ? (stressfulnessNameById[e.stressfulness_id] ?? "")
+              : "",
+          [tc("meaningfulness")]:
+            e.meaningfulness_id != null
+              ? (meaningfulnessNameById[e.meaningfulness_id] ?? "")
               : "",
         };
       }),

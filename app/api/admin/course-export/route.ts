@@ -9,11 +9,13 @@ import {
   MIN_PARTICIPANTS_FOR_EXPORT,
   type ExportMode,
 } from "@/lib/admin/course-export";
+import { buildResearchExport } from "@/lib/admin/research-export";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/admin/course-export?courseId=123&mode=aggregiert|roh&locale=de|en
-// Returns de-identified export rows for one course (see lib/admin/course-export.ts).
+// GET /api/admin/course-export?courseId=123&mode=aggregiert|roh|forschung&locale=de|en
+// aggregiert/roh: de-identified rows for one course (lib/admin/course-export.ts).
+// forschung: pseudonymised sheets for research (lib/admin/research-export.ts).
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
@@ -28,15 +30,20 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const courseId = Number(searchParams.get("courseId"));
   const modeParam = searchParams.get("mode");
-  const mode: ExportMode | null =
-    modeParam === "aggregiert" || modeParam === "roh" ? modeParam : null;
+  const mode: ExportMode | "forschung" | null =
+    modeParam === "aggregiert" || modeParam === "roh" || modeParam === "forschung"
+      ? modeParam
+      : null;
 
   if (!Number.isInteger(courseId) || courseId <= 0 || !mode) {
     return NextResponse.json({ error: t("invalidRequest") }, { status: 400 });
   }
 
   try {
-    const result = await buildCourseExport(auth.ctx.admin, courseId, mode, locale);
+    const result =
+      mode === "forschung"
+        ? await buildResearchExport(auth.ctx.admin, courseId, locale)
+        : await buildCourseExport(auth.ctx.admin, courseId, mode, locale);
 
     if (!result.ok) {
       if (result.reason === "COURSE_NOT_FOUND") {
@@ -57,6 +64,14 @@ export async function GET(request: NextRequest) {
         },
         { status: 422 },
       );
+    }
+
+    if ("sheets" in result) {
+      return NextResponse.json({
+        courseName: result.courseName,
+        sheets: result.sheets,
+        participants: result.participants,
+      });
     }
 
     return NextResponse.json({

@@ -1324,7 +1324,8 @@ export default function StatistikenPage() {
       locations,
       sats,
       { data: myDays },
-      allDays,
+      submittedCourseDays,
+      excludedRes,
     ] = await Promise.all([
       supabase
         .from("course")
@@ -1388,8 +1389,30 @@ export default function StatistikenPage() {
             .order("day_id")
             .range(from, to),
       ),
+      // Participants an admin excluded from statistics (user_course.is_excluded
+      // is not readable for other users, hence the RPC)
+      supabase.rpc("course_excluded_profile_ids", { p_course_id: courseId }),
     ]);
     if (isStale()) return;
+
+    // Excluded participants don't count towards anyone else's course
+    // comparison; the viewer's own data always stays, so an excluded user
+    // still sees their own statistics. If the RPC is missing (migration not
+    // yet applied), fall back to the unfiltered pool rather than failing.
+    if (excludedRes.error) {
+      console.warn(
+        "course_excluded_profile_ids unavailable, course comparison not filtered",
+        excludedRes.error.message,
+      );
+    }
+    const excludedProfileIds = new Set<string>(
+      ((excludedRes.data as string[] | null) ?? []).filter(
+        (id) => id !== userId,
+      ),
+    );
+    const allDays = submittedCourseDays.filter(
+      (d) => !excludedProfileIds.has(d.profiles_id),
+    );
 
     setIsCourseComparisonEnabled(courseSettings?.comparison_enabled === true);
     setCourseName(courseSettings?.name ?? "");
