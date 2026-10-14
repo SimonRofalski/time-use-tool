@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import * as XLSX from "xlsx";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import ConfirmModal from "./ConfirmModal";
@@ -32,7 +31,8 @@ import {
 // Pro Person ist deshalb ausschliesslich sichtbar: Name/E-Mail (bzw. Alias) und
 // pro Kurstag ein true/false ("abgeschlossen"). Keine Zeiteinträge, keine
 // Tätigkeiten, keine persönliche Zeitverteilung. Exporte werden serverseitig
-// de-identifiziert erzeugt (siehe lib/admin/course-export.ts).
+// de-identifiziert (lib/admin/course-export.ts) bzw. für die Forschung
+// pseudonymisiert (lib/admin/research-export.ts) erzeugt.
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,9 +79,7 @@ type DayStatusRow = {
   dayQuestionnaireCompleted: boolean;
 };
 
-type ExportRow = Record<string, string | number>;
 type ExportGranularity = "aggregiert" | "roh" | "forschung";
-type ExportSheet = { key: string; name: string; rows: ExportRow[] };
 
 // Drill-down navigation state for the "Alle Kurse" sub-tab
 type DrillView =
@@ -473,31 +471,22 @@ export default function KursuebersichtTab() {
     const { courseId } = view;
 
     try {
-      // Rows are built server-side. aggregiert/roh carry no person reference
+      // The file is built server-side. aggregiert/roh carry no person reference
       // (no names, e-mails, IDs, aliases or dates; shuffled order); forschung
       // links its sheets via a pseudonymous PersonID (no names or e-mails).
       const res = await fetch(
-        `/api/admin/course-export?courseId=${courseId}&mode=${granularity}&locale=${locale}`,
+        `/api/admin/course-export?courseId=${courseId}&mode=${granularity}&format=${format}&locale=${locale}`,
         { cache: "no-store" },
       );
-      const payload = (await res.json()) as {
-        error?: string;
-        courseName?: string;
-        rows?: ExportRow[];
-        sheets?: ExportSheet[];
-      };
-
-      const sheets: ExportSheet[] | undefined =
-        payload.sheets ??
-        (payload.rows
-          ? [{ key: "statistics", name: "Statistiken", rows: payload.rows }]
-          : undefined);
-      if (!res.ok || !sheets) {
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
         setExportError(payload.error ?? t("exportModal.exportError"));
         return false;
       }
 
-      const safeCourseName = (payload.courseName ?? view.courseName)
+      const safeCourseName = view.courseName
         .replace(/[^\w\- äöüÄÖÜß]/g, "")
         .trim();
       const baseName =
@@ -508,44 +497,16 @@ export default function KursuebersichtTab() {
                 ? "Aggregiert_anonym"
                 : "Rohdaten_anonym"
             }`;
-      const sanitize = (v: string | number | null | undefined) =>
-        String(v ?? "").replaceAll(";", ",");
+      // Research export as CSV arrives as a zip (one CSV per sheet)
+      const extension =
+        format === "xlsx" ? "xlsx" : granularity === "forschung" ? "zip" : "csv";
 
-      if (format === "csv") {
-        // One CSV file per sheet (research export \u2192 three files)
-        for (const sheet of sheets) {
-          const headers = Object.keys(sheet.rows[0] ?? {});
-          const bom = "\uFEFF";
-          const csvLines = [
-            headers.join(";"),
-            ...sheet.rows.map((r) =>
-              headers.map((h) => sanitize(r[h])).join(";"),
-            ),
-          ];
-          const blob = new Blob([bom + csvLines.join("\n")], {
-            type: "text/csv;charset=utf-8;",
-          });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download =
-            sheets.length > 1
-              ? `${baseName}_${sheet.name}.csv`
-              : `${baseName}.csv`;
-          a.click();
-          URL.revokeObjectURL(url);
-        }
-      } else {
-        const wb = XLSX.utils.book_new();
-        for (const sheet of sheets) {
-          const headers = Object.keys(sheet.rows[0] ?? {});
-          const ws = XLSX.utils.json_to_sheet(sheet.rows, { header: headers });
-          ws["!cols"] = headers.map((h) => ({ wch: Math.max(h.length, 14) }));
-          // Excel limits sheet names to 31 characters
-          XLSX.utils.book_append_sheet(wb, ws, sheet.name.slice(0, 31));
-        }
-        XLSX.writeFile(wb, `${baseName}.xlsx`);
-      }
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${baseName}.${extension}`;
+      a.click();
+      URL.revokeObjectURL(url);
       return true;
     } catch {
       setExportError(t("exportModal.exportError"));
