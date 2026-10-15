@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import * as XLSX from "xlsx";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import ConfirmModal from "./ConfirmModal";
@@ -32,7 +31,8 @@ import {
 // Pro Person ist deshalb ausschliesslich sichtbar: Name/E-Mail (bzw. Alias) und
 // pro Kurstag ein true/false ("abgeschlossen"). Keine Zeiteinträge, keine
 // Tätigkeiten, keine persönliche Zeitverteilung. Exporte werden serverseitig
-// de-identifiziert erzeugt (siehe lib/admin/course-export.ts).
+// de-identifiziert (lib/admin/course-export.ts) bzw. für die Forschung
+// pseudonymisiert (lib/admin/research-export.ts) erzeugt.
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,7 +79,7 @@ type DayStatusRow = {
   dayQuestionnaireCompleted: boolean;
 };
 
-type ExportRow = Record<string, string | number>;
+type ExportGranularity = "aggregiert" | "roh" | "forschung";
 
 // Drill-down navigation state for the "Alle Kurse" sub-tab
 type DrillView =
@@ -198,9 +198,8 @@ export default function KursuebersichtTab() {
   const [isAnonymizing, setIsAnonymizing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportGranularity, setExportGranularity] = useState<
-    "aggregiert" | "roh"
-  >("aggregiert");
+  const [exportGranularity, setExportGranularity] =
+    useState<ExportGranularity>("aggregiert");
   const [exportError, setExportError] = useState("");
 
   useEffect(() => {
@@ -463,7 +462,7 @@ export default function KursuebersichtTab() {
 
   async function handleExportCourse(
     format: "csv" | "xlsx",
-    granularity: "aggregiert" | "roh",
+    granularity: ExportGranularity,
   ): Promise<boolean> {
     if (view.type !== "course") return false;
     setIsExporting(true);
@@ -472,55 +471,42 @@ export default function KursuebersichtTab() {
     const { courseId } = view;
 
     try {
-      // Rows are built server-side without any person reference
-      // (no names, e-mails, IDs, aliases or dates; shuffled order).
+      // The file is built server-side. aggregiert/roh carry no person reference
+      // (no names, e-mails, IDs, aliases or dates; shuffled order); forschung
+      // links its sheets via a pseudonymous PersonID (no names or e-mails).
       const res = await fetch(
-        `/api/admin/course-export?courseId=${courseId}&mode=${granularity}&locale=${locale}`,
+        `/api/admin/course-export?courseId=${courseId}&mode=${granularity}&format=${format}&locale=${locale}`,
         { cache: "no-store" },
       );
-      const payload = (await res.json()) as {
-        error?: string;
-        courseName?: string;
-        rows?: ExportRow[];
-      };
-
-      if (!res.ok || !payload.rows) {
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
         setExportError(payload.error ?? t("exportModal.exportError"));
         return false;
       }
 
-      const rows = payload.rows;
-      const headers = Object.keys(rows[0] ?? {});
-      const safeCourseName = (payload.courseName ?? view.courseName)
+      const safeCourseName = view.courseName
         .replace(/[^\w\- äöüÄÖÜß]/g, "")
         .trim();
-      const modeSuffix =
-        granularity === "aggregiert" ? "Aggregiert_anonym" : "Rohdaten_anonym";
-      const sanitize = (v: string | number | null | undefined) =>
-        String(v ?? "").replaceAll(";", ",");
+      const baseName =
+        granularity === "forschung"
+          ? `${safeCourseName}_Forschungsdaten_pseudonymisiert`
+          : `${safeCourseName}_Statistiken_${
+              granularity === "aggregiert"
+                ? "Aggregiert_anonym"
+                : "Rohdaten_anonym"
+            }`;
+      // Research export as CSV arrives as a zip (one CSV per sheet)
+      const extension =
+        format === "xlsx" ? "xlsx" : granularity === "forschung" ? "zip" : "csv";
 
-      if (format === "csv") {
-        const bom = "\uFEFF";
-        const csvLines = [
-          headers.join(";"),
-          ...rows.map((r) => headers.map((h) => sanitize(r[h])).join(";")),
-        ];
-        const blob = new Blob([bom + csvLines.join("\n")], {
-          type: "text/csv;charset=utf-8;",
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${safeCourseName}_Statistiken_${modeSuffix}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
-        ws["!cols"] = headers.map((h) => ({ wch: Math.max(h.length, 14) }));
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Statistiken");
-        XLSX.writeFile(wb, `${safeCourseName}_Statistiken_${modeSuffix}.xlsx`);
-      }
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${baseName}.${extension}`;
+      a.click();
+      URL.revokeObjectURL(url);
       return true;
     } catch {
       setExportError(t("exportModal.exportError"));
@@ -1285,7 +1271,9 @@ export default function KursuebersichtTab() {
                     className="mt-0.5 shrink-0 text-violet-600 dark:text-violet-400"
                   />
                   <p className="text-xs text-violet-800 dark:text-violet-300">
-                    {t("exportModal.privacyNote")}
+                    {exportGranularity === "forschung"
+                      ? t("exportModal.researchPrivacyNote")
+                      : t("exportModal.privacyNote")}
                   </p>
                 </div>
 
@@ -1316,11 +1304,24 @@ export default function KursuebersichtTab() {
                     >
                       {t("exportModal.rawOption")}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setExportGranularity("forschung")}
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                        exportGranularity === "forschung"
+                          ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
+                          : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      {t("exportModal.researchOption")}
+                    </button>
                   </div>
                   <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                     {exportGranularity === "aggregiert"
                       ? t("exportModal.aggregatedDescription")
-                      : t("exportModal.rawDescription")}
+                      : exportGranularity === "roh"
+                        ? t("exportModal.rawDescription")
+                        : t("exportModal.researchDescription")}
                   </p>
                 </div>
 

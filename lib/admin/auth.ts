@@ -9,9 +9,10 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin-client";
 //
 // Datenschutz: Admins dürfen laut Ethikprüfung keine personenbezogenen
 // Zeitnutzungsdaten einsehen. Deshalb werden Statistiken und Exporte NUR
-// serverseitig berechnet und ausschliesslich aggregiert / de-identifiziert
-// an den Browser zurückgegeben. Die Rohdaten verlassen den Server nie mit
-// einem Personenbezug.
+// serverseitig berechnet und aggregiert / de-identifiziert an den Browser
+// zurückgegeben. Einzige Ausnahme ist der Forschungsexport
+// (lib/admin/research-export.ts): pseudonymisiert über eine PersonID, ohne
+// Namen und E-Mails.
 
 type AdminContext = {
   userId: string;

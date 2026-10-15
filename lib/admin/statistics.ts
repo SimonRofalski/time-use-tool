@@ -3,6 +3,7 @@ import type { Locale } from "@/i18n/routing";
 import { getLocalizedName } from "@/lib/i18n/localized-name";
 import { totalPeriodDays } from "@/lib/course-periods";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { minutesFromTimes } from "@/lib/admin/course-export";
 import type {
   ActivityData,
   AdminStatistics,
@@ -62,12 +63,6 @@ function courseDurationDays(start: string, end: string): number {
       (new Date(end).getTime() - new Date(start).getTime()) / 86_400_000,
     ) + 1
   );
-}
-
-// Converts "HH:MM:SS" to total minutes
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
 }
 
 // Truncates long strings for chart axis labels
@@ -182,7 +177,8 @@ function buildCategoryDistribution(
     if (e.primary_activity_id == null) continue;
     const catId = activityToCategory[e.primary_activity_id];
     if (catId == null) continue;
-    const mins = timeToMinutes(e.end_time) - timeToMinutes(e.start_time);
+    // minutesFromTimes treats an end time of 00:00 as midnight (23:50–24:00 slot)
+    const mins = minutesFromTimes(e.start_time, e.end_time);
     if (mins > 0) {
       minutesByCategory[catId] = (minutesByCategory[catId] ?? 0) + mins;
     }
@@ -347,18 +343,28 @@ export async function loadAdminStatistics(
   const categories = categoriesRes.data ?? [];
   const satisfactions = satisfactionsRes.data ?? [];
 
-  // Profiles excluded from statistics by admin (is_excluded = true on user_course)
-  const excludedProfileIds = new Set<string>();
+  // Enrolments excluded from statistics by admin (is_excluded = true on
+  // user_course) — per course, so an exclusion in one course doesn't hide the
+  // same person's days in another
+  const excludedEnrolments = new Set<string>();
   for (const uc of userCourses) {
-    if (uc.is_excluded) excludedProfileIds.add(uc.profiles_id);
+    if (uc.is_excluded)
+      excludedEnrolments.add(`${uc.profiles_id}|${uc.course_id}`);
   }
 
-  // Filter days and entries to remove excluded users' data
+  // Filter days to remove excluded users' data
   const filteredDays = allDays.filter(
-    (d) => !excludedProfileIds.has(d.profiles_id),
+    (d) => !excludedEnrolments.has(`${d.profiles_id}|${d.course_id}`),
   );
-  const filteredDayIds = new Set(filteredDays.map((d) => d.day_id));
-  const filteredEntries = allEntries.filter((e) => filteredDayIds.has(e.day_id));
+  // Content statistics (activities, categories, well-being) only use complete
+  // (submitted) days, so half-filled days don't skew the distribution —
+  // consistent with the participant statistics and the course export
+  const submittedDayIds = new Set(
+    filteredDays.filter((d) => d.is_submitted).map((d) => d.day_id),
+  );
+  const filteredEntries = allEntries.filter((e) =>
+    submittedDayIds.has(e.day_id),
+  );
 
   const dayById: Record<number, { profiles_id: string }> = {};
   for (const d of allDays) dayById[d.day_id] = { profiles_id: d.profiles_id };
