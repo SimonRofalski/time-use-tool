@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { getSwitchOidcConfig, getSwitchRedirectUri, oidc } from "@/lib/oidc/client";
+import {
+  getPublicAppOrigin,
+  getSwitchOidcConfig,
+  getSwitchRedirectUri,
+  oidc,
+} from "@/lib/oidc/client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin-client";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import {
@@ -14,8 +19,9 @@ const PKCE_COOKIE_NAMES = [
   "switch_oidc_nonce",
 ] as const;
 
-function errorRedirect(request: NextRequest, code: string) {
-  const url = new URL("/", request.url);
+// Redirects use the public origin, not request.url (internal behind a proxy)
+function errorRedirect(code: string) {
+  const url = new URL("/", getPublicAppOrigin());
   url.searchParams.set("error", code);
   return NextResponse.redirect(url);
 }
@@ -31,24 +37,28 @@ export async function GET(request: NextRequest) {
   }
 
   if (!codeVerifier || !expectedState || !expectedNonce) {
-    return errorRedirect(request, "oidc_missing_session");
+    return errorRedirect("oidc_missing_session");
   }
 
   let claims: Record<string, unknown>;
   try {
     const config = await getSwitchOidcConfig();
+    // openid-client sends this URL (minus its query) as redirect_uri, so it
+    // must be the registered public callback URL plus the IdP's parameters
+    const callbackUrl = new URL(getSwitchRedirectUri());
+    callbackUrl.search = request.nextUrl.search;
     const tokens = await oidc.authorizationCodeGrant(
       config,
-      new URL(request.url, getSwitchRedirectUri()),
+      callbackUrl,
       { pkceCodeVerifier: codeVerifier, expectedState, expectedNonce },
     );
     const idTokenClaims = tokens.claims();
     if (!idTokenClaims) {
-      return errorRedirect(request, "oidc_missing_claims");
+      return errorRedirect("oidc_missing_claims");
     }
     claims = idTokenClaims;
   } catch {
-    return errorRedirect(request, "oidc_exchange_failed");
+    return errorRedirect("oidc_exchange_failed");
   }
 
   const sub = typeof claims.sub === "string" ? claims.sub : undefined;
@@ -57,9 +67,11 @@ export async function GET(request: NextRequest) {
     typeof claims.given_name === "string" ? claims.given_name : undefined;
   const lastName =
     typeof claims.family_name === "string" ? claims.family_name : undefined;
+  // Only an explicit false counts as unverified (claim may be absent)
+  const emailVerified = claims.email_verified !== false;
 
   if (!sub || !email) {
-    return errorRedirect(request, "oidc_incomplete_identity");
+    return errorRedirect("oidc_incomplete_identity");
   }
 
   const admin = createSupabaseAdminClient();
@@ -70,12 +82,13 @@ export async function GET(request: NextRequest) {
       email,
       firstName,
       lastName,
+      emailVerified,
     });
   } catch (error) {
     if (error instanceof OidcAccountConflictError) {
-      return errorRedirect(request, "oidc_account_conflict");
+      return errorRedirect("oidc_account_conflict");
     }
-    return errorRedirect(request, "oidc_provisioning_failed");
+    return errorRedirect("oidc_provisioning_failed");
   }
 
   const { data: linkData, error: linkError } =
@@ -86,7 +99,7 @@ export async function GET(request: NextRequest) {
 
   const hashedToken = linkData?.properties?.hashed_token;
   if (linkError || !hashedToken) {
-    return errorRedirect(request, "oidc_session_failed");
+    return errorRedirect("oidc_session_failed");
   }
 
   const supabase = await createSupabaseServerClient();
@@ -96,8 +109,8 @@ export async function GET(request: NextRequest) {
   });
 
   if (verifyError) {
-    return errorRedirect(request, "oidc_session_failed");
+    return errorRedirect("oidc_session_failed");
   }
 
-  return NextResponse.redirect(new URL("/erfasste-zeit", request.url));
+  return NextResponse.redirect(new URL("/erfasste-zeit", getPublicAppOrigin()));
 }

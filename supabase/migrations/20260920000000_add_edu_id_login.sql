@@ -70,35 +70,27 @@ ALTER TABLE public.admin_password_reset_log
 -- so admin-triggered user deletion (auth.admin.deleteUserById) cleans up
 -- profiles (and everything FK'd to profiles.id) without manual cleanup.
 
+-- Uses pg_constraint, not information_schema: information_schema's
+-- constraint_column_usage only lists constraints on tables the current role
+-- owns, and auth.users belongs to supabase_auth_admin — so the existing FK was
+-- invisible there and the block tried to re-create it ("already exists").
 DO $$
 DECLARE
   fk_name text;
-  fk_delete_rule text;
+  fk_delete_type "char";
 BEGIN
-  SELECT tc.constraint_name, rc.delete_rule
-    INTO fk_name, fk_delete_rule
-  FROM information_schema.table_constraints tc
-  JOIN information_schema.referential_constraints rc
-    ON rc.constraint_name = tc.constraint_name
-   AND rc.constraint_schema = tc.constraint_schema
-  JOIN information_schema.key_column_usage kcu
-    ON kcu.constraint_name = tc.constraint_name
-   AND kcu.constraint_schema = tc.constraint_schema
-  JOIN information_schema.constraint_column_usage ccu
-    ON ccu.constraint_name = tc.constraint_name
-   AND ccu.constraint_schema = tc.constraint_schema
-  WHERE tc.table_schema = 'public'
-    AND tc.table_name = 'profiles'
-    AND tc.constraint_type = 'FOREIGN KEY'
-    AND kcu.column_name = 'id'
-    AND ccu.table_schema = 'auth'
-    AND ccu.table_name = 'users'
+  SELECT con.conname, con.confdeltype
+    INTO fk_name, fk_delete_type
+  FROM pg_constraint con
+  WHERE con.contype = 'f'
+    AND con.conrelid = 'public.profiles'::regclass
+    AND con.confrelid = 'auth.users'::regclass
   LIMIT 1;
 
   IF fk_name IS NULL THEN
     ALTER TABLE public.profiles
       ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
-  ELSIF fk_delete_rule IS DISTINCT FROM 'CASCADE' THEN
+  ELSIF fk_delete_type <> 'c' THEN  -- 'c' = ON DELETE CASCADE
     EXECUTE format('ALTER TABLE public.profiles DROP CONSTRAINT %I', fk_name);
     ALTER TABLE public.profiles
       ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;

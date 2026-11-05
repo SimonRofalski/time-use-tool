@@ -291,7 +291,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     // Fetch role from profiles table — this is the authoritative source
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("role, first_name, last_name, must_change_password")
+      .select("role, first_name, last_name")
       .eq("id", authUser.id)
       .single();
     const role = profileData?.role ?? "user";
@@ -311,9 +311,17 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       tutorialError ? true : !!tutorialData?.tutorial_completed_at,
     );
 
+    // Separate query for the same reason (edu-ID migration columns); on error
+    // there is no forced password change
+    const { data: authStateData } = await supabase
+      .from("profiles")
+      .select("must_change_password, auth_provider")
+      .eq("id", authUser.id)
+      .single();
+
     // Applies to every role, including admins — an admin-set temporary
     // password must be changed before anything else, no exceptions.
-    if (profileData?.must_change_password) {
+    if (authStateData?.must_change_password) {
       setNeedsPasswordChange(true);
       setProfileMenuOpen(false);
       setSettingsOpen(false);
@@ -336,7 +344,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       return;
     }
 
-    const hasSecurityQuestions = await checkSecurityQuestions(authUser.id);
+    // Security questions only exist to recover a password — edu-ID users
+    // sign in via SWITCH and have no password to recover, so skip them
+    const isEduIdUser = authStateData?.auth_provider === "switch_edu_id";
+    const hasSecurityQuestions =
+      isEduIdUser || (await checkSecurityQuestions(authUser.id));
     setNeedsSecurityQuestions(!hasSecurityQuestions);
 
     if (!hasSecurityQuestions) {

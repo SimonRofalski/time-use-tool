@@ -50,6 +50,7 @@ type RawEntry = {
   stressfulness_id: number | null;
   meaningfulness_id: number | null;
   digital_media_used: boolean | null;
+  ict_attention_id: number | null;
   time_entry_digital_media_type?: { digital_media_type_id: number | null }[];
   time_entry_social_context?: { social_context_id: number | null }[];
 };
@@ -162,6 +163,7 @@ export async function buildCourseExport(
     satisfactionsRes,
     stressfulnessRes,
     meaningfulnessRes,
+    ictAttentionRes,
   ] = await Promise.all([
     admin
       .from("category")
@@ -182,6 +184,7 @@ export async function buildCourseExport(
     admin.from("satisfaction").select("satisfaction_id, name, name_en"),
     admin.from("stressfulness").select("stressfulness_id, name, name_en"),
     admin.from("meaningfulness").select("meaningfulness_id, name, name_en"),
+    admin.from("ict_attention").select("ict_attention_id, name, name_en"),
   ]);
 
   const categoryNameById: Record<number, string> = {};
@@ -226,6 +229,9 @@ export async function buildCourseExport(
   const meaningfulnessNameById: Record<number, string> = {};
   for (const m of meaningfulnessRes.data ?? [])
     meaningfulnessNameById[m.meaningfulness_id] = getLocalizedName(m, locale);
+  const ictAttentionNameById: Record<number, string> = {};
+  for (const a of ictAttentionRes.data ?? [])
+    ictAttentionNameById[a.ict_attention_id] = getLocalizedName(a, locale);
 
   // Time entries of the submitted days
   // (chunked day-id lists keep request URLs short; paged to beat the 1000-row cap)
@@ -236,7 +242,7 @@ export async function buildCourseExport(
       admin
         .from("time_entry")
         .select(
-          "entry_id, day_id, start_time, end_time, primary_activity_id, secondary_activity_id, location_transport_id, satisfaction_id, stressfulness_id, meaningfulness_id, digital_media_used, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
+          "entry_id, day_id, start_time, end_time, primary_activity_id, secondary_activity_id, location_transport_id, satisfaction_id, stressfulness_id, meaningfulness_id, digital_media_used, ict_attention_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
         )
         .in("day_id", ids)
         .order("entry_id")
@@ -324,6 +330,10 @@ export async function buildCourseExport(
             .filter((id): id is number => typeof id === "number")
             .map((id) => digitalMediaTypeNameById[id] ?? `#${id}`)
             .join(", "),
+          [tc("ictAttention")]:
+            e.ict_attention_id != null
+              ? (ictAttentionNameById[e.ict_attention_id] ?? "")
+              : "",
           [tc("locationTransport")]:
             e.location_transport_id != null
               ? (locationNameById[e.location_transport_id] ?? "")

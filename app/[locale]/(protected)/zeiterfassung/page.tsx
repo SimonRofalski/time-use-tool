@@ -121,9 +121,12 @@ function getSlotEndTime(slot: string): string {
 
 // Determines the next questionnaire step based on the current step and pending data
 // Returns null when all steps are complete and the entry should be saved
+// askIctAttention: course toggle — adds the focused/background question
+// after the device-type step (only reached when a device was used)
 function getNextStep(
   currentStep: QuestionnaireStep,
   entry: PendingEntry,
+  askIctAttention: boolean,
 ): QuestionnaireStep | null {
   switch (currentStep) {
     case "primary_activity":
@@ -135,6 +138,8 @@ function getNextStep(
         ? "digital_media_type"
         : "location_transport";
     case "digital_media_type":
+      return askIctAttention ? "ict_attention" : "location_transport";
+    case "ict_attention":
       return "location_transport";
     case "location_transport":
       return "social_context";
@@ -153,6 +158,7 @@ function createEmptyPendingEntry(slots: string[]): PendingEntry {
     secondary_activity_id: null,
     digital_media_used: false,
     digital_media_type_ids: [],
+    ict_attention_id: null,
     location_transport_id: null,
     social_context_ids: [],
     satisfaction_id: null,
@@ -192,6 +198,7 @@ function getPreloadedEntry(
       e.stressfulness_id === first.stressfulness_id &&
       e.location_transport_id === first.location_transport_id &&
       e.digital_media_used === first.digital_media_used &&
+      e.ict_attention_id === first.ict_attention_id &&
       JSON.stringify([...e.digital_media_type_ids].sort()) ===
         JSON.stringify([...first.digital_media_type_ids].sort()),
   );
@@ -204,6 +211,7 @@ function getPreloadedEntry(
     secondary_activity_id: first.secondary_activity_id,
     digital_media_used: first.digital_media_used,
     digital_media_type_ids: first.digital_media_type_ids,
+    ict_attention_id: first.ict_attention_id,
     location_transport_id: first.location_transport_id,
     social_context_ids: first.social_context_ids,
     satisfaction_id: first.satisfaction_id,
@@ -309,6 +317,7 @@ function mapRawEntryToRecord(raw: any): TimeEntryRecord {
       raw.time_entry_digital_media_type?.map(
         (r: any) => r.digital_media_type_id,
       ) ?? [],
+    ict_attention_id: raw.ict_attention_id ?? null,
     social_context_ids:
       raw.time_entry_social_context?.map((sc: any) => sc.social_context_id) ??
       [],
@@ -511,6 +520,7 @@ export default function ZeiterfassungPage() {
   // Per-course opt-in flags (admin-toggleable, default off)
   const [askExtraRatings, setAskExtraRatings] = useState(false);
   const [askDayQuestionnaire, setAskDayQuestionnaire] = useState(false);
+  const [askIctAttention, setAskIctAttention] = useState(false);
   // Day whose questionnaire popup is open: set automatically right after a
   // day transitions to fully complete (144/144 slots), or by the user
   const [dayQuestionnaireDayId, setDayQuestionnaireDayId] = useState<
@@ -640,6 +650,7 @@ export default function ZeiterfassungPage() {
       supabase.from("satisfaction").select("*").order("satisfaction_id"),
       supabase.from("meaningfulness").select("*").order("meaningfulness_id"),
       supabase.from("stressfulness").select("*").order("stressfulness_id"),
+      supabase.from("ict_attention").select("*").order("ict_attention_id"),
     ]);
 
     // Get course enrollment
@@ -661,7 +672,9 @@ export default function ZeiterfassungPage() {
     const [{ data: courseSettings }, { data: periodsData }] = await Promise.all([
       supabase
         .from("course")
-        .select("ask_extra_ratings, ask_day_questionnaire, start_date, end_date")
+        .select(
+          "ask_extra_ratings, ask_day_questionnaire, ask_ict_attention, start_date, end_date",
+        )
         .eq("course_id", cid)
         .single(),
       supabase
@@ -672,6 +685,7 @@ export default function ZeiterfassungPage() {
     ]);
     setAskExtraRatings(courseSettings?.ask_extra_ratings === true);
     setAskDayQuestionnaire(courseSettings?.ask_day_questionnaire === true);
+    setAskIctAttention(courseSettings?.ask_ict_attention === true);
 
     // Course date range via periods; fallback to legacy columns
     let dates: string[];
@@ -684,8 +698,18 @@ export default function ZeiterfassungPage() {
     }
     setAllDates(dates);
 
-    const [cats, subs, acts, locs, socials, media, sats, meanings, stresses] =
-      await lookupsPromise;
+    const [
+      cats,
+      subs,
+      acts,
+      locs,
+      socials,
+      media,
+      sats,
+      meanings,
+      stresses,
+      ictAttentions,
+    ] = await lookupsPromise;
     setLookupData({
       categories: cats.data ?? [],
       subcategories: subs.data ?? [],
@@ -696,6 +720,7 @@ export default function ZeiterfassungPage() {
       satisfactions: sats.data ?? [],
       meaningfulnesses: meanings.data ?? [],
       stressfulnesses: stresses.data ?? [],
+      ictAttentions: ictAttentions.data ?? [],
     });
 
     // Determine initial date: URL param → today → earliest incomplete → last
@@ -777,7 +802,7 @@ export default function ZeiterfassungPage() {
         primary_activity_id, secondary_activity_id,
         satisfaction_id, meaningfulness_id, stressfulness_id,
         location_transport_id,
-        digital_media_used,
+        digital_media_used, ict_attention_id,
         time_entry_digital_media_type ( digital_media_type_id ),
         time_entry_social_context ( social_context_id )
       `,
@@ -874,7 +899,7 @@ export default function ZeiterfassungPage() {
       return;
     }
 
-    const nextStep = getNextStep(currentStep, updatedEntry);
+    const nextStep = getNextStep(currentStep, updatedEntry, askIctAttention);
     if (nextStep === null) {
       saveEntry(updatedEntry);
     } else {
@@ -1012,6 +1037,12 @@ export default function ZeiterfassungPage() {
       stressfulness_id: finalEntry.stressfulness_id || null,
       location_transport_id: finalEntry.location_transport_id || null,
       digital_media_used: finalEntry.digital_media_used,
+      // Only meaningful when a device was used and the course asks for it;
+      // cleared otherwise so a stale answer can't survive a "no device" edit
+      ict_attention_id:
+        askIctAttention && finalEntry.digital_media_used
+          ? finalEntry.ict_attention_id
+          : null,
     }));
 
     const { data: newEntries, error: insertError } = await supabase
@@ -1303,6 +1334,7 @@ export default function ZeiterfassungPage() {
               showDeleteSelection={shownSelectedSlots.size > 0}
               isDeletingSelection={isDeletingSelection}
               askExtraRatings={askExtraRatings}
+              askIctAttention={askIctAttention}
             />
           ) : (
             <div className="rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-10 text-center">

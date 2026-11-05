@@ -48,7 +48,6 @@ function renderStatus(status: string, tone: "error" | "success") {
 
 export default function Home() {
   const t = useTranslations("login");
-  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -326,52 +325,28 @@ export default function Home() {
           </h1>
         </div>
 
-        {!showPasswordLogin && (
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
-            <h2 className="mb-2 text-center text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {t("switchEduIdTitle")}
-            </h2>
-            <p className="mb-5 text-center text-sm text-slate-500 dark:text-slate-400">
-              {t("switchEduIdDescription")}
-            </p>
-
+        {/* SWITCH edu-ID: additional sign-in option next to email/password.
+            Hidden in the password-recovery flows, where it doesn't apply. */}
+        {(mode === "signin" || mode === "signup") && (
+          <div className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
             <a
               href="/api/auth/switch/initiate"
               className="block w-full rounded-md bg-slate-800 px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-slate-700"
             >
               {t("switchEduIdButton")}
             </a>
-
-            <div className="mt-5 text-center">
-              <button
-                type="button"
-                onClick={() => setShowPasswordLogin(true)}
-                className="text-sm text-slate-500 dark:text-slate-400 underline-offset-2 transition hover:text-slate-700 hover:underline dark:hover:text-slate-200"
-              >
-                {t("emailPasswordDisclosureLabel")}
-              </button>
+            <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
+              {t("switchEduIdDescription")}
+            </p>
+            <div className="mt-4 flex items-center gap-3 text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+              {t("orDivider")}
+              <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
             </div>
-
-            {renderStatus(status, statusTone)}
           </div>
         )}
 
-        {showPasswordLogin && (
-          <>
-            <div className="mb-4 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPasswordLogin(false);
-                  handleModeChange("signin");
-                }}
-                className="text-xs text-slate-500 dark:text-slate-400 transition hover:text-slate-700 dark:hover:text-slate-200"
-              >
-                {t("backToSwitchEduIdButton")}
-              </button>
-            </div>
-
-            {mode !== "forgot-password" && (
+        {mode !== "forgot-password" && (
           <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 p-2 shadow-sm backdrop-blur-sm">
             <button
               type="button"
@@ -639,9 +614,7 @@ export default function Home() {
               </>
             )}
           </div>
-            </div>
-          </>
-        )}
+        </div>
       </div>
     </div>
   );

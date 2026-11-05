@@ -59,6 +59,7 @@ type EntryRow = {
   stressfulness_id: number | null;
   meaningfulness_id: number | null;
   digital_media_used: boolean | null;
+  ict_attention_id: number | null;
   time_entry_digital_media_type?: { digital_media_type_id: number | null }[];
   time_entry_social_context?: { social_context_id: number | null }[];
 };
@@ -210,7 +211,7 @@ export async function buildResearchExport(
         admin
           .from("time_entry")
           .select(
-            "entry_id, day_id, start_time, end_time, primary_activity_id, secondary_activity_id, location_transport_id, satisfaction_id, stressfulness_id, meaningfulness_id, digital_media_used, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
+            "entry_id, day_id, start_time, end_time, primary_activity_id, secondary_activity_id, location_transport_id, satisfaction_id, stressfulness_id, meaningfulness_id, digital_media_used, ict_attention_id, time_entry_digital_media_type(digital_media_type_id), time_entry_social_context(social_context_id)",
           )
           .in("day_id", ids)
           .order("entry_id")
@@ -291,6 +292,7 @@ export async function buildResearchExport(
     satisfaction,
     stressfulness,
     meaningfulness,
+    ictAttention,
     diaryFillTiming,
     dayAppreciation,
     dayTypeContext,
@@ -315,6 +317,7 @@ export async function buildResearchExport(
     loadLookup(admin, "satisfaction"),
     loadLookup(admin, "stressfulness"),
     loadLookup(admin, "meaningfulness"),
+    loadLookup(admin, "ict_attention"),
     loadLookup(admin, "diary_fill_timing"),
     loadLookup(admin, "day_appreciation"),
     loadLookup(admin, "day_type_context"),
@@ -415,6 +418,8 @@ export async function buildResearchExport(
         .map((m) => label(digitalMediaType, m.digital_media_type_id))
         .filter(Boolean)
         .join(", "),
+      [tr("ictAttentionCode")]: code(ictAttention, e.ict_attention_id),
+      [tc("ictAttention")]: label(ictAttention, e.ict_attention_id),
       [tc("locationTransport")]: label(location, e.location_transport_id),
       [tc("socialContext")]: (e.time_entry_social_context ?? [])
         .map((s) => label(socialContext, s.social_context_id))

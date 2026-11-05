@@ -12,7 +12,16 @@ export type SwitchEduIdIdentity = {
   email: string;
   firstName?: string;
   lastName?: string;
+  // From the ID token's email_verified claim; linking an existing account by
+  // email is only allowed for a verified address (prevents account takeover)
+  emailVerified: boolean;
 };
+
+// ILIKE treats % and _ as wildcards — escape them so "a_b@x.ch" can't
+// match (and link to) a different account like "axb@x.ch"
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
 
 export type ProvisionResult = {
   userId: string;
@@ -32,7 +41,7 @@ export async function resolveOrProvisionProfile(
   admin: SupabaseClient,
   identity: SwitchEduIdIdentity,
 ): Promise<ProvisionResult> {
-  const { sub, email, firstName, lastName } = identity;
+  const { sub, email, firstName, lastName, emailVerified } = identity;
 
   const { data: bySub } = await admin
     .from("profiles")
@@ -47,10 +56,13 @@ export async function resolveOrProvisionProfile(
   const { data: byEmail } = await admin
     .from("profiles")
     .select("id, auth_provider, switch_edu_id_sub")
-    .ilike("email", email)
+    .ilike("email", escapeLikePattern(email))
     .maybeSingle();
 
   if (byEmail) {
+    if (!emailVerified) {
+      throw new OidcAccountConflictError();
+    }
     if (byEmail.switch_edu_id_sub && byEmail.switch_edu_id_sub !== sub) {
       // Same email, already linked to a *different* edu-ID identity —
       // shouldn't happen given switch_edu_id_sub is UNIQUE and looked up
