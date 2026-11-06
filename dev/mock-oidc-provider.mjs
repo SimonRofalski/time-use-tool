@@ -14,6 +14,12 @@
 //   collision-user-1  -> first create a password account with this exact
 //                        email via the admin "Account anlegen" UI, then log
 //                        in here to see it get linked instead of duplicated
+//   unverified-1      -> same email as collision-user-1 but email_verified
+//                        false: linking must be refused (oidc_account_conflict)
+//   no-email-1        -> releases no email at all -> oidc_incomplete_identity
+//
+// Like SWITCH, claims are released via the UserInfo endpoint, not in the ID
+// token (oidc-provider's default conformIdTokenClaims behaviour).
 //
 // TEST_ACCOUNTS' emails can be edited freely for local testing.
 
@@ -41,6 +47,16 @@ const TEST_ACCOUNTS = {
     given_name: "Kollision",
     family_name: "Test",
   },
+  "unverified-1": {
+    email: "collision@test.ch",
+    email_verified: false,
+    given_name: "Unverifiziert",
+    family_name: "Test",
+  },
+  "no-email-1": {
+    given_name: "Ohne",
+    family_name: "Mail",
+  },
 };
 
 const configuration = {
@@ -55,6 +71,9 @@ const configuration = {
     },
   ],
   pkce: { required: () => true },
+  // SWITCH's own scope (see lib/oidc/client.ts getSwitchScope) — accepted
+  // here so the mock behaves like the real IdP for the requested scope set
+  scopes: ["openid", "email", "profile", "https://eduid.ch/scope/userinfo.read"],
   features: {
     devInteractions: { enabled: true },
   },

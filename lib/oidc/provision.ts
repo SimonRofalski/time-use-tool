@@ -43,21 +43,39 @@ export async function resolveOrProvisionProfile(
 ): Promise<ProvisionResult> {
   const { sub, email, firstName, lastName, emailVerified } = identity;
 
-  const { data: bySub } = await admin
+  // Query errors must abort: treating a transient failure as "no match" would
+  // fall through to createUser and fail (or duplicate) for an existing account.
+  const { data: bySub, error: bySubError } = await admin
     .from("profiles")
     .select("id, auth_provider")
     .eq("switch_edu_id_sub", sub)
     .maybeSingle();
 
+  if (bySubError) {
+    throw bySubError;
+  }
+
   if (bySub) {
     return { userId: bySub.id, created: false, linked: false };
   }
 
-  const { data: byEmail } = await admin
+  const { data: emailMatches, error: byEmailError } = await admin
     .from("profiles")
     .select("id, auth_provider, switch_edu_id_sub")
     .ilike("email", escapeLikePattern(email))
-    .maybeSingle();
+    .limit(2);
+
+  if (byEmailError) {
+    throw byEmailError;
+  }
+
+  // Several profiles with the same address (case variants) — linking any one
+  // of them would be a guess, so fail closed and let an admin sort it out
+  if (emailMatches.length > 1) {
+    throw new OidcAccountConflictError();
+  }
+
+  const byEmail = emailMatches[0];
 
   if (byEmail) {
     if (!emailVerified) {
@@ -70,9 +88,16 @@ export async function resolveOrProvisionProfile(
       throw new OidcAccountConflictError();
     }
 
+    // An admin-created account still carries must_change_password from its
+    // temporary password; once it signs in via edu-ID there is no password
+    // to change, so the forced password gate would only get in the way
     const { error: linkError } = await admin
       .from("profiles")
-      .update({ auth_provider: "switch_edu_id", switch_edu_id_sub: sub })
+      .update({
+        auth_provider: "switch_edu_id",
+        switch_edu_id_sub: sub,
+        must_change_password: false,
+      })
       .eq("id", byEmail.id);
 
     if (linkError) {

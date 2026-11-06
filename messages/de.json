@@ -77,7 +77,8 @@
       "incompleteIdentity": "SWITCH edu-ID hat keine E-Mail-Adresse geliefert. Bitte wende dich an einen Admin.",
       "accountConflict": "Dieses Konto ist bereits mit einer anderen SWITCH edu-ID verknüpft. Bitte wende dich an einen Admin.",
       "provisioningFailed": "Konto konnte nicht eingerichtet werden. Bitte versuche es erneut.",
-      "sessionFailed": "Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut."
+      "sessionFailed": "Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
+      "unavailable": "SWITCH edu-ID ist im Moment nicht erreichbar. Bitte versuche es später erneut oder melde dich mit E-Mail und Passwort an."
     }
   },
   "protectedLayout": {

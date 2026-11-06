@@ -56,8 +56,17 @@ export async function GET(request: NextRequest) {
     if (!idTokenClaims) {
       return errorRedirect("oidc_missing_claims");
     }
-    claims = idTokenClaims;
-  } catch {
+    // SWITCH (like the mock) releases email/name by default only via the
+    // UserInfo endpoint — the ID token carries little more than `sub`.
+    // fetchUserInfo also checks that UserInfo's sub matches the ID token's.
+    const userInfo = await oidc.fetchUserInfo(
+      config,
+      tokens.access_token,
+      idTokenClaims.sub,
+    );
+    claims = { ...idTokenClaims, ...userInfo };
+  } catch (error) {
+    console.error("SWITCH OIDC code exchange failed", error);
     return errorRedirect("oidc_exchange_failed");
   }
 
@@ -76,29 +85,44 @@ export async function GET(request: NextRequest) {
 
   const admin = createSupabaseAdminClient();
 
+  let userId: string;
   try {
-    await resolveOrProvisionProfile(admin, {
+    ({ userId } = await resolveOrProvisionProfile(admin, {
       sub,
       email,
       firstName,
       lastName,
       emailVerified,
-    });
+    }));
   } catch (error) {
     if (error instanceof OidcAccountConflictError) {
       return errorRedirect("oidc_account_conflict");
     }
+    console.error("SWITCH edu-ID provisioning failed", error);
     return errorRedirect("oidc_provisioning_failed");
+  }
+
+  // Mint the session for the account that was resolved above, not for the
+  // email in the current claims: a returning user matched by `sub` may have
+  // changed their edu-ID email since, and generating a link for the new
+  // address would log them into an empty (or someone else's) account.
+  const { data: userData, error: userError } =
+    await admin.auth.admin.getUserById(userId);
+  const accountEmail = userData?.user?.email;
+  if (userError || !accountEmail) {
+    console.error("SWITCH edu-ID: resolved account has no email", userError);
+    return errorRedirect("oidc_session_failed");
   }
 
   const { data: linkData, error: linkError } =
     await admin.auth.admin.generateLink({
       type: "magiclink",
-      email,
+      email: accountEmail,
     });
 
   const hashedToken = linkData?.properties?.hashed_token;
   if (linkError || !hashedToken) {
+    console.error("SWITCH edu-ID: generateLink failed", linkError);
     return errorRedirect("oidc_session_failed");
   }
 
@@ -109,6 +133,7 @@ export async function GET(request: NextRequest) {
   });
 
   if (verifyError) {
+    console.error("SWITCH edu-ID: verifyOtp failed", verifyError);
     return errorRedirect("oidc_session_failed");
   }
 

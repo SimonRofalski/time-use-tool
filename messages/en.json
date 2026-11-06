@@ -77,7 +77,8 @@
       "incompleteIdentity": "SWITCH edu-ID did not provide an email address. Please contact an admin.",
       "accountConflict": "This account is already linked to a different SWITCH edu-ID. Please contact an admin.",
       "provisioningFailed": "Account could not be set up. Please try again.",
-      "sessionFailed": "Sign-in could not be completed. Please try again."
+      "sessionFailed": "Sign-in could not be completed. Please try again.",
+      "unavailable": "SWITCH edu-ID is currently unavailable. Please try again later or sign in with email and password."
     }
   },
   "protectedLayout": {

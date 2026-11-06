@@ -27,6 +27,7 @@ const OIDC_ERROR_KEYS: Record<string, string> = {
   oidc_account_conflict: "oidcErrors.accountConflict",
   oidc_provisioning_failed: "oidcErrors.provisioningFailed",
   oidc_session_failed: "oidcErrors.sessionFailed",
+  oidc_unavailable: "oidcErrors.unavailable",
 };
 
 function renderStatus(status: string, tone: "error" | "success") {
