@@ -21,7 +21,6 @@ npm run mock-oidc  # Local mock SWITCH edu-ID OIDC provider (localhost:9999) —
 All page routes live under `app/[locale]/...` (added 2026-09 for bilingual support — see Internationalization below). `localePrefix: "never"` means the locale segment is never visible in the URL; routes below are described by their visible path.
 
 - `/` — Single-page login (sign in / sign up / forgot password modes combined), also handles security-question-based password reset
-- `/reset-password` — Password reset via email link
 - `/(protected)/zeiterfassung` — Time entry: 10-minute slot grid (`TimeGrid.tsx`) + activity picker (`ActivitySelector.tsx`)
 - `/(protected)/erfasste-zeit` — Day-by-day overview/carousel of submitted entries with completion status
 - `/(protected)/statistiken` — Two tabs: `ZeitverteilungTab` (time distribution) and `KursvergleichTab` (course comparison), built on `recharts`
@@ -40,7 +39,7 @@ Two Supabase client instances:
 - `lib/supabase/browser-client.ts` — Singleton for client components, uses `NEXT_PUBLIC_*` env vars
 - `lib/supabase/server-client.ts` — Server-side instance using Next.js `cookies()` API for session persistence and token refresh
 
-Sessions are stored in cookies and refreshed server-side on each request via the proxy. Password reset supports both the email-link flow (`/reset-password`) and a security-questions flow (`lib/security-questions.ts`, `lib/security-questions-server.ts`, `app/api/security-questions/`, `app/api/password-reset/security-questions/`, `app/api/password-reset/verify/`, `app/api/password-reset/complete/`) — this stays the recovery path for password-based accounts regardless of how they signed up.
+Sessions are stored in cookies and refreshed server-side on each request via the proxy. Password reset runs only via the security-questions flow (the unused email-link page `/reset-password` was removed 2026-11) (`lib/security-questions.ts`, `lib/security-questions-server.ts`, `app/api/security-questions/`, `app/api/password-reset/security-questions/`, `app/api/password-reset/verify/`, `app/api/password-reset/complete/`) — this stays the recovery path for password-based accounts regardless of how they signed up.
 
 ### SWITCH edu-ID login (OIDC)
 
@@ -123,4 +122,13 @@ The HETUS activity names are old-fashioned, so `activity.keywords_de` / `keyword
 
 ### ICT attention question
 
-When a device was used (`digital_media_used = true`) and the course has `course.ask_ict_attention` on (admin toggle, default off), the questionnaire adds a mandatory step `ict_attention` after the device-type step: focused vs. background use (lookup table `ict_attention`, `time_entry.ict_attention_id`, migration `20261104000001_add_ict_attention.sql`). Saved as NULL when no device was used or the toggle is off. Included in the anonymous raw export and the research export.
+Focused vs. background device use (lookup table `ict_attention`, `time_entry.ict_attention_id`, migrations `20261104000001_add_ict_attention.sql` + `20261106000000_update_ict_attention_texts.sql` for the tutor's final wording). Asked only when the course has `course.ask_ict_attention` on (admin toggle, default off) **and** a device was used **and** the entry has a secondary activity — see `shouldAskIctAttention()` in `zeiterfassung/ict-attention.ts` (tutor decision 2026-11: device use during a sole main activity counts as focused, so it isn't asked). It has no step of its own: it appears on the device-type screen below the device chips and is mandatory there. Saved as NULL ("not asked") in every other case. Included in the anonymous raw export and the research export.
+
+### Security hardening (2026-11-06, from a code review)
+
+- `profiles.role`, `email`, `is_active` (plus the three auth-state columns) can't be changed by app users — trigger `protect_profiles_auth_fields`, which now checks `current_user IN ('authenticated','anon')` so manual edits in the Supabase SQL editor work (migration `20261106000001_security_hardening.sql`).
+- Course access codes live in the admin-only table `course_access_code` (not `course`); enrollment goes through `app/api/courses/enroll` (server-side code check, service role). `20261106000002_finish_access_code_move.sql` drops `course."accessCode"` and all user INSERT policies on `user_course` — only run it after the matching app version is deployed.
+- Security-question reset: same response whether or not an account exists (decoy questions for unknown emails), no profile ID sent to the client, 5 failed attempts per email within 15 min lock further tries (`security_question_reset_attempt`). Logic in `lib/password-reset-server.ts`.
+- Changing the password (`/api/auth/change-password`) requires the current password.
+- Every `.ilike("email", …)` must use `escapeLikePattern` (`lib/escape-like.ts`); "today" must use `getLocalIsoDate` (`lib/local-date.ts`), never `toISOString()`.
+- Known, deliberately deferred to the PostgreSQL migration: the course comparison still loads other participants' raw entries into the browser, and saving a time entry is several non-atomic requests.

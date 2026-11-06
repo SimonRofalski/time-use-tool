@@ -6,22 +6,6 @@
   "adminPage": {
     "title": "Admin"
   },
-  "resetPassword": {
-    "brand": "Time Use Tool",
-    "subtitle": "Set new password",
-    "invalidToken": "Invalid or expired recovery link. Please request a new one.",
-    "passwordMismatch": "Passwords don't match.",
-    "passwordTooShort": "Password must be at least 6 characters long.",
-    "samePasswordError": "Your new password must be different from the old one.",
-    "successMessage": "Password reset successfully!",
-    "newPasswordLabel": "New password",
-    "newPasswordPlaceholder": "At least 6 characters",
-    "confirmPasswordLabel": "Confirm password",
-    "confirmPasswordPlaceholder": "Repeat password",
-    "submitButton": "Reset password",
-    "submitButtonLoading": "Resetting...",
-    "checking": "Checking..."
-  },
   "login": {
     "brand": "Time Use Tool",
     "modes": {
@@ -183,7 +167,7 @@
       "secondaryActivity": "Doing anything else at the same time?",
       "digitalMedia": "Did you use a device? (smartphone, tablet, PC…)",
       "digitalMediaType": "Which devices did you use?",
-      "ictAttention": "Was your use of ICT the main focus of your attention, or was it in the background?",
+      "ictAttention": "Was your ICT use focused or in the background?",
       "locationTransport": "Where were you during this time?",
       "socialContext": "Was anyone else with you?",
       "satisfaction": "How did you feel during the activity?",
@@ -195,7 +179,6 @@
       "secondaryActivity": "Secondary activity",
       "digitalMedia": "Device?",
       "digitalMediaType": "Device type",
-      "ictAttention": "Focus",
       "locationTransport": "Location",
       "socialContext": "Social",
       "satisfaction": "Mood"
@@ -225,7 +208,8 @@
       "no": "No"
     },
     "digitalMediaTypeStep": {
-      "validationError": "Please select at least one device type."
+      "validationError": "Please select at least one device type.",
+      "ictAttentionValidationError": "Please choose whether your device use was focused or in the background."
     },
     "locationCategories": {
       "orte": "Places",
@@ -519,7 +503,7 @@
       "accessCodeLabel": "Access code",
       "accessCodePlaceholder": "e.g. SS2026",
       "askExtraRatingsLabel": "Ask meaningfulness & stressfulness",
-      "askIctAttentionLabel": "Ask for focus when a device was used (focused / background)",
+      "askIctAttentionLabel": "Ask for focus when a device was used alongside a secondary activity (focused / background)",
       "askDayQuestionnaireLabel": "Ask day questionnaire",
       "createSuccess": "Course created successfully.",
       "creatingButton": "Creating…",
@@ -591,7 +575,8 @@
           "confirmLabel": "Remove"
         },
         "dayQuestionnairesProgress": "{answered} / {total} day questions answered"
-      }
+      },
+      "anonymizeError": "Anonymization failed – the course was not marked as anonymized. Please try again."
     },
     "exportModal": {
       "title": "Data export",
@@ -907,12 +892,16 @@
     "saveFailedError": "Password could not be changed.",
     "networkError": "Network error while changing the password.",
     "saveButton": "Save password",
-    "savingButton": "Saving..."
+    "savingButton": "Saving...",
+    "currentPasswordLabel": "Current (temporary) password",
+    "currentPasswordRequired": "Please enter your current (temporary) password."
   },
   "apiErrors": {
     "changePassword": {
       "notAuthenticated": "Not signed in.",
-      "passwordTooShort": "Password must be at least 6 characters long."
+      "passwordTooShort": "Password must be at least 6 characters long.",
+      "currentPasswordWrong": "The current password is incorrect.",
+      "newPasswordSameAsCurrent": "The new password must be different from the current one."
     },
     "adminUsers": {
       "invalidRequest": "Invalid request.",
@@ -931,15 +920,14 @@
     },
     "passwordResetSecurityQuestions": {
       "emailRequired": "Please enter an email address.",
-      "accountNotFound": "No account could be found for this email.",
-      "loadError": "Security questions could not be loaded.",
-      "notTwoQuestionsSet": "This account doesn't have two security questions set up yet. Please contact an admin."
+      "loadError": "Security questions could not be loaded."
     },
     "passwordResetVerify": {
       "answerBothRequired": "Please answer both security questions.",
       "checkFailed": "Security questions could not be verified.",
-      "answersDontMatch": "The answers don't match the ones on file.",
-      "resetPrepareFailed": "The reset could not be prepared."
+      "answersDontMatch": "The answers don't match the stored ones. If you never set up security questions, please contact an admin.",
+      "resetPrepareFailed": "The reset could not be prepared.",
+      "tooManyAttempts": "Too many attempts. Please wait 15 minutes and try again."
     },
     "securityQuestions": {
       "notAuthenticated": "Not signed in.",

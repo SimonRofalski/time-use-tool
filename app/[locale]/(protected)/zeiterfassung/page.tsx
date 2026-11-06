@@ -12,7 +12,9 @@ import {
   type QuestionnaireStep,
   type LookupData,
 } from "./types";
+import { shouldAskIctAttention } from "./ict-attention";
 import { getPeriodDates, getSinglePeriodDates } from "@/lib/course-periods";
+import { getLocalIsoDate } from "@/lib/local-date";
 
 function TimeGridLoading() {
   const t = useTranslations("zeiterfassung");
@@ -120,13 +122,12 @@ function getSlotEndTime(slot: string): string {
 }
 
 // Determines the next questionnaire step based on the current step and pending data
-// Returns null when all steps are complete and the entry should be saved
-// askIctAttention: course toggle — adds the focused/background question
-// after the device-type step (only reached when a device was used)
+// Returns null when all steps are complete and the entry should be saved.
+// The focused/background ICT question has no step of its own: it is shown on
+// the device-type screen (see shouldAskIctAttention in ActivitySelector).
 function getNextStep(
   currentStep: QuestionnaireStep,
   entry: PendingEntry,
-  askIctAttention: boolean,
 ): QuestionnaireStep | null {
   switch (currentStep) {
     case "primary_activity":
@@ -138,8 +139,6 @@ function getNextStep(
         ? "digital_media_type"
         : "location_transport";
     case "digital_media_type":
-      return askIctAttention ? "ict_attention" : "location_transport";
-    case "ict_attention":
       return "location_transport";
     case "location_transport":
       return "social_context";
@@ -725,7 +724,7 @@ export default function ZeiterfassungPage() {
 
     // Determine initial date: URL param → today → earliest incomplete → last
     const dateFromUrl = searchParams.get("date");
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalIsoDate(new Date());
     let targetDate: string;
 
     if (dateFromUrl && dates.includes(dateFromUrl)) {
@@ -899,7 +898,7 @@ export default function ZeiterfassungPage() {
       return;
     }
 
-    const nextStep = getNextStep(currentStep, updatedEntry, askIctAttention);
+    const nextStep = getNextStep(currentStep, updatedEntry);
     if (nextStep === null) {
       saveEntry(updatedEntry);
     } else {
@@ -1016,80 +1015,90 @@ export default function ZeiterfassungPage() {
     if (!userId || courseId === null || !finalEntry.primary_activity_id) return;
 
     isSavingRef.current = true;
-    const sortedSlots = [...finalEntry.slots].sort();
+    // try/finally: any early return or thrown error must release the lock,
+    // otherwise every further save is silently ignored until a reload
+    try {
+      const sortedSlots = [...finalEntry.slots].sort();
 
-    // Ensure a day record exists before inserting entries
-    const activeDayId = await ensureDayRecord();
-    if (activeDayId === null) return;
+      // Ensure a day record exists before inserting entries
+      const activeDayId = await ensureDayRecord();
+      if (activeDayId === null) return;
 
-    // Remove any existing entries for the selected slots before inserting
-    await deleteOverlappingEntries(activeDayId, sortedSlots);
+      // Remove any existing entries for the selected slots before inserting
+      await deleteOverlappingEntries(activeDayId, sortedSlots);
 
-    // Build one DB row per selected slot (constraint: end_time = start_time + 10 min)
-    const rowsToInsert = sortedSlots.map((slot) => ({
-      day_id: activeDayId,
-      start_time: `${slot}:00`,
-      end_time: getSlotEndTime(slot),
-      primary_activity_id: finalEntry.primary_activity_id,
-      secondary_activity_id: finalEntry.secondary_activity_id || null,
-      satisfaction_id: finalEntry.satisfaction_id || null,
-      meaningfulness_id: finalEntry.meaningfulness_id || null,
-      stressfulness_id: finalEntry.stressfulness_id || null,
-      location_transport_id: finalEntry.location_transport_id || null,
-      digital_media_used: finalEntry.digital_media_used,
-      // Only meaningful when a device was used and the course asks for it;
-      // cleared otherwise so a stale answer can't survive a "no device" edit
-      ict_attention_id:
-        askIctAttention && finalEntry.digital_media_used
+      // Build one DB row per selected slot (constraint: end_time = start_time + 10 min)
+      const rowsToInsert = sortedSlots.map((slot) => ({
+        day_id: activeDayId,
+        start_time: `${slot}:00`,
+        end_time: getSlotEndTime(slot),
+        primary_activity_id: finalEntry.primary_activity_id,
+        secondary_activity_id: finalEntry.secondary_activity_id || null,
+        satisfaction_id: finalEntry.satisfaction_id || null,
+        meaningfulness_id: finalEntry.meaningfulness_id || null,
+        stressfulness_id: finalEntry.stressfulness_id || null,
+        location_transport_id: finalEntry.location_transport_id || null,
+        digital_media_used: finalEntry.digital_media_used,
+        // Only asked when the course has it on, a device was used AND there is
+        // a secondary activity; cleared otherwise so a stale answer can't
+        // survive an edit (e.g. secondary activity removed again)
+        ict_attention_id: shouldAskIctAttention(askIctAttention, finalEntry)
           ? finalEntry.ict_attention_id
           : null,
-    }));
+      }));
 
-    const { data: newEntries, error: insertError } = await supabase
-      .from("time_entry")
-      .insert(rowsToInsert)
-      .select("entry_id");
+      const { data: newEntries, error: insertError } = await supabase
+        .from("time_entry")
+        .insert(rowsToInsert)
+        .select("entry_id");
 
-    if (insertError || !newEntries) {
+      if (insertError || !newEntries) {
+        setErrorMessage(
+          t("saveError", {
+            message: insertError?.message ?? t("unknownError"),
+          }),
+        );
+        return;
+      }
+
+      // Insert digital media type junction rows
+      if (
+        finalEntry.digital_media_used &&
+        finalEntry.digital_media_type_ids.length > 0
+      ) {
+        const mediaRows = newEntries.flatMap((entry) =>
+          finalEntry.digital_media_type_ids.map((id) => ({
+            entry_id: entry.entry_id,
+            digital_media_type_id: id,
+          })),
+        );
+        await supabase.from("time_entry_digital_media_type").insert(mediaRows);
+      }
+
+      // Insert social context records for every newly created entry
+      if (finalEntry.social_context_ids.length > 0) {
+        const socialRows = newEntries.flatMap((entry) =>
+          finalEntry.social_context_ids.map((id) => ({
+            entry_id: entry.entry_id,
+            social_context_id: id,
+          })),
+        );
+        await supabase.from("time_entry_social_context").insert(socialRows);
+      }
+
+      // Refresh the grid and update day completion flag
+      await loadEntriesForDay(activeDayId);
+      await updateDayCompletion(activeDayId);
+      handleCancel();
+    } catch (error) {
       setErrorMessage(
         t("saveError", {
-          message: insertError?.message ?? t("unknownError"),
+          message: error instanceof Error ? error.message : t("unknownError"),
         }),
       );
+    } finally {
       isSavingRef.current = false;
-      return;
     }
-
-    // Insert digital media type junction rows
-    if (
-      finalEntry.digital_media_used &&
-      finalEntry.digital_media_type_ids.length > 0
-    ) {
-      const mediaRows = newEntries.flatMap((entry) =>
-        finalEntry.digital_media_type_ids.map((id) => ({
-          entry_id: entry.entry_id,
-          digital_media_type_id: id,
-        })),
-      );
-      await supabase.from("time_entry_digital_media_type").insert(mediaRows);
-    }
-
-    // Insert social context records for every newly created entry
-    if (finalEntry.social_context_ids.length > 0) {
-      const socialRows = newEntries.flatMap((entry) =>
-        finalEntry.social_context_ids.map((id) => ({
-          entry_id: entry.entry_id,
-          social_context_id: id,
-        })),
-      );
-      await supabase.from("time_entry_social_context").insert(socialRows);
-    }
-
-    // Refresh the grid and update day completion flag
-    await loadEntriesForDay(activeDayId);
-    await updateDayCompletion(activeDayId);
-    isSavingRef.current = false;
-    handleCancel();
   }
 
   // Creates a day record if one doesn't exist yet, returns the day_id

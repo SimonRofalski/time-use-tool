@@ -160,14 +160,13 @@ export type PendingEntry = {
 };
 
 // The ordered steps in the questionnaire flow
-// digital_media_type is only shown when digital_media_used = true;
-// ict_attention additionally requires the course toggle ask_ict_attention
+// digital_media_type is only shown when digital_media_used = true; it also
+// hosts the ICT focus question when shouldAskIctAttention() applies
 export type QuestionnaireStep =
   | "primary_activity"
   | "secondary_activity"
   | "digital_media"
   | "digital_media_type"
-  | "ict_attention"
   | "location_transport"
   | "social_context"
   | "satisfaction";

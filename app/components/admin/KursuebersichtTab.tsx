@@ -203,6 +203,7 @@ export default function KursuebersichtTab() {
   const [exportGranularity, setExportGranularity] =
     useState<ExportGranularity>("aggregiert");
   const [exportError, setExportError] = useState("");
+  const [anonymizeError, setAnonymizeError] = useState("");
 
   useEffect(() => {
     if (subTab === "alle" && view.type === "list") {
@@ -219,7 +220,9 @@ export default function KursuebersichtTab() {
     const { data: courseData, error: courseErr } = await supabase
       .from("course")
       .select(
-        "course_id, name, start_date, end_date, is_locked, accessCode, anonymized_at, comparison_enabled, ask_extra_ratings, ask_ict_attention, ask_day_questionnaire",
+        // Access codes live in the admin-only course_access_code table
+        // (migration 20261106000001_security_hardening.sql)
+        "course_id, name, start_date, end_date, is_locked, anonymized_at, comparison_enabled, ask_extra_ratings, ask_ict_attention, ask_day_questionnaire, course_access_code(access_code)",
       )
       .order("start_date", { ascending: false });
 
@@ -229,10 +232,16 @@ export default function KursuebersichtTab() {
       return;
     }
 
-    // Count enrolled users per course client-side
-    const { data: userCourseData } = await supabase
-      .from("user_course")
-      .select("course_id");
+    // Count enrolled users per course client-side (paged: PostgREST caps
+    // every response at 1000 rows)
+    const userCourseData = await fetchAllRows<{ course_id: number }>(
+      (from, to) =>
+        supabase
+          .from("user_course")
+          .select("course_id")
+          .order("user_course_id")
+          .range(from, to),
+    ).catch(() => []);
 
     const countByCourse: Record<number, number> = {};
     for (const row of userCourseData ?? []) {
@@ -252,8 +261,15 @@ export default function KursuebersichtTab() {
     }
 
     setCourses(
-      courseData.map((c) => ({
+      courseData.map(({ course_access_code, ...c }) => ({
         ...c,
+        // One-to-one embed: PostgREST returns an object (or an array on
+        // older versions) — accept both
+        accessCode:
+          (Array.isArray(course_access_code)
+            ? course_access_code[0]?.access_code
+            : (course_access_code as { access_code?: string } | null)
+                ?.access_code) ?? null,
         userCount: countByCourse[c.course_id] ?? 0,
         periods: periodsByCourse[c.course_id] ?? [],
       })),
@@ -421,9 +437,8 @@ export default function KursuebersichtTab() {
 
   async function handleChangeAccessCode(courseId: number, newCode: string) {
     const { error } = await supabase
-      .from("course")
-      .update({ accessCode: newCode })
-      .eq("course_id", courseId);
+      .from("course_access_code")
+      .upsert({ course_id: courseId, access_code: newCode });
     if (!error) {
       setCourses((prev) =>
         prev.map((c) =>
@@ -520,6 +535,7 @@ export default function KursuebersichtTab() {
 
   async function handleAnonymizeCourse(courseId: number) {
     setIsAnonymizing(true);
+    setAnonymizeError("");
 
     // Sort users deterministically for stable alias assignment
     const usersToAnonymize = [...courseUsers].sort((a, b) =>
@@ -531,7 +547,7 @@ export default function KursuebersichtTab() {
       alias: `TN-${String(i + 1).padStart(4, "0")}`,
     }));
 
-    await Promise.all(
+    const aliasResults = await Promise.all(
       updates.map(({ userCourseId, alias }) =>
         supabase
           .from("user_course")
@@ -540,11 +556,25 @@ export default function KursuebersichtTab() {
       ),
     );
 
+    // Only mark the course as anonymized when every alias was written —
+    // otherwise some participants would still show their real name while
+    // the course claims to be anonymized. Re-running is safe: the aliases are
+    // deterministic (same sort order → same alias per participant).
+    const aliasFailed = aliasResults.some((result) => result.error);
     const anonymizedAt = new Date().toISOString();
-    await supabase
-      .from("course")
-      .update({ anonymized_at: anonymizedAt })
-      .eq("course_id", courseId);
+    const { error: courseUpdateError } = aliasFailed
+      ? { error: null }
+      : await supabase
+          .from("course")
+          .update({ anonymized_at: anonymizedAt })
+          .eq("course_id", courseId);
+
+    if (aliasFailed || courseUpdateError) {
+      setAnonymizeError(t("courseDetail.anonymizeError"));
+      setIsAnonymizing(false);
+      setConfirmModal(null);
+      return;
+    }
 
     setCourses((prev) =>
       prev.map((c) =>
@@ -694,7 +724,6 @@ export default function KursuebersichtTab() {
         name: newName.trim(),
         start_date: spanStart,
         end_date: spanEnd,
-        accessCode: newAccessCode.trim(),
         is_locked: false,
         comparison_enabled: false,
         ask_extra_ratings: newAskExtraRatings,
@@ -723,9 +752,29 @@ export default function KursuebersichtTab() {
       .from("course_period")
       .insert(periodInserts);
 
-    if (periodError) {
+    // Access code goes into the admin-only course_access_code table
+    const { error: codeError } = periodError
+      ? { error: null }
+      : await supabase.from("course_access_code").insert({
+          course_id: courseInsert.course_id,
+          access_code: newAccessCode.trim(),
+        });
+
+    if (periodError || codeError) {
+      // Not atomic on the client — roll back the half-created course so no
+      // course without periods/code is left behind
+      await supabase
+        .from("course_period")
+        .delete()
+        .eq("course_id", courseInsert.course_id);
+      await supabase
+        .from("course")
+        .delete()
+        .eq("course_id", courseInsert.course_id);
       setCreateError(
-        t("errors.periodsSaveError", { message: periodError.message }),
+        t("errors.periodsSaveError", {
+          message: (periodError ?? codeError)?.message ?? "",
+        }),
       );
       setIsCreating(false);
       return;
@@ -1292,6 +1341,11 @@ export default function KursuebersichtTab() {
             )}
           </div>
         </div>
+        {anonymizeError && (
+          <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+            {anonymizeError}
+          </p>
+        )}
 
         {isExportModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

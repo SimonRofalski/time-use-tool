@@ -6,22 +6,6 @@
   "adminPage": {
     "title": "Admin"
   },
-  "resetPassword": {
-    "brand": "Time Use Tool",
-    "subtitle": "Neues Passwort setzen",
-    "invalidToken": "Ungültiger oder abgelaufener Recovery-Link. Bitte fordere einen neuen an.",
-    "passwordMismatch": "Passwörter stimmen nicht überein.",
-    "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein.",
-    "samePasswordError": "Das neue Passwort muss sich vom alten unterscheiden.",
-    "successMessage": "Passwort erfolgreich zurückgesetzt!",
-    "newPasswordLabel": "Neues Passwort",
-    "newPasswordPlaceholder": "Mindestens 6 Zeichen",
-    "confirmPasswordLabel": "Passwort bestätigen",
-    "confirmPasswordPlaceholder": "Passwort wiederholen",
-    "submitButton": "Passwort zurücksetzen",
-    "submitButtonLoading": "Wird zurückgesetzt...",
-    "checking": "Wird überprüft..."
-  },
   "login": {
     "brand": "Time Use Tool",
     "modes": {
@@ -183,7 +167,7 @@
       "secondaryActivity": "Gleichzeitig noch etwas gemacht?",
       "digitalMedia": "Hast du ein Gerät genutzt? (Smartphone, Tablet, PC…)",
       "digitalMediaType": "Welche Geräte hast du genutzt?",
-      "ictAttention": "War die Nutzung des Geräts der Hauptfokus deiner Aufmerksamkeit, oder lief es im Hintergrund?",
+      "ictAttention": "Hast du IKT aktiv genutzt oder lief sie im Hintergrund?",
       "locationTransport": "Wo warst du während dieser Zeit?",
       "socialContext": "War jemand anders mit dabei?",
       "satisfaction": "Wie hast du dich während der Aktivität gefühlt?",
@@ -195,7 +179,6 @@
       "secondaryActivity": "Nebentätigkeit",
       "digitalMedia": "Gerät?",
       "digitalMediaType": "Geräteart",
-      "ictAttention": "Fokus",
       "locationTransport": "Ort",
       "socialContext": "Sozial",
       "satisfaction": "Stimmung"
@@ -225,7 +208,8 @@
       "no": "Nein"
     },
     "digitalMediaTypeStep": {
-      "validationError": "Bitte wähle mindestens eine Geräteart aus."
+      "validationError": "Bitte wähle mindestens eine Geräteart aus.",
+      "ictAttentionValidationError": "Bitte wähle aus, ob du das Gerät aktiv genutzt hast oder ob es im Hintergrund lief."
     },
     "locationCategories": {
       "orte": "Orte",
@@ -519,7 +503,7 @@
       "accessCodeLabel": "Zugangscode",
       "accessCodePlaceholder": "z. B. SS2026",
       "askExtraRatingsLabel": "Bedeutsamkeit & Stressbelastung abfragen",
-      "askIctAttentionLabel": "Bei Gerätenutzung nach Fokus fragen (fokussiert / im Hintergrund)",
+      "askIctAttentionLabel": "Bei Gerätenutzung mit Nebentätigkeit nach Fokus fragen (aktiv / im Hintergrund)",
       "askDayQuestionnaireLabel": "Tagesfragebogen abfragen",
       "createSuccess": "Kurs wurde erfolgreich erstellt.",
       "creatingButton": "Wird erstellt…",
@@ -591,7 +575,8 @@
           "confirmLabel": "Entfernen"
         },
         "dayQuestionnairesProgress": "{answered} / {total} Tagesfragen beantwortet"
-      }
+      },
+      "anonymizeError": "Die Anonymisierung ist fehlgeschlagen – der Kurs wurde nicht als anonymisiert markiert. Bitte versuche es erneut."
     },
     "exportModal": {
       "title": "Datenexport",
@@ -907,12 +892,16 @@
     "saveFailedError": "Passwort konnte nicht geändert werden.",
     "networkError": "Netzwerkfehler beim Ändern des Passworts.",
     "saveButton": "Passwort speichern",
-    "savingButton": "Wird gespeichert..."
+    "savingButton": "Wird gespeichert...",
+    "currentPasswordLabel": "Aktuelles (temporäres) Passwort",
+    "currentPasswordRequired": "Bitte gib dein aktuelles (temporäres) Passwort ein."
   },
   "apiErrors": {
     "changePassword": {
       "notAuthenticated": "Nicht angemeldet.",
-      "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein."
+      "passwordTooShort": "Passwort muss mindestens 6 Zeichen lang sein.",
+      "currentPasswordWrong": "Das aktuelle Passwort ist falsch.",
+      "newPasswordSameAsCurrent": "Das neue Passwort muss sich vom aktuellen unterscheiden."
     },
     "adminUsers": {
       "invalidRequest": "Ungültige Anfrage.",
@@ -931,15 +920,14 @@
     },
     "passwordResetSecurityQuestions": {
       "emailRequired": "Bitte gib eine E-Mail-Adresse ein.",
-      "accountNotFound": "Für diese E-Mail konnte kein Konto gefunden werden.",
-      "loadError": "Sicherheitsfragen konnten nicht geladen werden.",
-      "notTwoQuestionsSet": "Für dieses Konto sind noch keine zwei Sicherheitsfragen hinterlegt. Bitte wende dich an einen Admin."
+      "loadError": "Sicherheitsfragen konnten nicht geladen werden."
     },
     "passwordResetVerify": {
       "answerBothRequired": "Bitte beantworte beide Sicherheitsfragen.",
       "checkFailed": "Sicherheitsfragen konnten nicht geprüft werden.",
-      "answersDontMatch": "Die Antworten stimmen nicht mit den hinterlegten Angaben überein.",
-      "resetPrepareFailed": "Reset konnte nicht vorbereitet werden."
+      "answersDontMatch": "Die Antworten stimmen nicht mit den hinterlegten Angaben überein. Falls du keine Sicherheitsfragen hinterlegt hast, wende dich an einen Admin.",
+      "resetPrepareFailed": "Reset konnte nicht vorbereitet werden.",
+      "tooManyAttempts": "Zu viele Versuche. Bitte warte 15 Minuten und versuche es dann erneut."
     },
     "securityQuestions": {
       "notAuthenticated": "Nicht angemeldet.",

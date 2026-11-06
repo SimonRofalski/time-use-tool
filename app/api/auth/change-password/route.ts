@@ -1,12 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { getTranslations } from "next-intl/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin-client";
 import { getApiLocale } from "@/lib/i18n/api-locale";
 
 type ChangePasswordBody = {
+  currentPassword?: string;
   newPassword?: string;
 };
+
+// Checks the current password with a throwaway client that doesn't touch the
+// caller's session cookies. Without this check, anyone holding someone
+// else's session could set a password of their own and keep the account.
+async function isCurrentPasswordCorrect(email: string, password: string) {
+  const verifier = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const { error } = await verifier.auth.signInWithPassword({ email, password });
+  if (!error) await verifier.auth.signOut({ scope: "local" });
+  return !error;
+}
 
 export async function POST(request: NextRequest) {
   const t = await getTranslations({
@@ -27,6 +43,21 @@ export async function POST(request: NextRequest) {
 
   if (!body.newPassword || body.newPassword.length < 6) {
     return NextResponse.json({ error: t("passwordTooShort") }, { status: 400 });
+  }
+
+  if (
+    !body.currentPassword ||
+    !user.email ||
+    !(await isCurrentPasswordCorrect(user.email, body.currentPassword))
+  ) {
+    return NextResponse.json(
+      { error: t("currentPasswordWrong") },
+      { status: 400 },
+    );
+  }
+
+  if (body.currentPassword === body.newPassword) {
+    return NextResponse.json({ error: t("newPasswordSameAsCurrent") }, { status: 400 });
   }
 
   // Runs under the caller's own session — the user is changing their own

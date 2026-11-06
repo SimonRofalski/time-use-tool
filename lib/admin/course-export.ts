@@ -108,10 +108,18 @@ export async function buildCourseExport(
   if (!course) return { ok: false, reason: "COURSE_NOT_FOUND" };
 
   // Enrolled, non-excluded participants
-  const { data: enrollments } = await admin
-    .from("user_course")
-    .select("profiles_id, is_excluded")
-    .eq("course_id", courseId);
+  // Paged: PostgREST silently caps every response at 1000 rows
+  const enrollments = await fetchAllRows<{
+    profiles_id: string;
+    is_excluded: boolean | null;
+  }>((from, to) =>
+    admin
+      .from("user_course")
+      .select("profiles_id, is_excluded")
+      .eq("course_id", courseId)
+      .order("user_course_id")
+      .range(from, to),
+  );
   const eligibleProfileIds = new Set(
     (enrollments ?? [])
       .filter((e) => !e.is_excluded)

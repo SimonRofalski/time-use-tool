@@ -13,6 +13,7 @@ export default function MustChangePasswordForm({
 }: MustChangePasswordFormProps) {
   const t = useTranslations("mustChangePassword");
   const supabase = getSupabaseBrowserClient();
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -25,6 +26,11 @@ export default function MustChangePasswordForm({
     }
 
     setSaveError(null);
+
+    if (!currentPassword) {
+      setSaveError(t("currentPasswordRequired"));
+      return;
+    }
 
     if (newPassword.length < 6) {
       setSaveError(t("passwordTooShort"));
@@ -52,7 +58,7 @@ export default function MustChangePasswordForm({
             ? { Authorization: `Bearer ${session.access_token}` }
             : {}),
         },
-        body: JSON.stringify({ newPassword }),
+        body: JSON.stringify({ currentPassword, newPassword }),
       });
 
       let result: { error?: string } = {};
@@ -88,6 +94,20 @@ export default function MustChangePasswordForm({
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+            {t("currentPasswordLabel")}
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(event) => {
+                setCurrentPassword(event.target.value);
+                setSaveError(null);
+              }}
+              autoComplete="current-password"
+              className="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            />
+          </label>
+
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
             {t("newPasswordLabel")}
             <input

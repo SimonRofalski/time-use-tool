@@ -191,23 +191,38 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const isAdmin = profileRole === "admin";
 
   useEffect(() => {
+    // The access check (role, onboarding gates) only needs to run once per
+    // user. Supabase fires auth events on every token refresh (about hourly)
+    // and when the tab regains focus; re-running the check each time reset
+    // the page to the loading screen and unmounted it — losing unsaved input
+    // (e.g. a half-filled questionnaire). So only re-run it for a new user.
+    let initializedUserId: string | null = null;
+    function initializeOnce(authUser: SupabaseUser) {
+      if (initializedUserId === authUser.id) {
+        return;
+      }
+      initializedUserId = authUser.id;
+      void initializeUserAccess(authUser);
+    }
+
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) {
         router.push("/");
         return;
       }
 
-      void initializeUserAccess(data.user);
+      initializeOnce(data.user);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (!session?.user) {
+          initializedUserId = null;
           router.push("/");
           return;
         }
 
-        void initializeUserAccess(session.user);
+        initializeOnce(session.user);
       },
     );
 

@@ -90,30 +90,36 @@ export default function EnrollmentModal({
       return;
     }
 
-    const { data: courseData, error: fetchError } = await supabase
-      .from("course")
-      .select("course_id, accessCode")
-      .eq("course_id", selectedCourseId)
-      .single();
-
-    if (fetchError || !courseData) {
-      setErrorMessage(t("courseLoadRetryError"));
-      setIsSubmitting(false);
-      return;
+    // The access code is checked server-side — the codes are not readable
+    // from the browser (see app/api/courses/enroll/route.ts)
+    let errorCode: string | null = null;
+    try {
+      const response = await fetch("/api/courses/enroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: selectedCourseId,
+          accessCode: accessCode.trim(),
+        }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        errorCode = result.error ?? "enroll_failed";
+      }
+    } catch {
+      errorCode = "enroll_failed";
     }
 
-    if (courseData.accessCode !== accessCode.trim()) {
-      setErrorMessage(t("invalidAccessCodeError"));
-      setIsSubmitting(false);
-      return;
-    }
-
-    const { error: enrollError } = await supabase
-      .from("user_course")
-      .insert({ profiles_id: userId, course_id: selectedCourseId });
-
-    if (enrollError) {
-      setErrorMessage(t("enrollFailedError"));
+    if (errorCode) {
+      setErrorMessage(
+        errorCode === "invalid_code"
+          ? t("invalidAccessCodeError")
+          : errorCode === "course_load_failed"
+            ? t("courseLoadRetryError")
+            : t("enrollFailedError"),
+      );
       setIsSubmitting(false);
       return;
     }
