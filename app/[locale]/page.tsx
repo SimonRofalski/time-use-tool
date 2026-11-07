@@ -56,7 +56,9 @@ export default function Home() {
   const [statusTone, setStatusTone] = useState<"error" | "success">("error");
   const [emailHasError, setEmailHasError] = useState(false);
   const [passwordHasError, setPasswordHasError] = useState(false);
-  const [resetProfileId, setResetProfileId] = useState<string | null>(null);
+  // Email the reset questions were loaded for (the server never returns a
+  // profile ID — the verify step identifies the account by email again)
+  const [resetEmail, setResetEmail] = useState<string | null>(null);
   const [resetQuestions, setResetQuestions] = useState<ResetQuestion[]>([]);
   const [resetAnswers, setResetAnswers] = useState(["", ""]);
   const [newPassword, setNewPassword] = useState("");
@@ -110,7 +112,7 @@ export default function Home() {
     setStatusTone("error");
     setEmail("");
     setPassword("");
-    setResetProfileId(null);
+    setResetEmail(null);
     setResetQuestions([]);
     setResetAnswers(["", ""]);
     setNewPassword("");
@@ -152,15 +154,14 @@ export default function Home() {
       });
       const result = (await response.json()) as {
         error?: string;
-        profileId?: string;
         questions?: ResetQuestion[];
       };
 
-      if (!response.ok || !result.profileId || !result.questions) {
+      if (!response.ok || !result.questions || result.questions.length !== 2) {
         setStatus(result.error ?? t("status.securityQuestionsLoadError"));
         setStatusTone("error");
       } else {
-        setResetProfileId(result.profileId);
+        setResetEmail(normalizedEmail);
         setResetQuestions(result.questions);
         setStatus("");
       }
@@ -209,7 +210,7 @@ export default function Home() {
   ) {
     event.preventDefault();
 
-    if (!resetProfileId || resetQuestions.length !== 2) {
+    if (!resetEmail || resetQuestions.length !== 2) {
       setStatus(t("status.securityQuestionsLoadError"));
       setStatusTone("error");
       return;
@@ -227,7 +228,7 @@ export default function Home() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        profileId: resetProfileId,
+        email: resetEmail,
         answers: resetQuestions.map((question, index) => ({
           questionId: question.questionId,
           answer: resetAnswers[index],
@@ -238,7 +239,6 @@ export default function Home() {
     const result = (await response.json()) as {
       error?: string;
       token?: string;
-      profileId?: string;
     };
 
     if (!response.ok || !result.token) {
@@ -256,7 +256,7 @@ export default function Home() {
   ) {
     event.preventDefault();
 
-    if (!resetToken || !resetProfileId) {
+    if (!resetToken) {
       setStatus(t("status.resetSessionExpired"));
       setStatusTone("error");
       return;
@@ -281,7 +281,6 @@ export default function Home() {
       },
       body: JSON.stringify({
         token: resetToken,
-        profileId: resetProfileId,
         password: newPassword,
       }),
     });
@@ -298,7 +297,7 @@ export default function Home() {
     setStatusTone("success");
     setMode("signin");
     setPassword("");
-    setResetProfileId(null);
+    setResetEmail(null);
     setResetQuestions([]);
     setResetAnswers(["", ""]);
     setNewPassword("");

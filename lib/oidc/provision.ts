@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { escapeLikePattern } from "@/lib/escape-like";
 
 export class OidcAccountConflictError extends Error {
   constructor() {
@@ -16,12 +17,6 @@ export type SwitchEduIdIdentity = {
   // email is only allowed for a verified address (prevents account takeover)
   emailVerified: boolean;
 };
-
-// ILIKE treats % and _ as wildcards — escape them so "a_b@x.ch" can't
-// match (and link to) a different account like "axb@x.ch"
-function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
 
 export type ProvisionResult = {
   userId: string;

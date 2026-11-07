@@ -111,24 +111,41 @@ export default function NutzeruebersichtTab() {
     setIsLoading(true);
     setError("");
 
-    // All active profiles (requires the admin RLS policy from the migration)
-    const { data: profiles, error: profilesErr } = await supabase
-      .from("profiles")
-      .select("id, email, first_name, last_name, auth_provider, must_change_password")
-      .eq("is_active", true);
+    // All active profiles (requires the admin RLS policy from the migration).
+    // Paged: PostgREST silently caps every response at 1000 rows.
+    type ProfileRow = {
+      id: string;
+      email: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      auth_provider: string | null;
+      must_change_password: boolean | null;
+    };
+    const profiles = await fetchAllRows<ProfileRow>((from, to) =>
+      supabase
+        .from("profiles")
+        .select("id, email, first_name, last_name, auth_provider, must_change_password")
+        .eq("is_active", true)
+        .order("id")
+        .range(from, to),
+    ).catch(() => null);
 
-    if (profilesErr || !profiles) {
+    if (!profiles) {
       setError(t("loadError"));
       setIsLoading(false);
       return;
     }
 
     // Fetch enrollments with course name + dates + periods for total-days calculation
-    const { data: userCourses } = await supabase
-      .from("user_course")
-      .select(
-        "user_course_id, profiles_id, is_excluded, course:course_id(name, start_date, end_date, course_period(start_date, end_date))",
-      );
+    const userCourses = await fetchAllRows((from, to) =>
+      supabase
+        .from("user_course")
+        .select(
+          "user_course_id, profiles_id, is_excluded, course:course_id(name, start_date, end_date, course_period(start_date, end_date))",
+        )
+        .order("user_course_id")
+        .range(from, to),
+    ).catch(() => []);
 
     const courseInfoByUser: Record<
       string,

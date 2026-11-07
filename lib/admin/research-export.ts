@@ -170,11 +170,19 @@ export async function buildResearchExport(
   if (!course) return { ok: false, reason: "COURSE_NOT_FOUND" };
 
   // Enrolled, non-excluded participants → stable pseudonym
-  const { data: enrollments } = await admin
-    .from("user_course")
-    .select("user_course_id, profiles_id, is_excluded")
-    .eq("course_id", courseId)
-    .order("user_course_id");
+  // Paged: PostgREST silently caps every response at 1000 rows
+  const enrollments = await fetchAllRows<{
+    user_course_id: string;
+    profiles_id: string;
+    is_excluded: boolean | null;
+  }>((from, to) =>
+    admin
+      .from("user_course")
+      .select("user_course_id, profiles_id, is_excluded")
+      .eq("course_id", courseId)
+      .order("user_course_id")
+      .range(from, to),
+  );
   const personIdByEnrolment = buildPersonIds(
     (enrollments ?? []).map((e) => e.user_course_id as string),
   );

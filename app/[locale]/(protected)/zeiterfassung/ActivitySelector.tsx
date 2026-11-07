@@ -75,6 +75,7 @@ import {
   CATEGORY_COLORS,
   getCategoryColor,
 } from "./types";
+import { shouldAskIctAttention } from "./ict-attention";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -196,8 +197,6 @@ function getStepQuestion(
       return t("questions.digitalMedia");
     case "digital_media_type":
       return t("questions.digitalMediaType");
-    case "ict_attention":
-      return t("questions.ictAttention");
     case "location_transport":
       return t("questions.locationTransport");
     case "social_context":
@@ -208,11 +207,9 @@ function getStepQuestion(
 }
 
 // Returns label and step index (1-based) out of total for the step indicator
-// askIctAttention: the ICT focus step only counts when the course asks it
 function getStepMeta(
   step: QuestionnaireStep,
   t: ActivitySelectorTranslate,
-  askIctAttention: boolean,
 ): {
   index: number;
   total: number;
@@ -223,7 +220,6 @@ function getStepMeta(
     "secondary_activity",
     "digital_media",
     "digital_media_type",
-    ...(askIctAttention ? (["ict_attention"] as const) : []),
     "location_transport",
     "social_context",
     "satisfaction",
@@ -233,7 +229,6 @@ function getStepMeta(
     secondary_activity: t("stepLabels.secondaryActivity"),
     digital_media: t("stepLabels.digitalMedia"),
     digital_media_type: t("stepLabels.digitalMediaType"),
-    ict_attention: t("stepLabels.ictAttention"),
     location_transport: t("stepLabels.locationTransport"),
     social_context: t("stepLabels.socialContext"),
     satisfaction: t("stepLabels.satisfaction"),
@@ -916,7 +911,7 @@ export default function ActivitySelector({
     )
     .map((item) => getLocalizedName(item, locale));
 
-  const ictAttentionOption = pendingEntry.digital_media_used
+  const ictAttentionOption = shouldAskIctAttention(askIctAttention, pendingEntry)
     ? lookupData.ictAttentions.find(
         (item) => item.ict_attention_id === pendingEntry.ict_attention_id,
       )
@@ -1113,7 +1108,12 @@ export default function ActivitySelector({
     );
 
     const selectedIds = new Set(pendingEntry.digital_media_type_ids);
-    const isContinueDisabled = selectedIds.size === 0;
+    // Focused/background question on the same screen — only with a secondary
+    // activity (see ict-attention.ts); mandatory once shown
+    const showIctAttention = shouldAskIctAttention(askIctAttention, pendingEntry);
+    const isIctAttentionMissing =
+      showIctAttention && pendingEntry.ict_attention_id === null;
+    const isContinueDisabled = selectedIds.size === 0 || isIctAttentionMissing;
 
     function toggleDevice(id: number) {
       const updated = new Set(selectedIds);
@@ -1129,6 +1129,12 @@ export default function ActivitySelector({
     function handleContinue() {
       if (selectedIds.size === 0) {
         setStepValidationError(t("digitalMediaTypeStep.validationError"));
+        return;
+      }
+      if (isIctAttentionMissing) {
+        setStepValidationError(
+          t("digitalMediaTypeStep.ictAttentionValidationError"),
+        );
         return;
       }
       onStepComplete({
@@ -1177,6 +1183,14 @@ export default function ActivitySelector({
             );
           })}
         </div>
+        {showIctAttention && (
+          <div className="space-y-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {t("questions.ictAttention")}
+            </p>
+            {renderIctAttentionOptions()}
+          </div>
+        )}
         {stepValidationError && (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
             {stepValidationError}
@@ -1204,10 +1218,9 @@ export default function ActivitySelector({
     "2": Headphones,
   };
 
-  // Step 4b (conditional, course toggle ask_ict_attention): was the device
-  // use the main focus or in the background? Mandatory — one tap selects
-  // and advances, the same as the yes/no device question.
-  function renderIctAttentionStep() {
+  // Focused vs. background use, rendered inside the device-type step (no step
+  // of its own). A tap only selects — "Weiter" below the step advances.
+  function renderIctAttentionOptions() {
     return (
       <div className="grid gap-3 sm:grid-cols-2">
         {lookupData.ictAttentions.map((option) => {
@@ -1222,9 +1235,10 @@ export default function ActivitySelector({
             <button
               key={option.ict_attention_id}
               type="button"
-              onClick={() =>
-                onStepComplete({ ict_attention_id: option.ict_attention_id })
-              }
+              onClick={() => {
+                setStepValidationError(null);
+                onStepComplete({ ict_attention_id: option.ict_attention_id });
+              }}
               className={`flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all ${
                 isSelected
                   ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15"
@@ -1769,8 +1783,6 @@ export default function ActivitySelector({
         return renderDigitalMediaStep();
       case "digital_media_type":
         return renderDigitalMediaTypeStep();
-      case "ict_attention":
-        return renderIctAttentionStep();
       case "location_transport":
         return renderLocationStep();
       case "social_context":
@@ -1780,7 +1792,7 @@ export default function ActivitySelector({
     }
   }
 
-  const stepMeta = getStepMeta(step, t, askIctAttention);
+  const stepMeta = getStepMeta(step, t);
   const slotsRange = formatSlotsRange(selectedSlots, t);
   const isFirstStep = step === "primary_activity";
   const isSecondaryStep = step === "secondary_activity";

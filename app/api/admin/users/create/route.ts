@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { error: updateProfileError } = await admin
+  const { data: updatedProfiles, error: updateProfileError } = await admin
     .from("profiles")
     .update({
       auth_provider: "password",
@@ -55,10 +55,18 @@ export async function POST(request: NextRequest) {
       ...(body.firstName ? { first_name: body.firstName } : {}),
       ...(body.lastName ? { last_name: body.lastName } : {}),
     })
-    .eq("id", created.user.id);
+    .eq("id", created.user.id)
+    .select("id");
 
-  if (updateProfileError) {
-    return NextResponse.json({ error: updateProfileError.message }, { status: 500 });
+  if (updateProfileError || !updatedProfiles?.length) {
+    // Not atomic: the auth account already exists. Without the profile flags
+    // it could be used with the temporary password and no forced change, so
+    // delete it again (cascades to profiles) instead of leaving a half state.
+    await admin.auth.admin.deleteUser(created.user.id);
+    return NextResponse.json(
+      { error: updateProfileError?.message ?? t("createFailed") },
+      { status: 500 },
+    );
   }
 
   await admin.from("admin_password_reset_log").insert({
