@@ -6,22 +6,6 @@
   "adminPage": {
     "title": "Admin"
   },
-  "resetPassword": {
-    "brand": "Time Use Tool",
-    "subtitle": "Set new password",
-    "invalidToken": "Invalid or expired recovery link. Please request a new one.",
-    "passwordMismatch": "Passwords don't match.",
-    "passwordTooShort": "Password must be at least 6 characters long.",
-    "samePasswordError": "Your new password must be different from the old one.",
-    "successMessage": "Password reset successfully!",
-    "newPasswordLabel": "New password",
-    "newPasswordPlaceholder": "At least 6 characters",
-    "confirmPasswordLabel": "Confirm password",
-    "confirmPasswordPlaceholder": "Repeat password",
-    "submitButton": "Reset password",
-    "submitButtonLoading": "Resetting...",
-    "checking": "Checking..."
-  },
   "login": {
     "brand": "Time Use Tool",
     "modes": {
@@ -52,6 +36,9 @@
     "noAccountButton": "Don't have an account yet? Create one here",
     "forgotPasswordButton": "Forgot password?",
     "backToSigninButton": "Back to sign in",
+    "switchEduIdDescription": "For students and staff with a SWITCH edu-ID – your account is created automatically the first time you sign in.",
+    "switchEduIdButton": "Sign in with SWITCH edu-ID",
+    "orDivider": "or",
     "status": {
       "emailRequired": "Please enter your email address.",
       "emailInvalid": "Please enter a valid email address.",
@@ -65,6 +52,17 @@
       "passwordTooShort": "Password must be at least 6 characters long.",
       "passwordSetError": "The password could not be set.",
       "passwordResetSuccess": "Password reset successfully. You can now sign in."
+    },
+    "oidcErrorGeneric": "Sign-in with SWITCH edu-ID failed. Please try again.",
+    "oidcErrors": {
+      "missingSession": "The sign-in attempt expired. Please try again.",
+      "exchangeFailed": "Sign-in with SWITCH edu-ID failed. Please try again.",
+      "missingClaims": "SWITCH edu-ID did not provide enough account data.",
+      "incompleteIdentity": "SWITCH edu-ID did not provide an email address. Please contact an admin.",
+      "accountConflict": "This account is already linked to a different SWITCH edu-ID. Please contact an admin.",
+      "provisioningFailed": "Account could not be set up. Please try again.",
+      "sessionFailed": "Sign-in could not be completed. Please try again.",
+      "unavailable": "SWITCH edu-ID is currently unavailable. Please try again later or sign in with email and password."
     }
   },
   "protectedLayout": {
@@ -170,6 +168,7 @@
       "secondaryActivity": "Doing anything else at the same time?",
       "digitalMedia": "Did you use a device? (smartphone, tablet, PC…)",
       "digitalMediaType": "Which devices did you use?",
+      "ictAttention": "Was your ICT use focused or in the background?",
       "locationTransport": "Where were you during this time?",
       "socialContext": "Was anyone else with you?",
       "satisfaction": "How did you feel during the activity?",
@@ -210,7 +209,8 @@
       "no": "No"
     },
     "digitalMediaTypeStep": {
-      "validationError": "Please select at least one device type."
+      "validationError": "Please select at least one device type.",
+      "ictAttentionValidationError": "Please choose whether your device use was focused or in the background."
     },
     "locationCategories": {
       "orte": "Places",
@@ -474,7 +474,8 @@
   },
   "common": {
     "confirmButton": "Confirm",
-    "cancelButton": "Cancel"
+    "cancelButton": "Cancel",
+    "closeButton": "Close"
   },
   "kursuebersicht": {
     "subTabs": {
@@ -503,6 +504,7 @@
       "accessCodeLabel": "Access code",
       "accessCodePlaceholder": "e.g. SS2026",
       "askExtraRatingsLabel": "Ask meaningfulness & stressfulness",
+      "askIctAttentionLabel": "Ask for focus when a device was used alongside a secondary activity (focused / background)",
       "askDayQuestionnaireLabel": "Ask day questionnaire",
       "createSuccess": "Course created successfully.",
       "creatingButton": "Creating…",
@@ -518,6 +520,7 @@
       "comparisonEnabledBadge": "Comparison enabled",
       "comparisonDisabledBadge": "Comparison locked",
       "extraRatingsEnabledBadge": "Meaningfulness & stress active",
+      "ictAttentionEnabledBadge": "Device focus active",
       "dayQuestionnaireEnabledBadge": "Day questionnaire active",
       "accessCodeLabel": "Access code:",
       "saveButton": "Save",
@@ -537,6 +540,8 @@
       "comparisonDisableButton": "Lock comparison",
       "extraRatingsEnableButton": "Enable meaningfulness & stress",
       "extraRatingsDisableButton": "Disable meaningfulness & stress",
+      "ictAttentionEnableButton": "Enable device focus",
+      "ictAttentionDisableButton": "Disable device focus",
       "dayQuestionnaireEnableButton": "Enable day questionnaire",
       "dayQuestionnaireDisableButton": "Disable day questionnaire",
       "anonymizeButton": "Anonymize course",
@@ -571,7 +576,8 @@
           "confirmLabel": "Remove"
         },
         "dayQuestionnairesProgress": "{answered} / {total} day questions answered"
-      }
+      },
+      "anonymizeError": "Anonymization failed – the course was not marked as anonymized. Please try again."
     },
     "exportModal": {
       "title": "Data export",
@@ -653,10 +659,20 @@
     "noCoursePlaceholder": "–",
     "includeButton": "Include",
     "excludeButton": "Exclude",
+    "createUserButton": "Create account",
+    "setPasswordButton": "Set temp password",
+    "deleteButton": "Delete",
+    "deleteError": "User could not be deleted.",
+    "authMethodBadge": {
+      "switchEduId": "SWITCH edu-ID",
+      "password": "Email & password"
+    },
+    "mustChangePasswordBadge": "Password change pending",
     "table": {
       "user": "User",
       "course": "Course",
       "progress": "Progress",
+      "authMethod": "Sign-in method",
       "actions": "Actions"
     },
     "includeConfirm": {
@@ -668,6 +684,38 @@
       "title": "Exclude user",
       "message": "{name}'s data will be removed from all statistics. The user will not be notified.",
       "confirmLabel": "Exclude"
+    },
+    "deleteConfirm": {
+      "title": "Delete user",
+      "message": "{name}'s account will be permanently deleted, including all tracked time entries.",
+      "confirmLabel": "Delete"
+    },
+    "createUserModal": {
+      "title": "Create account",
+      "description": "For users without SWITCH edu-ID. The temporary password must be changed on first login.",
+      "emailLabel": "Email",
+      "firstNameLabel": "First name",
+      "lastNameLabel": "Last name",
+      "temporaryPasswordLabel": "Temporary password",
+      "generateButton": "Generate",
+      "createButton": "Create account",
+      "creatingButton": "Creating...",
+      "createdTitle": "Account created",
+      "createdMessage": "Account for {email} has been created. Please pass on this temporary password — it will not be shown again:",
+      "createFailedError": "Account could not be created.",
+      "networkError": "Network error while creating the account."
+    },
+    "setPasswordModal": {
+      "title": "Set temporary password",
+      "description": "For {name}. A new password must be set on next login.",
+      "switchEduIdWarning": "This user currently signs in via SWITCH edu-ID. Set the password anyway?",
+      "temporaryPasswordLabel": "Temporary password",
+      "generateButton": "Generate",
+      "saveButton": "Set password",
+      "savingButton": "Saving...",
+      "forceConfirmButton": "Set anyway",
+      "saveFailedError": "Password could not be set.",
+      "networkError": "Network error while setting the password."
     }
   },
   "adminStatistiken": {
@@ -834,7 +882,38 @@
     "saveButton": "Save security questions",
     "savingButton": "Saving..."
   },
+  "mustChangePassword": {
+    "title": "New password required",
+    "description": "An admin has set a temporary password for your account. Please set a new password of your own before continuing.",
+    "newPasswordLabel": "New password",
+    "confirmPasswordLabel": "Confirm password",
+    "passwordTooShort": "Password must be at least 6 characters long.",
+    "passwordMismatch": "The passwords do not match.",
+    "unexpectedServerResponse": "Unexpected server response while saving.",
+    "saveFailedError": "Password could not be changed.",
+    "networkError": "Network error while changing the password.",
+    "saveButton": "Save password",
+    "savingButton": "Saving...",
+    "currentPasswordLabel": "Current (temporary) password",
+    "currentPasswordRequired": "Please enter your current (temporary) password."
+  },
   "apiErrors": {
+    "changePassword": {
+      "notAuthenticated": "Not signed in.",
+      "passwordTooShort": "Password must be at least 6 characters long.",
+      "currentPasswordWrong": "The current password is incorrect.",
+      "newPasswordSameAsCurrent": "The new password must be different from the current one."
+    },
+    "adminUsers": {
+      "invalidRequest": "Invalid request.",
+      "invalidEmail": "Please enter a valid email address.",
+      "passwordTooShort": "Password must be at least 6 characters long.",
+      "createFailed": "Account could not be created.",
+      "userNotFound": "User not found.",
+      "switchEduIdAccountNeedsForce": "This user currently signs in via SWITCH edu-ID. Set the password anyway?",
+      "cannotDeleteSelf": "You cannot delete your own account.",
+      "deleteFailed": "User could not be deleted."
+    },
     "passwordResetComplete": {
       "invalidRequest": "Invalid request.",
       "passwordTooShort": "Password must be at least 6 characters long.",
@@ -842,15 +921,14 @@
     },
     "passwordResetSecurityQuestions": {
       "emailRequired": "Please enter an email address.",
-      "accountNotFound": "No account could be found for this email.",
-      "loadError": "Security questions could not be loaded.",
-      "notTwoQuestionsSet": "This account doesn't have two security questions set up yet. Please contact an admin."
+      "loadError": "Security questions could not be loaded."
     },
     "passwordResetVerify": {
       "answerBothRequired": "Please answer both security questions.",
       "checkFailed": "Security questions could not be verified.",
-      "answersDontMatch": "The answers don't match the ones on file.",
-      "resetPrepareFailed": "The reset could not be prepared."
+      "answersDontMatch": "The answers don't match the stored ones. If you never set up security questions, please contact an admin.",
+      "resetPrepareFailed": "The reset could not be prepared.",
+      "tooManyAttempts": "Too many attempts. Please wait 15 minutes and try again."
     },
     "securityQuestions": {
       "notAuthenticated": "Not signed in.",
@@ -880,6 +958,7 @@
         "secondaryActivity": "Secondary activity",
         "digitalMediaUsed": "Digital media used",
         "mediaTypes": "Media types",
+        "ictAttention": "Device focus",
         "locationTransport": "Location / transport",
         "socialContext": "Social context",
         "wellbeing": "Well-being",
@@ -904,6 +983,7 @@
         "wellbeingCode": "Well-being (code)",
         "stressfulnessCode": "Stress (code)",
         "meaningfulnessCode": "Meaningfulness (code)",
+        "ictAttentionCode": "Device focus (code)",
         "trackedMinutes": "Tracked minutes (of 1440)",
         "dayQuestionnaireAnswered": "Day questions answered",
         "diaryFillTiming": "Time of filling in",

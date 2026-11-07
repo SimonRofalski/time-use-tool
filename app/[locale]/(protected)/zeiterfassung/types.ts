@@ -51,6 +51,10 @@ export type Activity = {
   code: string;
   name: string;
   name_en: string;
+  // Hidden search aliases (migration 20261104000000_add_activity_keywords.sql).
+  // Optional so the app keeps working before that migration is applied.
+  keywords_de?: string[] | null;
+  keywords_en?: string[] | null;
 };
 
 export type LocationTransport = {
@@ -95,6 +99,16 @@ export type Stressfulness = {
   name_en: string;
 };
 
+// Focused vs. background device use (migration 20261104000001_add_ict_attention.sql)
+export type IctAttention = {
+  ict_attention_id: number;
+  code: string;
+  name: string;
+  name_en: string;
+  description: string;
+  description_en: string;
+};
+
 // All lookup tables bundled together for convenient passing between components
 export type LookupData = {
   categories: Category[];
@@ -106,6 +120,7 @@ export type LookupData = {
   satisfactions: Satisfaction[];
   meaningfulnesses: Meaningfulness[];
   stressfulnesses: Stressfulness[];
+  ictAttentions: IctAttention[];
 };
 
 // ─── Core data types ──────────────────────────────────────────────────────────
@@ -125,6 +140,7 @@ export type TimeEntryRecord = {
   location_transport_id: number | null;
   digital_media_used: boolean;
   digital_media_type_ids: number[];
+  ict_attention_id: number | null;
   social_context_ids: number[];
 };
 
@@ -135,6 +151,7 @@ export type PendingEntry = {
   secondary_activity_id: number | null;
   digital_media_used: boolean;
   digital_media_type_ids: number[];
+  ict_attention_id: number | null;
   location_transport_id: number | null;
   social_context_ids: number[];
   satisfaction_id: number | null;
@@ -143,7 +160,8 @@ export type PendingEntry = {
 };
 
 // The ordered steps in the questionnaire flow
-// digital_media_type is only shown when digital_media_used = true
+// digital_media_type is only shown when digital_media_used = true; it also
+// hosts the ICT focus question when shouldAskIctAttention() applies
 export type QuestionnaireStep =
   | "primary_activity"
   | "secondary_activity"

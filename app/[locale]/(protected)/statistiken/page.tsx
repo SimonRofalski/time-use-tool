@@ -23,6 +23,7 @@ import type {
   ComparisonMetaStats,
   MetaAggregates,
 } from "./types";
+import { getLocalIsoDate } from "@/lib/local-date";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -181,13 +182,6 @@ function calculateMinutes(startTime: string, endTime: string): number {
   const endMinTotal =
     eh === 0 && em === 0 && startMinTotal > 0 ? 1440 : eh * 60 + em;
   return endMinTotal - startMinTotal;
-}
-
-function getLocalIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function dateOnlyToEpochDay(dateOnly: string): number {

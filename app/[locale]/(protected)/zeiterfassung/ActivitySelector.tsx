@@ -5,6 +5,10 @@ import { useLocale, useTranslations } from "next-intl";
 import type { Locale } from "@/i18n/routing";
 import { getLocalizedName } from "@/lib/i18n/localized-name";
 import {
+  matchesActivitySearch,
+  tokenizeSearchQuery,
+} from "@/lib/activity-search";
+import {
   Baby,
   Bike,
   BookOpen,
@@ -48,6 +52,7 @@ import {
   Search,
   Smartphone,
   Tablet,
+  Target,
   ShoppingBag,
   Sparkles,
   Trash2,
@@ -70,6 +75,7 @@ import {
   CATEGORY_COLORS,
   getCategoryColor,
 } from "./types";
+import { shouldAskIctAttention } from "./ict-attention";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -113,6 +119,7 @@ type ActivitySelectorProps = {
   showDeleteSelection: boolean;
   isDeletingSelection?: boolean;
   askExtraRatings: boolean;
+  askIctAttention: boolean;
 };
 
 // ─── Pure helper functions ────────────────────────────────────────────────────
@@ -127,7 +134,7 @@ function buildActivityHierarchy(
   locale: Locale,
   excludeActivityId?: number | null,
 ): CategoryNode[] {
-  const query = searchQuery.toLowerCase().trim();
+  const queryTokens = tokenizeSearchQuery(searchQuery);
 
   return lookupData.categories
     .map((cat, index) => {
@@ -139,13 +146,19 @@ function buildActivityHierarchy(
           const activities = lookupData.activities
             .filter((act) => act.subcategory_id === sub.subcategory_id)
             .filter((act) => act.activity_id !== excludeActivityId)
+            // Match on the visible name plus the hidden keywords (aliases)
+            .filter((act) =>
+              matchesActivitySearch(
+                act,
+                getLocalizedName(act, locale),
+                queryTokens,
+                locale,
+              ),
+            )
             .map((act) => ({
               activity_id: act.activity_id,
               name: getLocalizedName(act, locale),
-            }))
-            .filter((act) =>
-              query ? act.name.toLowerCase().includes(query) : true,
-            );
+            }));
 
           return {
             subcategory_id: sub.subcategory_id,
@@ -386,6 +399,7 @@ function buildSelectedSlotGroups(
       s: entry.secondary_activity_id,
       dm: entry.digital_media_used,
       dmt: [...entry.digital_media_type_ids].sort((a, b) => a - b),
+      ia: entry.ict_attention_id,
       l: entry.location_transport_id,
       sc: [...entry.social_context_ids].sort((a, b) => a - b),
       sat: entry.satisfaction_id,
@@ -787,6 +801,7 @@ export default function ActivitySelector({
   showDeleteSelection,
   isDeletingSelection = false,
   askExtraRatings,
+  askIctAttention,
 }: ActivitySelectorProps) {
   const t = useTranslations("activitySelector");
   const locale = useLocale() as Locale;
@@ -895,6 +910,15 @@ export default function ActivitySelector({
       pendingEntry.digital_media_type_ids.includes(item.digital_media_type_id),
     )
     .map((item) => getLocalizedName(item, locale));
+
+  const ictAttentionOption = shouldAskIctAttention(askIctAttention, pendingEntry)
+    ? lookupData.ictAttentions.find(
+        (item) => item.ict_attention_id === pendingEntry.ict_attention_id,
+      )
+    : undefined;
+  const ictAttentionName = ictAttentionOption
+    ? getLocalizedName(ictAttentionOption, locale)
+    : null;
 
   // ── Step content renderers ──────────────────────────────────────────────────
 
@@ -1084,7 +1108,12 @@ export default function ActivitySelector({
     );
 
     const selectedIds = new Set(pendingEntry.digital_media_type_ids);
-    const isContinueDisabled = selectedIds.size === 0;
+    // Focused/background question on the same screen — only with a secondary
+    // activity (see ict-attention.ts); mandatory once shown
+    const showIctAttention = shouldAskIctAttention(askIctAttention, pendingEntry);
+    const isIctAttentionMissing =
+      showIctAttention && pendingEntry.ict_attention_id === null;
+    const isContinueDisabled = selectedIds.size === 0 || isIctAttentionMissing;
 
     function toggleDevice(id: number) {
       const updated = new Set(selectedIds);
@@ -1100,6 +1129,12 @@ export default function ActivitySelector({
     function handleContinue() {
       if (selectedIds.size === 0) {
         setStepValidationError(t("digitalMediaTypeStep.validationError"));
+        return;
+      }
+      if (isIctAttentionMissing) {
+        setStepValidationError(
+          t("digitalMediaTypeStep.ictAttentionValidationError"),
+        );
         return;
       }
       onStepComplete({
@@ -1148,6 +1183,14 @@ export default function ActivitySelector({
             );
           })}
         </div>
+        {showIctAttention && (
+          <div className="space-y-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {t("questions.ictAttention")}
+            </p>
+            {renderIctAttentionOptions()}
+          </div>
+        )}
         {stepValidationError && (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
             {stepValidationError}
@@ -1165,6 +1208,67 @@ export default function ActivitySelector({
         >
           {t("continueButton")}
         </button>
+      </div>
+    );
+  }
+
+  // ICT attention visuals keyed by `code`: 1 = focused, 2 = background
+  const ICT_ATTENTION_ICON_BY_CODE: Record<string, LucideIcon> = {
+    "1": Target,
+    "2": Headphones,
+  };
+
+  // Focused vs. background use, rendered inside the device-type step (no step
+  // of its own). A tap only selects — "Weiter" below the step advances.
+  function renderIctAttentionOptions() {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2">
+        {lookupData.ictAttentions.map((option) => {
+          const isSelected =
+            pendingEntry.ict_attention_id === option.ict_attention_id;
+          const IconComponent =
+            ICT_ATTENTION_ICON_BY_CODE[option.code] ?? HelpCircle;
+          const description =
+            locale === "en" ? option.description_en : option.description;
+
+          return (
+            <button
+              key={option.ict_attention_id}
+              type="button"
+              onClick={() => {
+                setStepValidationError(null);
+                onStepComplete({ ict_attention_id: option.ict_attention_id });
+              }}
+              className={`flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all ${
+                isSelected
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-500/15"
+                  : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
+              }`}
+            >
+              <span
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ring-1 ${
+                  isSelected
+                    ? "bg-blue-100 text-blue-600 ring-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:ring-blue-500/30"
+                    : "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600"
+                }`}
+              >
+                <IconComponent className="h-5 w-5" />
+              </span>
+              <span
+                className={`text-sm font-semibold ${
+                  isSelected
+                    ? "text-blue-700 dark:text-blue-300"
+                    : "text-slate-800 dark:text-slate-100"
+                }`}
+              >
+                {getLocalizedName(option, locale)}
+              </span>
+              <span className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                {description}
+              </span>
+            </button>
+          );
+        })}
       </div>
     );
   }
@@ -1905,6 +2009,12 @@ export default function ActivitySelector({
                     {name}
                   </span>
                 ))}
+                {ictAttentionName && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-violet-100">
+                    <Target className="h-3.5 w-3.5" />
+                    {ictAttentionName}
+                  </span>
+                )}
                 {digitalMediaTypeNames.length === 0 && (
                   <p className="text-xs text-slate-400">
                     {t("overview.nothingSelected")}

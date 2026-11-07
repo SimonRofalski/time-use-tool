@@ -5,10 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev       # Start development server (localhost:3000)
-npm run build     # Production build
-npm run start     # Start production server
-npm run lint      # Run ESLint
+npm run dev        # Start development server (localhost:3000)
+npm run build      # Production build
+npm run start      # Start production server
+npm run lint       # Run ESLint
+npm run mock-oidc  # Local mock SWITCH edu-ID OIDC provider (localhost:9999) — run alongside `dev` to test edu-ID login before the real SWITCH SP registration exists
 ```
 
 ## Architecture
@@ -20,7 +21,6 @@ npm run lint      # Run ESLint
 All page routes live under `app/[locale]/...` (added 2026-09 for bilingual support — see Internationalization below). `localePrefix: "never"` means the locale segment is never visible in the URL; routes below are described by their visible path.
 
 - `/` — Single-page login (sign in / sign up / forgot password modes combined), also handles security-question-based password reset
-- `/reset-password` — Password reset via email link
 - `/(protected)/zeiterfassung` — Time entry: 10-minute slot grid (`TimeGrid.tsx`) + activity picker (`ActivitySelector.tsx`)
 - `/(protected)/erfasste-zeit` — Day-by-day overview/carousel of submitted entries with completion status
 - `/(protected)/statistiken` — Two tabs: `ZeitverteilungTab` (time distribution) and `KursvergleichTab` (course comparison), built on `recharts`
@@ -39,7 +39,21 @@ Two Supabase client instances:
 - `lib/supabase/browser-client.ts` — Singleton for client components, uses `NEXT_PUBLIC_*` env vars
 - `lib/supabase/server-client.ts` — Server-side instance using Next.js `cookies()` API for session persistence and token refresh
 
-Auth supports email/password only (Google OAuth was removed). Sessions are stored in cookies and refreshed server-side on each request via the proxy. Password reset supports both the email-link flow (`/reset-password`) and a security-questions flow (`lib/security-questions.ts`, `lib/security-questions-server.ts`, `app/api/security-questions/`, `app/api/password-reset/security-questions/`, `app/api/password-reset/verify/`, `app/api/password-reset/complete/`).
+Sessions are stored in cookies and refreshed server-side on each request via the proxy. Password reset runs only via the security-questions flow (the unused email-link page `/reset-password` was removed 2026-11) (`lib/security-questions.ts`, `lib/security-questions-server.ts`, `app/api/security-questions/`, `app/api/password-reset/security-questions/`, `app/api/password-reset/verify/`, `app/api/password-reset/complete/`) — this stays the recovery path for password-based accounts regardless of how they signed up.
+
+### SWITCH edu-ID login (OIDC)
+
+Added 2026-09 (Google OAuth was removed earlier and is not coming back). Two auth methods now coexist, tracked via `profiles.auth_provider` (`'password' | 'switch_edu_id'`):
+
+- **SWITCH edu-ID is an additional option, not a replacement** (decided 2026-11): the login page (`app/[locale]/page.tsx`) shows a "Mit SWITCH edu-ID anmelden" button above the unchanged email/password card (sign in + self sign-up). Any edu-ID user may sign in (no BFH-affiliation check); an account is created on first login. edu-ID users skip the mandatory security-questions step in the protected layout (they have no password to recover).
+- **Behind a reverse proxy / Docker**: the callback never trusts `request.url` (internal address there) — redirects and the `redirect_uri` sent to the token endpoint are derived from `SWITCH_OIDC_REDIRECT_URI` (`getPublicAppOrigin()` in `lib/oidc/client.ts`); the PKCE cookies' `secure` flag follows that URL's protocol, not `NODE_ENV`. Discovery is re-fetched every 24 h, as SWITCH requires (no static snapshot); if it fails, `/api/auth/switch/initiate` redirects to `/?error=oidc_unavailable`.
+- **Claims come from UserInfo**: SWITCH (and the mock) release email/name by default only via the UserInfo endpoint, not in the ID token, so the callback calls `fetchUserInfo` and merges it over the ID-token claims. The requested scope includes SWITCH's `https://eduid.ch/scope/userinfo.read` (overridable via `SWITCH_OIDC_SCOPE`). Client auth is `client_secret_basic` (set explicitly — openid-client v6 defaults to post); the Resource Registry entry must match.
+- **Session goes to the resolved account**: the magic link is generated for the email stored on the account `resolveOrProvisionProfile` returned (looked up by id), never for the email in the current claims — a returning user matched by `sub` may have changed their edu-ID email.
+- The OIDC negotiation itself (`lib/oidc/client.ts`, `lib/oidc/provision.ts`, using `openid-client` v6's functional API) deliberately has **no Supabase imports** — only `app/api/auth/switch/callback/route.ts` bridges the verified identity into a Supabase session (via `auth.admin.generateLink({type:"magiclink"})` + `verifyOtp`). This is intentional: the team plans to migrate off Supabase to a custom Postgres/auth stack, and Supabase's own SSO/SAML product was deliberately avoided so this logic stays portable.
+- **Account linking**: a first edu-ID login whose email matches an existing password-based profile links automatically (same `auth.users.id`, full history preserved) — see `lib/oidc/provision.ts`. No extra confirmation step from the user (a known v1 simplification). Guarded by: the `ILIKE` email match escapes `%`/`_` (otherwise wildcards could match someone else's account), and linking is refused when the ID token says `email_verified: false`.
+- The real SWITCH SP registration (client id/secret) hasn't happened yet — it's an external process the team owns. Development runs against a local mock provider instead: `npm run mock-oidc` (`dev/mock-oidc-provider.mjs`, port 9999, a few seeded test accounts covering new-user / returning-user / email-collision scenarios). Swapping to production only requires changing the four `SWITCH_OIDC_*` env vars, no code changes.
+- **Admin-managed password accounts**: since not everyone has edu-ID, admins can create password-based accounts and reset passwords from the Nutzerübersicht tab (`app/components/admin/NutzeruebersichtTab.tsx`, `CreateUserModal.tsx`, `SetPasswordModal.tsx`, backed by `app/api/admin/users/{create,set-password,delete}/`). Any admin-set password forces `profiles.must_change_password = true`, which gates the entire protected layout (`app/[locale]/(protected)/layout.tsx`, `MustChangePasswordForm.tsx`) until the user sets their own password — this check runs **before** the security-questions gate and applies to every role, no exceptions.
+- `profiles.auth_provider`, `must_change_password`, and `switch_edu_id_sub` are locked to service-role-only writes via a Postgres trigger (`supabase/migrations/20260920000000_add_edu_id_login.sql`) — a user's own RLS "update own profile" policy has no column restriction, so without this trigger a user could flip `must_change_password` back to `false` themselves via a plain `supabase-js` call. Any code that needs to change these three columns must go through `lib/supabase/admin-client.ts`'s service-role client.
 
 ### Navigation
 
@@ -70,6 +84,15 @@ Added for AFE2 — the tool is being made bilingual. Two independent pieces:
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_PROJECT_ID
+SUPABASE_SERVICE_ROLE_KEY     # server-only, used by lib/supabase/admin-client.ts
+
+# SWITCH edu-ID OIDC (see "SWITCH edu-ID login" above) — local dev points
+# these at `npm run mock-oidc`; production values come from the SWITCH SP
+# registration. See .env.example for the local-dev placeholder values.
+SWITCH_OIDC_ISSUER_URL
+SWITCH_OIDC_CLIENT_ID
+SWITCH_OIDC_CLIENT_SECRET
+SWITCH_OIDC_REDIRECT_URI
 ```
 
 ### UI Conventions
@@ -92,3 +115,22 @@ Auth (including security-question-based password reset) and the Supabase schema 
 Course logic (multi-period courses, date-range handling) is centralized in `lib/course-periods.ts` as shared source of truth for admin, user, and stats views.
 
 Known stale/uncertain areas — verify against code before relying on them: the exact current shape of the mandatory profile-completion/enrollment flow in the layout, and whether `@heroicons/react`/`@heroui/react` are still needed as dependencies at all.
+
+**SWITCH edu-ID login status (2026-11-06)**: verified end-to-end against the local mock (scripted browser round-trips in dev and production builds): new user, returning user, linking to an admin-created password account (clears `must_change_password`), `email_verified: false` refused, missing email refused, changed edu-ID email still lands in the same account, IdP unreachable → `oidc_unavailable`. The mock seeds `unverified-1` and `no-email-1` for the error cases. Also not yet done: the SWITCH registration in the SWITCH Resource Registry (done by BFH IT, not started yet; needs the final BFH-domain callback URL) and swapping the `SWITCH_OIDC_*` env vars to production values (issuer `https://login.eduid.ch/`, test issuer `https://login.test.eduid.ch/`).
+
+### Activity search keywords
+
+The HETUS activity names are old-fashioned, so `activity.keywords_de` / `keywords_en` (`text[]`, migration `20261104000000_add_activity_keywords.sql`) hold hidden search aliases (e.g. "duschen" → "Waschen und Anziehen", "gamen" → Computer-/Konsolen-/Mobile Spiele). Matching lives in `lib/activity-search.ts`: every query word must appear in the localized name or the current locale's keywords; umlauts/ß are folded on both sides. Keywords are never shown in the UI.
+
+### ICT attention question
+
+Focused vs. background device use (lookup table `ict_attention`, `time_entry.ict_attention_id`, migrations `20261104000001_add_ict_attention.sql` + `20261106000000_update_ict_attention_texts.sql` for the tutor's final wording). Asked only when the course has `course.ask_ict_attention` on (admin toggle, default off) **and** a device was used **and** the entry has a secondary activity — see `shouldAskIctAttention()` in `zeiterfassung/ict-attention.ts` (tutor decision 2026-11: device use during a sole main activity counts as focused, so it isn't asked). It has no step of its own: it appears on the device-type screen below the device chips and is mandatory there. Saved as NULL ("not asked") in every other case. Included in the anonymous raw export and the research export.
+
+### Security hardening (2026-11-06, from a code review)
+
+- `profiles.role`, `email`, `is_active` (plus the three auth-state columns) can't be changed by app users — trigger `protect_profiles_auth_fields`, which now checks `current_user IN ('authenticated','anon')` so manual edits in the Supabase SQL editor work (migration `20261106000001_security_hardening.sql`).
+- Course access codes live in the admin-only table `course_access_code` (not `course`); enrollment goes through `app/api/courses/enroll` (server-side code check, service role). `20261106000002_finish_access_code_move.sql` drops `course."accessCode"` and all user INSERT policies on `user_course` — only run it after the matching app version is deployed.
+- Security-question reset: same response whether or not an account exists (decoy questions for unknown emails), no profile ID sent to the client, 5 failed attempts per email within 15 min lock further tries (`security_question_reset_attempt`). Logic in `lib/password-reset-server.ts`.
+- Changing the password (`/api/auth/change-password`) requires the current password.
+- Every `.ilike("email", …)` must use `escapeLikePattern` (`lib/escape-like.ts`); "today" must use `getLocalIsoDate` (`lib/local-date.ts`), never `toISOString()`.
+- Known, deliberately deferred to the PostgreSQL migration: the course comparison still loads other participants' raw entries into the browser, and saving a time entry is several non-atomic requests.

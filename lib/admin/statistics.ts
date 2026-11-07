@@ -70,18 +70,12 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
-function getSatisfactionSortRank(name: string): number {
-  const normalized = name.toLowerCase();
-  if (normalized.includes("sehr schlecht")) return 0;
-  if (normalized.includes("schlecht")) return 1;
-  if (
-    normalized.includes("mittelmäßig") ||
-    normalized.includes("mittelmaessig")
-  )
-    return 2;
-  if (normalized.includes("gut") && !normalized.includes("sehr gut")) return 3;
-  if (normalized.includes("sehr gut")) return 4;
-  return 2;
+// Sort rank from the language-neutral code (1 = very good … 5 = very bad),
+// so the chart reads "very bad → very good" in every language. The old
+// version matched German words and fell apart in English.
+function getSatisfactionSortRank(code: string): number {
+  const numeric = Number(code);
+  return Number.isFinite(numeric) ? -numeric : 0;
 }
 
 // ─── Data processors ──────────────────────────────────────────────────────────
@@ -202,7 +196,7 @@ function buildCategoryDistribution(
 
 function buildSatisfactionData(
   entries: { satisfaction_id: number | null }[],
-  satisfactions: { satisfaction_id: number; name: string }[],
+  satisfactions: { satisfaction_id: number; name: string; code: string }[],
 ): SatisfactionData[] {
   const counts: Record<number, number> = {};
   for (const e of entries) {
@@ -214,7 +208,7 @@ function buildSatisfactionData(
   return [...satisfactions]
     .sort(
       (a, b) =>
-        getSatisfactionSortRank(a.name) - getSatisfactionSortRank(b.name),
+        getSatisfactionSortRank(a.code) - getSatisfactionSortRank(b.code),
     )
     .map((s) => {
       const count = counts[s.satisfaction_id] ?? 0;
@@ -274,7 +268,18 @@ export async function loadAdminStatistics(
       .eq("is_active", true),
     admin.from("course").select("course_id, name, start_date, end_date, is_locked"),
     admin.from("course_period").select("course_id, start_date, end_date"),
-    admin.from("user_course").select("profiles_id, course_id, is_excluded"),
+    // Paged: PostgREST silently caps every response at 1000 rows
+    fetchAllRows<{
+      profiles_id: string;
+      course_id: number;
+      is_excluded: boolean | null;
+    }>((from, to) =>
+      admin
+        .from("user_course")
+        .select("profiles_id, course_id, is_excluded")
+        .order("user_course_id")
+        .range(from, to),
+    ),
     fetchAllRows<DayLite>((from, to) =>
       admin
         .from("day")
@@ -307,7 +312,7 @@ export async function loadAdminStatistics(
     admin.from("activity").select("activity_id, name, name_en, subcategory_id"),
     admin.from("subcategory").select("subcategory_id, category_id"),
     admin.from("category").select("category_id, name, name_en"),
-    admin.from("satisfaction").select("satisfaction_id, name, name_en"),
+    admin.from("satisfaction").select("satisfaction_id, code, name, name_en"),
   ]);
 
   if (coursesRes.error) {
@@ -316,7 +321,7 @@ export async function loadAdminStatistics(
 
   const rawCourses = coursesRes.data ?? [];
   const allPeriods = periodsRes.data ?? [];
-  const userCourses = userCoursesRes.data ?? [];
+  const userCourses = userCoursesRes;
 
   // Group periods by course_id and compute total days per course
   const periodsByCourseId: Record<

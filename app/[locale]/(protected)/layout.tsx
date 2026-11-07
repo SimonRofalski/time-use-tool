@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import EnrollmentModal from "@/app/components/EnrollmentModal";
+import MustChangePasswordForm from "@/app/components/MustChangePasswordForm";
 import ProfileDetailsForm from "@/app/components/ProfileDetailsForm";
 import SecurityQuestionsForm from "@/app/components/SecurityQuestionsForm";
 import TutorialTour, {
@@ -153,6 +154,9 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isEnrolled, setIsEnrolled] = useState<boolean | null>(null);
+  const [needsPasswordChange, setNeedsPasswordChange] = useState<
+    boolean | null
+  >(null);
   const [needsSecurityQuestions, setNeedsSecurityQuestions] = useState<
     boolean | null
   >(null);
@@ -187,23 +191,38 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const isAdmin = profileRole === "admin";
 
   useEffect(() => {
+    // The access check (role, onboarding gates) only needs to run once per
+    // user. Supabase fires auth events on every token refresh (about hourly)
+    // and when the tab regains focus; re-running the check each time reset
+    // the page to the loading screen and unmounted it — losing unsaved input
+    // (e.g. a half-filled questionnaire). So only re-run it for a new user.
+    let initializedUserId: string | null = null;
+    function initializeOnce(authUser: SupabaseUser) {
+      if (initializedUserId === authUser.id) {
+        return;
+      }
+      initializedUserId = authUser.id;
+      void initializeUserAccess(authUser);
+    }
+
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) {
         router.push("/");
         return;
       }
 
-      void initializeUserAccess(data.user);
+      initializeOnce(data.user);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (!session?.user) {
+          initializedUserId = null;
           router.push("/");
           return;
         }
 
-        void initializeUserAccess(session.user);
+        initializeOnce(session.user);
       },
     );
 
@@ -279,6 +298,7 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   async function initializeUserAccess(authUser: SupabaseUser) {
     setUser(authUser);
     setAccessCheckReady(false);
+    setNeedsPasswordChange(null);
     setNeedsSecurityQuestions(null);
     setNeedsProfileDetails(null);
     setIsEnrolled(null);
@@ -306,6 +326,25 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       tutorialError ? true : !!tutorialData?.tutorial_completed_at,
     );
 
+    // Separate query for the same reason (edu-ID migration columns); on error
+    // there is no forced password change
+    const { data: authStateData } = await supabase
+      .from("profiles")
+      .select("must_change_password, auth_provider")
+      .eq("id", authUser.id)
+      .single();
+
+    // Applies to every role, including admins — an admin-set temporary
+    // password must be changed before anything else, no exceptions.
+    if (authStateData?.must_change_password) {
+      setNeedsPasswordChange(true);
+      setProfileMenuOpen(false);
+      setSettingsOpen(false);
+      setAccessCheckReady(true);
+      return;
+    }
+    setNeedsPasswordChange(false);
+
     // Admins skip profile completion and course enrollment requirements
     if (role === "admin") {
       setNeedsSecurityQuestions(false);
@@ -320,7 +359,11 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
       return;
     }
 
-    const hasSecurityQuestions = await checkSecurityQuestions(authUser.id);
+    // Security questions only exist to recover a password — edu-ID users
+    // sign in via SWITCH and have no password to recover, so skip them
+    const isEduIdUser = authStateData?.auth_provider === "switch_edu_id";
+    const hasSecurityQuestions =
+      isEduIdUser || (await checkSecurityQuestions(authUser.id));
     setNeedsSecurityQuestions(!hasSecurityQuestions);
 
     if (!hasSecurityQuestions) {
@@ -433,6 +476,17 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     setAccessCheckReady(false);
     await checkEnrollment(user.id);
     setAccessCheckReady(true);
+  }
+
+  async function handleMustChangePasswordSaved() {
+    if (!user) {
+      return;
+    }
+
+    // Re-derive everything from scratch now that must_change_password is
+    // false — simpler and just as correct as manually continuing the chain,
+    // since role/profile/enrollment state all still need a fresh read anyway.
+    await initializeUserAccess(user);
   }
 
   async function handleSecurityQuestionsSaved() {
@@ -615,15 +669,23 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
     .filter(Boolean)
     .join(" ");
 
-  const showSecurityQuestionsGate = needsSecurityQuestions === true;
+  const showMustChangePasswordGate = needsPasswordChange === true;
+  const showSecurityQuestionsGate =
+    needsPasswordChange === false && needsSecurityQuestions === true;
   const showProfileDetailsGate =
-    needsSecurityQuestions === false && needsProfileDetails === true;
+    needsPasswordChange === false &&
+    needsSecurityQuestions === false &&
+    needsProfileDetails === true;
   const showEnrollmentGate =
+    needsPasswordChange === false &&
     needsSecurityQuestions === false &&
     needsProfileDetails === false &&
     isEnrolled === false;
   const showOnboardingGate =
-    showSecurityQuestionsGate || showProfileDetailsGate || showEnrollmentGate;
+    showMustChangePasswordGate ||
+    showSecurityQuestionsGate ||
+    showProfileDetailsGate ||
+    showEnrollmentGate;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
@@ -1101,6 +1163,14 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
             <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
           )}
         </>
+      )}
+
+      {showMustChangePasswordGate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-md overflow-y-auto scrollbar-thin rounded-3xl border border-slate-200 bg-white px-6 pb-6 shadow-2xl transition-colors dark:border-slate-800 dark:bg-slate-900">
+            <MustChangePasswordForm onSaved={handleMustChangePasswordSaved} />
+          </div>
+        </div>
       )}
 
       {showProfileDetailsGate && (

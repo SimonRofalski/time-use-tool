@@ -16,6 +16,20 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+// Maps app/api/auth/switch/callback/route.ts's ?error= codes to translated
+// messages. Kept as an explicit lookup (rather than interpolating the raw
+// code into a translation key) so an unrecognized code falls back safely.
+const OIDC_ERROR_KEYS: Record<string, string> = {
+  oidc_missing_session: "oidcErrors.missingSession",
+  oidc_exchange_failed: "oidcErrors.exchangeFailed",
+  oidc_missing_claims: "oidcErrors.missingClaims",
+  oidc_incomplete_identity: "oidcErrors.incompleteIdentity",
+  oidc_account_conflict: "oidcErrors.accountConflict",
+  oidc_provisioning_failed: "oidcErrors.provisioningFailed",
+  oidc_session_failed: "oidcErrors.sessionFailed",
+  oidc_unavailable: "oidcErrors.unavailable",
+};
+
 function renderStatus(status: string, tone: "error" | "success") {
   if (!status) {
     return null;
@@ -42,7 +56,9 @@ export default function Home() {
   const [statusTone, setStatusTone] = useState<"error" | "success">("error");
   const [emailHasError, setEmailHasError] = useState(false);
   const [passwordHasError, setPasswordHasError] = useState(false);
-  const [resetProfileId, setResetProfileId] = useState<string | null>(null);
+  // Email the reset questions were loaded for (the server never returns a
+  // profile ID — the verify step identifies the account by email again)
+  const [resetEmail, setResetEmail] = useState<string | null>(null);
   const [resetQuestions, setResetQuestions] = useState<ResetQuestion[]>([]);
   const [resetAnswers, setResetAnswers] = useState(["", ""]);
   const [newPassword, setNewPassword] = useState("");
@@ -79,13 +95,24 @@ export default function Home() {
     return () => listener?.subscription.unsubscribe();
   }, [supabase, router]);
 
+  useEffect(() => {
+    const errorCode = new URLSearchParams(window.location.search).get("error");
+    if (!errorCode) {
+      return;
+    }
+    setStatus(t(OIDC_ERROR_KEYS[errorCode] ?? "oidcErrorGeneric"));
+    setStatusTone("error");
+    window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleModeChange = (newMode: Mode) => {
     setMode(newMode);
     setStatus("");
     setStatusTone("error");
     setEmail("");
     setPassword("");
-    setResetProfileId(null);
+    setResetEmail(null);
     setResetQuestions([]);
     setResetAnswers(["", ""]);
     setNewPassword("");
@@ -127,15 +154,14 @@ export default function Home() {
       });
       const result = (await response.json()) as {
         error?: string;
-        profileId?: string;
         questions?: ResetQuestion[];
       };
 
-      if (!response.ok || !result.profileId || !result.questions) {
+      if (!response.ok || !result.questions || result.questions.length !== 2) {
         setStatus(result.error ?? t("status.securityQuestionsLoadError"));
         setStatusTone("error");
       } else {
-        setResetProfileId(result.profileId);
+        setResetEmail(normalizedEmail);
         setResetQuestions(result.questions);
         setStatus("");
       }
@@ -184,7 +210,7 @@ export default function Home() {
   ) {
     event.preventDefault();
 
-    if (!resetProfileId || resetQuestions.length !== 2) {
+    if (!resetEmail || resetQuestions.length !== 2) {
       setStatus(t("status.securityQuestionsLoadError"));
       setStatusTone("error");
       return;
@@ -202,7 +228,7 @@ export default function Home() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        profileId: resetProfileId,
+        email: resetEmail,
         answers: resetQuestions.map((question, index) => ({
           questionId: question.questionId,
           answer: resetAnswers[index],
@@ -213,7 +239,6 @@ export default function Home() {
     const result = (await response.json()) as {
       error?: string;
       token?: string;
-      profileId?: string;
     };
 
     if (!response.ok || !result.token) {
@@ -231,7 +256,7 @@ export default function Home() {
   ) {
     event.preventDefault();
 
-    if (!resetToken || !resetProfileId) {
+    if (!resetToken) {
       setStatus(t("status.resetSessionExpired"));
       setStatusTone("error");
       return;
@@ -256,7 +281,6 @@ export default function Home() {
       },
       body: JSON.stringify({
         token: resetToken,
-        profileId: resetProfileId,
         password: newPassword,
       }),
     });
@@ -273,7 +297,7 @@ export default function Home() {
     setStatusTone("success");
     setMode("signin");
     setPassword("");
-    setResetProfileId(null);
+    setResetEmail(null);
     setResetQuestions([]);
     setResetAnswers(["", ""]);
     setNewPassword("");
@@ -300,6 +324,27 @@ export default function Home() {
             {t("brand")}
           </h1>
         </div>
+
+        {/* SWITCH edu-ID: additional sign-in option next to email/password.
+            Hidden in the password-recovery flows, where it doesn't apply. */}
+        {(mode === "signin" || mode === "signup") && (
+          <div className="mb-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm">
+            <a
+              href="/api/auth/switch/initiate"
+              className="block w-full rounded-md bg-slate-800 px-4 py-3 text-center text-sm font-medium text-white transition hover:bg-slate-700"
+            >
+              {t("switchEduIdButton")}
+            </a>
+            <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
+              {t("switchEduIdDescription")}
+            </p>
+            <div className="mt-4 flex items-center gap-3 text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+              {t("orDivider")}
+              <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+            </div>
+          </div>
+        )}
 
         {mode !== "forgot-password" && (
           <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 p-2 shadow-sm backdrop-blur-sm">

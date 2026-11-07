@@ -6,7 +6,6 @@ import { getApiLocale } from "@/lib/i18n/api-locale";
 
 type CompleteBody = {
   token?: string;
-  profileId?: string;
   password?: string;
 };
 
@@ -17,7 +16,7 @@ export async function POST(request: NextRequest) {
   });
   const body = (await request.json()) as CompleteBody;
 
-  if (!body.token || !body.profileId || !body.password) {
+  if (!body.token || !body.password) {
     return NextResponse.json({ error: t("invalidRequest") }, { status: 400 });
   }
 
@@ -33,8 +32,11 @@ export async function POST(request: NextRequest) {
 
   const { data: challenge, error: challengeError } = await adminSupabase
     .from("security_question_reset_challenge")
-    .select("security_question_reset_challenge_id, expires_at, consumed_at")
-    .eq("profiles_id", body.profileId)
+    // The profile comes from the challenge row (found via the token hash) —
+    // the client never sends or sees a profile ID
+    .select(
+      "security_question_reset_challenge_id, profiles_id, expires_at, consumed_at",
+    )
     .eq("token_hash", tokenHash)
     .maybeSingle();
 
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { error: updateUserError } =
-    await adminSupabase.auth.admin.updateUserById(body.profileId, {
+    await adminSupabase.auth.admin.updateUserById(challenge.profiles_id, {
       password: body.password,
     });
 
